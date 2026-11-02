@@ -769,7 +769,7 @@
       if (!tr) tool = t = "layout";
       else edit = { kind: "trail", id: tr.id, closed: false, pts: pairs(tr.pts), sel: -1, history: [] };
     }
-    $$(".tool[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t || (b.dataset.tool === "boundary" && t === "editBoundary"))));
+    $$(".tool[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t || (b.dataset.tool === "layout" && LAYOUT_TOOLS.includes(t)))));
     map.getCanvas().style.cursor = t && !["editBoundary", "editTrail", "layout"].includes(t) ? "crosshair" : "";
     if (map.getLayer("boundary-line")) map.setLayoutProperty("boundary-line", "visibility", t === "editBoundary" || !prefs.ov.boundary ? "none" : "visible");
     if (LAYOUT_TOOLS.includes(t) && !prefs.ov.trails) { prefs.ov.trails = true; $("#ov-trails").checked = true; applyLayers(); }
@@ -923,8 +923,7 @@
     if (tool) { pts.push([e.lngLat.lng, e.lngLat.lat]); updateHint(); updateDraft(); return; }
     if (isPhone() && $("#app").dataset.sheet === "open") { setSheet("peek"); return; }
     const hit = map.queryRenderedFeatures(e.point, { layers: ["sightings"] })[0];
-    if (hit) { sightingPopup(hit.properties.id, e.lngLat); return; }
-    infoPopup(e.lngLat);
+    if (hit) sightingPopup(hit.properties.id, e.lngLat);
   });
 
   // ---------- trails & place names (editable) ----------
@@ -1146,33 +1145,6 @@
       : "No ground inside the shooting sector.";
   }
 
-  function wetLabel(twi) { return twi < 5.5 ? "Dry" : twi < 7 ? "Fresh" : twi < 8.5 ? "Moist" : "Wet"; }
-  function nearestStand(lon, lat) {
-    let best = null;
-    for (const s of Store.data.stands) { const d = Geo.distance([s.lon, s.lat], [lon, lat]); if (!best || d < best.d) best = { s, d }; }
-    return best;
-  }
-  async function infoPopup(ll) {
-    const { lng, lat } = ll;
-    const [E, N] = Geo.toSweref(lng, lat);
-    const inf = lookupInfo(lng, lat);
-    const el = await elevationAt(lng, lat);
-    const near = nearestStand(lng, lat);
-    const rows = [];
-    if (el) rows.push(["Elevation", `${el.z.toFixed(1)} m`], ["Slope", `${Math.round(el.slope)}°`]);
-    if (inf && inf.code) rows.push(["Ground", esc(landLabel(inf.code))]);
-    if (inf) {
-      const felled = (inf.code === 118 || inf.code === 128) && inf.tree > 8;
-      rows.push(["Trees", felled ? `Felled recently (about ${Math.round(inf.tree)} m trees around 2019)` : inf.tree < 2 ? "Open, under 2 m" : `about ${Math.round(inf.tree)} m tall`],
-        ["Moisture", wetLabel(inf.twi)]);
-    }
-    if (near && near.d < 3000) rows.push(["Nearest stand", `${esc(near.s.name || "Stand")}, ${Math.round(near.d)} m ${Geo.compassName(Geo.bearing([near.s.lon, near.s.lat], [lng, lat]))}`]);
-    const aerial = `https://minkarta.lantmateriet.se/plats/3006/v2.0/?e=${Math.round(E)}&n=${Math.round(N)}&z=12&mapprofile=karta&layers=`;
-    const html = `<div class="pop"><dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
-      <div class="coords">N ${Math.round(N)} · E ${Math.round(E)} (SWEREF 99 TM)<br>${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
-      <div style="margin-top:6px"><a href="${aerial}" target="_blank" rel="noopener">Open at Lantmäteriet ↗</a> <span class="note small">(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)</span></div></div>`;
-    new maplibregl.Popup({ maxWidth: "300px" }).setLngLat(ll).setHTML(html).addTo(map);
-  }
   let moveRaf = 0;
   map.on("mousemove", (e) => {
     if (isPhone() || moveRaf) return;
@@ -1191,6 +1163,7 @@
     if (watchId !== null) return true;
     if (!("geolocation" in navigator)) { toast("This browser can't share your position."); return false; }
     firstFix = true;
+    prefs.gpsOn = true; savePrefs();
     $("#locate").setAttribute("aria-pressed", "true");
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
@@ -1208,6 +1181,7 @@
         else toast(`You're ${(Geo.distance(ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
+      followTick();
       renderMyCone();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
@@ -1221,6 +1195,9 @@
   function stopGPS() {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     watchId = null; myFix = null; $("#locate").setAttribute("aria-pressed", "false");
+    prefs.gpsOn = false; savePrefs();
+    if (Follow.on) setFollow(false);
+    if (typeof renderHud === "function" && map.getSource("me")) renderHud();
     renderMyCone();
     if (meMarker) { meMarker.remove(); meMarker = null; }
     if (map.getSource("me")) map.getSource("me").setData(FC());
@@ -1242,7 +1219,9 @@
     $("#hudHead").hidden = !hasHead;
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
     $("#hudFacing").textContent = hasHead ? `Facing ${Geo.compassName(Heading.deg)} ${Math.round(Heading.deg)}°` : "";
-    $("#hudCompass").textContent = Heading.on ? "Hide facing" : "Show my facing";
+    $("#hudCompass").classList.toggle("on", Heading.on);
+    $("#hudFollow").classList.toggle("on", Follow.on);
+    $("#hudCone").classList.toggle("on", !!prefs.myCone && watchId !== null);
     if (meMarker) {
       meMarker.getElement().classList.toggle("has-heading", hasHead);
       if (hasHead) meMarker.setRotation(Heading.deg);
@@ -1258,7 +1237,7 @@
     Heading.seen = true;
     if (Heading.deg === null) Heading.deg = h;
     else { const d = ((h - Heading.deg + 540) % 360) - 180; Heading.deg = (Heading.deg + d * 0.3 + 360) % 360; }  // smooth the jitter
-    if (!Heading.raf) Heading.raf = requestAnimationFrame(() => { Heading.raf = 0; renderHud(); });
+    if (!Heading.raf) Heading.raf = requestAnimationFrame(() => { Heading.raf = 0; followTick(); renderHud(); });
   }
   async function enableHeading() {
     const D = window.DeviceOrientationEvent;
@@ -1273,7 +1252,35 @@
     Heading.on = true; Heading.seen = false; renderHud();
     setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(); } }, 3000);
   }
+  const Follow = { on: false, warnedFar: false };
+  function setFollow(on, byHand = false) {
+    if (on) {
+      if (!Heading.on) enableHeading();   // first: the iPhone asks for compass access only from a tap
+      if (!startGPS()) return;
+      Follow.on = true; Follow.warnedFar = false; Follow.zoomed = false;
+      if (myFix && nearArea(myFix.ll)) map.jumpTo({ center: myFix.ll, zoom: Math.max(map.getZoom(), 17) });
+    } else {
+      Follow.on = false;
+      if (byHand) toast("Follow mode paused. Tap Follow me to continue.");
+      else map.easeTo({ bearing: 0, duration: 500 });
+    }
+    renderHud();
+  }
+  function followTick() {
+    if (!Follow.on) return;
+    const cam = {};
+    if (Heading.deg !== null) cam.bearing = Heading.deg;
+    if (myFix) {
+      if (nearArea(myFix.ll)) {
+        cam.center = myFix.ll;
+        if (!Follow.zoomed) { Follow.zoomed = true; if (map.getZoom() < 16.5) cam.zoom = 17; }
+      }
+      else if (!Follow.warnedFar) { Follow.warnedFar = true; toast(`You're ${(Geo.distance(myFix.ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000); }
+    }
+    if (cam.bearing !== undefined || cam.center) map.jumpTo(cam);
+  }
   function disableHeading() {
+    if (Follow.on) setFollow(false);
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
     Heading.on = false; Heading.deg = null; renderHud();
@@ -1349,6 +1356,15 @@
     $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
     $("#hudCompass").addEventListener("click", () => (Heading.on ? disableHeading() : enableHeading()));
+    $("#hudFollow").addEventListener("click", () => setFollow(!Follow.on));
+    $("#hudCone").addEventListener("click", () => {
+      const on = !(prefs.myCone && watchId !== null);
+      prefs.myCone = on; savePrefs(); $("#showMyCone").checked = on;
+      if (on) startGPS();
+      renderMyCone(); renderHud();
+    });
+    // moving the map by hand ends follow mode
+    for (const ev of ["dragstart", "rotatestart", "pitchstart"]) map.on(ev, (e) => { if (Follow.on && e.originalEvent) setFollow(false, true); });
     map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);
     $("#locate").addEventListener("click", toggleLocate);
@@ -1364,7 +1380,8 @@
 
     // tools
     $$(".tool[data-tool]").forEach((b) => b.addEventListener("click", () => {
-      const active = tool === b.dataset.tool || (b.dataset.tool === "boundary" && tool === "editBoundary");
+      const active = tool === b.dataset.tool || (b.dataset.tool === "layout" && LAYOUT_TOOLS.includes(tool));
+      if (active && LAYOUT_TOOLS.includes(tool)) closeFeatForm();
       setTool(active ? null : b.dataset.tool);
     }));
     $("#hintCancel").addEventListener("click", () => {
@@ -1490,7 +1507,7 @@
     setInterval(loadForecast, 30 * 60e3);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
     $("#showMyCone").checked = prefs.myCone;
-    $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); renderMyCone(); });
+    $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
     $("#showCones").checked = prefs.cones;
     $("#showCones").addEventListener("change", (e) => { prefs.cones = e.target.checked; savePrefs(); applyLayers(); });
 
@@ -1804,6 +1821,7 @@
     } catch { /* offline: keep running this version */ }
   }
   checkForUpdate();
+  if (prefs.gpsOn && !location.search.includes("shot=")) map.once("load", () => startGPS());
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();
 })();

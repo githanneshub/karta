@@ -98,8 +98,8 @@
     return d;
   }
 
-  const COMPASS = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-  function compassName(brg) { return COMPASS[Math.round(((brg % 360) + 360) % 360 / 22.5) % 16]; }
+  const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];  // 8 main directions; degrees give the detail
+  function compassName(brg) { return COMPASS[Math.round(((brg % 360) + 360) % 360 / 45) % 8]; }
 
   root.Geo = { toSweref, fromSweref, bearing, distance, destination, wedge, circle, areaHa, angleDiff, compassName };
 })(typeof window !== "undefined" ? window : globalThis);

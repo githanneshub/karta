@@ -363,3 +363,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud-rose text { font-size: 19px; }
 .vl-ok { background: #ece6d2; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .35); }
 .vl-veg { background: #161a16; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .45); }
+
+.hud-btns { display: flex; gap: 12px; }
+.hud-btn.on { color: #1d7cf2; }
+
+.hud-btns { gap: 10px; flex-wrap: wrap; }
+.hud-btn { color: var(--muted); padding: 2px 0; border-bottom: 2px solid transparent; }
+.hud-btn.on { color: var(--accent); border-bottom-color: var(--accent); }
