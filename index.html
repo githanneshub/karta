@@ -13,22 +13,19 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "4421956d57";</script>
-<script src="firebase-config.js?v=4421956d57"></script>
-<script type="module" src="fb.js?v=4421956d57"></script>
+<script>window.APP_VERSION = "1b6c7c30cf";</script>
+<script src="firebase-config.js?v=1b6c7c30cf"></script>
+<script type="module" src="fb.js?v=1b6c7c30cf"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=4421956d57">
-<link rel="stylesheet" href="app.css?v=4421956d57">
+<link rel="stylesheet" href="maplibre-gl.css?v=1b6c7c30cf">
+<link rel="stylesheet" href="app.css?v=1b6c7c30cf">
 
-<script>
-  document.documentElement.dataset.theme = "dark";
-  try { if (JSON.parse(localStorage.getItem("alnaryd-prefs") || "{}").night) document.documentElement.classList.add("night"); } catch (e) { /* ignore */ }
-</script>
+<script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
   <aside id="panel" aria-label="Map controls">
     <button id="sheetHandle" class="sheet-handle" type="button" aria-label="Expand or collapse panel"><span></span></button>
@@ -75,12 +72,6 @@
           <li><label><input type="checkbox" id="ov-steep" data-ov="steep"><span class="sw sw-steep"></span>Steep ground <small>&gt; 18°</small></label></li>
           <li><label><input type="checkbox" id="threeD"><span class="sw sw-3d"></span>3D terrain</label></li>
         </ul>
-
-        <div id="whoBox" hidden>
-          <h2 class="eyebrow">Whose plans to show</h2>
-          <p class="note small">Stands, stalk routes and sightings. Only changes what you see on this phone.</p>
-          <ul class="toggles" id="whoList"></ul>
-        </div>
 
         <details class="sect" id="editSect">
           <summary>Edit the map</summary>
@@ -134,8 +125,6 @@
           <label><input type="radio" name="lang" id="lang-en" value="en"><span translate="no">English</span></label>
         </div>
 
-        <h2 class="eyebrow">Screen</h2>
-        <label class="switch"><input type="checkbox" id="nightMode"><span>Night mode (dimmed screen)</span></label>
         <label class="slider" for="exag">3D height exaggeration <output id="exagOut">1.6×</output></label>
         <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
 
@@ -147,16 +136,29 @@
 
       <!-- WIND -->
       <section class="pane" id="pane-wind" role="tabpanel" aria-labelledby="tab-wind" hidden>
+        <div class="wx-now">
+          <span class="wx-icon" id="wxIcon"></span>
+          <div class="wx-main">
+            <div class="wx-wind"><span class="wind-big" id="windBig">SW</span> <span class="wx-speed" id="windSpeedNow">4 m/s</span></div>
+            <div class="wind-sub" id="wxLine"></div>
+            <div class="wind-sub" id="windScent">Scent drifts toward NE</div>
+            <div class="wind-sub" id="sunLine"></div>
+          </div>
+        </div>
         <div class="fc">
           <div class="fc-head"><span id="fcSource">Loading SMHI forecast…</span><button class="link" id="fcUse" type="button" hidden>Use SMHI forecast</button></div>
           <div class="fc-strip" id="fcStrip" role="listbox" aria-label="Hourly wind forecast" hidden></div>
           <p class="note small" id="fcNote"></p>
         </div>
-        <div class="wind-read wind-now">
-          <div class="wind-big" id="windBig">SW</div>
-          <div><div class="wind-sub" id="windSub">Wind from 225°</div>
-          <div class="wind-sub" id="windScent">Scent drifts toward NE</div></div>
+        <div class="wx-switches">
+          <label class="switch"><input type="checkbox" id="showMyCone" checked><span>Scent from me</span></label>
+          <label class="switch"><input type="checkbox" id="showCones" checked><span>Scent from stands</span></label>
         </div>
+
+        <h2 class="eyebrow">Stands in this wind</h2>
+        <ol class="stand-status" id="windStands"></ol>
+        <p class="note small">Calm mornings scent rises uphill, evenings it sinks along hollows.</p>
+
         <details class="sect" id="windManual">
           <summary>Adjust by hand</summary>
           <div class="wind-head">
@@ -165,20 +167,6 @@
           <label class="slider" for="windSpeed">Wind speed <output id="windSpeedOut">4 m/s</output></label>
           <input type="range" id="windSpeed" min="0" max="15" step="0.5" value="4">
         </details>
-        <div class="row">
-          <label class="switch"><input type="checkbox" id="showMyCone" checked><span>Scent cone from my position</span></label>
-        </div>
-        <p class="note small" id="myConeNote"></p>
-        <div class="row">
-          <label class="switch"><input type="checkbox" id="showCones" checked><span>Scent cones from stands</span></label>
-        </div>
-        <p class="note small" id="coneNote">Each cone shows where scent from a stand is likely to carry. Light wind swirls, so cones get wider and shorter.</p>
-
-        <h2 class="eyebrow">Stands in this wind</h2>
-        <ol class="stand-status" id="windStands"></ol>
-
-        <h2 class="eyebrow">Thermals</h2>
-        <p class="note small">In calm mornings air warms and drifts uphill. In the evening it cools and slides downhill along hollows. Turn on <b>Drainage &amp; cold-air flow</b> to see which way scent pools at dusk.</p>
       </section>
 
       <!-- STANDS -->
@@ -288,12 +276,6 @@
           </div>
         </form>
         <ul class="items" id="logList"></ul>
-        <h2 class="eyebrow">Export</h2>
-        <p class="note small">Save stands, routes, boundary and sightings as a file you can import into a GPS hunting app.</p>
-        <div class="row gap">
-          <button class="btn" id="exportGpx" type="button">Export GPX</button>
-          <button class="btn" id="exportJson" type="button">Export GeoJSON</button>
-        </div>
       </section>
 
       <!-- FAMILY (hosted site only) -->
@@ -305,6 +287,11 @@
         </div>
         <h2 class="eyebrow">Family</h2>
         <ul class="items" id="familyList"></ul>
+        <div id="whoBox" hidden>
+          <h2 class="eyebrow">Whose plans to show</h2>
+          <p class="note small">Stands, stalk routes and sightings. Only changes what you see on this phone.</p>
+          <ul class="toggles" id="whoList"></ul>
+        </div>
         <form id="memberForm" class="editor" hidden autocomplete="off">
           <h2 class="eyebrow">Add someone</h2>
           <div class="grid2">
@@ -426,10 +413,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=4421956d57"></script>
-<script src="geo.js?v=4421956d57"></script>
-<script src="view.js?v=4421956d57"></script>
-<script src="app.js?v=4421956d57"></script>
+<script src="i18n.js?v=1b6c7c30cf"></script>
+<script src="geo.js?v=1b6c7c30cf"></script>
+<script src="view.js?v=1b6c7c30cf"></script>
+<script src="app.js?v=1b6c7c30cf"></script>
 
 </body>
 </html>

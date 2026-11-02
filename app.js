@@ -551,13 +551,10 @@
   function renderMyCone() {
     const src = map.getSource("mycone");
     if (!src) return;
-    if (!prefs.myCone || !myFix) { src.setData(FC()); $("#myConeNote").textContent = prefs.myCone ? "Turn on your position to see it." : ""; return; }
+    if (!prefs.myCone || !myFix) { src.setData(FC()); return; }
     const w = prefs.wind;
     const ring = w.speed < 1 ? Geo.circle(myFix.ll, 60) : coneGeom({ lon: myFix.ll[0], lat: myFix.ll[1] });
     src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }]));
-    $("#myConeNote").textContent = w.speed < 1
-      ? "Calm: your scent spreads about 60 m around you and drifts with the slope."
-      : `Your scent carries about ${Math.round(clamp(120 + w.speed * 70, 120, 700))} m toward ${Geo.compassName((w.from + 180) % 360)}.`;
   }
 
   function editStand(id) {
@@ -729,7 +726,9 @@
       const d = await r.json();
       Forecast.hours = d.timeSeries
         .filter((t) => t.data && typeof t.data.wind_speed === "number" && typeof t.data.wind_from_direction === "number")
-        .map((t) => ({ t: Date.parse(t.time), from: Math.round(t.data.wind_from_direction) % 360, speed: t.data.wind_speed, gust: t.data.wind_speed_of_gust }));
+        .map((t) => ({ t: Date.parse(t.time), from: Math.round(t.data.wind_from_direction) % 360, speed: t.data.wind_speed, gust: t.data.wind_speed_of_gust,
+          sym: t.data.symbol_code, temp: t.data.air_temperature, vis: t.data.visibility_in_air,
+          rain: t.data.precipitation_amount_mean_deterministic, pop: t.data.probability_of_precipitation }));
       Forecast.fetched = Date.now(); Forecast.failed = false;
       try { localStorage.setItem("alnaryd-forecast", JSON.stringify({ hours: Forecast.hours, fetched: Forecast.fetched })); } catch { /* ignore */ }
     } catch {
@@ -759,6 +758,71 @@
     const day = d.toDateString() === today.toDateString() ? "Today" : d.toDateString() === tomorrow.toDateString() ? "Tomorrow" : fcDay(t);
     return `${day} ${fcClock(t)}`;
   }
+  // SMHI symbol codes 1-27 → what we draw. Fog also when visibility drops under 1 km.
+  const WX_NAMES = { 1: "Clear", 2: "Nearly clear", 3: "Variable cloud", 4: "Half clear", 5: "Cloudy", 6: "Overcast", 7: "Fog",
+    8: "Light rain showers", 9: "Rain showers", 10: "Heavy rain showers", 11: "Thunderstorm", 12: "Light sleet showers", 13: "Sleet showers",
+    14: "Heavy sleet showers", 15: "Light snow showers", 16: "Snow showers", 17: "Heavy snow showers", 18: "Light rain", 19: "Rain", 20: "Heavy rain",
+    21: "Thunder", 22: "Light sleet", 23: "Sleet", 24: "Heavy sleet", 25: "Light snow", 26: "Snow", 27: "Heavy snow" };
+  function wxKind(h) {
+    const c = h.sym;
+    if (!c) return null;
+    if (c === 11 || c === 21) return "thunder";
+    if (c >= 8 && c <= 10) return "showers";
+    if (c >= 18 && c <= 20) return "rain";
+    if ((c >= 12 && c <= 14) || (c >= 22 && c <= 24)) return "sleet";
+    if ((c >= 15 && c <= 17) || c >= 25) return "snow";
+    if (c === 7 || (typeof h.vis === "number" && h.vis < 1)) return "fog";
+    return c <= 2 ? "clear" : c <= 4 ? "partly" : "cloud";
+  }
+  function wxName(h) { return wxKind(h) === "fog" ? "Fog" : WX_NAMES[h.sym] || ""; }
+  // Sun height above the horizon in degrees (good to a fraction of a degree, plenty for day/night and sunrise).
+  function sunAlt(t, lon, lat) {
+    const n = t / 864e5 - 10957.5, rad = Math.PI / 180;
+    const g = (357.528 + 0.9856003 * n) * rad, L = 280.46 + 0.9856474 * n;
+    const lam = (L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)) * rad, eps = (23.439 - 4e-7 * n) * rad;
+    const dec = Math.asin(Math.sin(eps) * Math.sin(lam)), ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
+    const H = ((18.697374558 + 24.06570982441908 * n) * 15 + lon) * rad - ra;
+    return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(H)) / rad;
+  }
+  function sunTimes(t) {
+    const d = new Date(t); d.setHours(0, 0, 0, 0);
+    let up = null, down = null, prev = sunAlt(d.getTime(), HOME[0], HOME[1]);
+    for (let m = 5; m <= 1440; m += 5) {
+      const tt = d.getTime() + m * 6e4, a = sunAlt(tt, HOME[0], HOME[1]);
+      if (prev < -0.833 && a >= -0.833) up = tt; if (prev >= -0.833 && a < -0.833) down = tt;
+      prev = a;
+    }
+    return { up, down };
+  }
+  const SUN = '<circle cx="16" cy="16" r="6" fill="#f5b82e"/><g stroke="#f5b82e" stroke-width="2" stroke-linecap="round"><path d="M16 3v3M16 26v3M3 16h3M26 16h3M6.8 6.8l2.1 2.1M23.1 23.1l2.1 2.1M6.8 25.2l2.1-2.1M23.1 8.9l2.1-2.1"/></g>';
+  const MOON = '<path d="M20 5a11 11 0 1 0 7 19A9 9 0 0 1 20 5z" fill="#e6dfb8"/>';
+  const CLOUD = (dy = 0, c = "#c9d0c3") => `<path transform="translate(0 ${dy})" d="M9 26h15a5.5 5.5 0 0 0 .4-11 7.5 7.5 0 0 0-14.3 2A4.6 4.6 0 0 0 9 26z" fill="${c}"/>`;
+  const DROPS = '<g stroke="#4dabf7" stroke-width="2.2" stroke-linecap="round"><path d="M11 25l-1.5 4M17 25l-1.5 4M23 25l-1.5 4"/></g>';
+  const FLAKES = '<g fill="#fff"><circle cx="10" cy="27" r="1.7"/><circle cx="16.5" cy="29" r="1.7"/><circle cx="23" cy="27" r="1.7"/></g>';
+  function wxSvg(h) {
+    const k = wxKind(h);
+    if (!k) return "";
+    const night = sunAlt(h.t, HOME[0], HOME[1]) < -3;
+    const sky = night ? MOON : SUN, small = `<g transform="translate(-3 -4) scale(.68)">${sky}</g>`;
+    const body = {
+      clear: sky,
+      partly: small + CLOUD(2),
+      cloud: CLOUD(-1, "#b7bfb0"),
+      fog: '<g stroke="#c9d0c3" stroke-width="2.4" stroke-linecap="round"><path d="M5 11h22M8 16h19M5 21h22M9 26h15"/></g>',
+      showers: small + CLOUD(-3) + DROPS,
+      rain: CLOUD(-4, "#a9b2a2") + DROPS,
+      sleet: CLOUD(-4, "#a9b2a2") + '<g stroke="#4dabf7" stroke-width="2.2" stroke-linecap="round"><path d="M11 25l-1.5 4M21 25l-1.5 4"/></g><circle cx="16" cy="28" r="1.7" fill="#fff"/>',
+      snow: CLOUD(-4, "#b7bfb0") + FLAKES,
+      thunder: CLOUD(-4, "#8f988a") + '<path d="M17 21l-4 6h3.5l-2 5 6-7.5h-3.6l2-3.5z" fill="#fcc419"/>',
+    }[k];
+    return `<svg class="wx" viewBox="0 0 32 32" aria-hidden="true">${body}</svg>`;
+  }
+  // The forecast hour the map is planned for (or the coming hour when the wind is set by hand).
+  function wxHour() {
+    if (!Forecast.hours.length) return null;
+    return (prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT)) || Forecast.hours[0];
+  }
+
   function renderForecast(scroll = false) {
     const has = Forecast.hours.length > 0, manual = prefs.windMode === "manual";
     $("#fcStrip").hidden = !has;
@@ -770,8 +834,7 @@
     }
     const age = Math.round((Date.now() - Forecast.fetched) / 60000);
     $("#fcSource").textContent = manual ? "Set by hand" : `SMHI forecast · ${fcLabel(Forecast.selT)}`;
-    $("#fcNote").textContent = (Forecast.failed ? `Offline: showing the forecast from ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago. ` : "")
-      + "Big number: wind in m/s, small: gusts. Tap an hour to plan for it. Wind in the forest is weaker and less steady than the forecast.";
+    $("#fcNote").textContent = Forecast.failed ? `Offline: showing the forecast from ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago. ` : "";
     let lastDay = "";
     $("#fcStrip").innerHTML = Forecast.hours.map((h) => {
       const day = fcDay(h.t), newDay = day !== lastDay; lastDay = day;
@@ -780,7 +843,8 @@
       return `<button type="button" class="fc-h${sel ? " sel" : ""}${newDay ? " day" : ""}" data-t="${h.t}" role="option" aria-selected="${sel}"
         aria-label="${fcLabel(h.t)}, wind from ${Geo.compassName(h.from)} ${h.speed.toFixed(1)} metres per second">
         <span class="fc-day">${newDay ? day : ""}</span><span class="fc-time">${fcClock(h.t).slice(0, 2)}</span>
-        <svg viewBox="-10 -10 20 20" style="transform:rotate(${h.from}deg)"${calm ? ' class="calm"' : ""}><path d="M0 7 L-5 -3 L0 -1 L5 -3 Z"/></svg>
+        ${wxSvg(h) || "<span></span>"}<span class="fc-temp">${typeof h.temp === "number" ? Math.round(h.temp) + "°" : ""}</span>
+        <svg class="fc-arrow" viewBox="-10 -10 20 20" style="transform:rotate(${h.from}deg)"${calm ? ' data-calm=""' : ""}><path d="M0 7 L-5 -3 L0 -1 L5 -3 Z"/></svg>
         <span class="fc-ms">${Math.round(h.speed)}</span><span class="fc-gust">${h.gust ? Math.round(h.gust) : ""}</span></button>`;
     }).join("");
     if (scroll || !renderForecast.done) {
@@ -795,10 +859,19 @@
     const w = prefs.wind;
     $("#dialG").setAttribute("transform", `rotate(${w.from})`);
     $("#dial").setAttribute("aria-valuenow", String(w.from));
-    $("#windBig").textContent = Geo.compassName(w.from);
+    $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
-    $("#windSub").textContent = `From ${w.from}° at ${w.speed} m/s` + (fh && fh.gust ? `, gusts ${Math.round(fh.gust)}` : "");
+    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "");
     $("#windScent").textContent = w.speed < 1 ? "Calm: scent pools and swirls" : `Scent drifts toward ${Geo.compassName((w.from + 180) % 360)}`;
+    const wx = wxHour();
+    $("#wxIcon").innerHTML = wx ? wxSvg(wx) : "";
+    $("#wxLine").textContent = wx ? [
+      typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : null, wxName(wx) || null,
+      typeof wx.vis === "number" && wx.vis < 4 ? `visibility ${wx.vis < 1 ? Math.round(wx.vis * 1000) + " m" : wx.vis.toFixed(1) + " km"}` : null,
+      wx.rain >= 0.1 ? `${wx.rain.toFixed(1)} mm/h` : null,
+    ].filter(Boolean).join(" · ") : "";
+    const sun = sunTimes(wx ? wx.t : Date.now());
+    $("#sunLine").textContent = sun.up && sun.down ? `Sunrise ${fcClock(sun.up)} · Sunset ${fcClock(sun.down)}` : "";
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
     $("#windSpeed").value = w.speed;
     renderHud();
@@ -1314,7 +1387,12 @@
     for (const t of $$("#hudRing text")) t.setAttribute("transform", `rotate(${b} ${t.dataset.x} ${t.dataset.y})`);
     $("#hudWind").setAttribute("transform", `rotate(${w.from - b})`);
     $("#hudWind").classList.toggle("calm", w.speed < 1);
-    $("#hudWindText").textContent = w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s`;
+    const wx = wxHour(), hudKey = `${w.from}|${w.speed}|${wx ? wx.t : ""}`;
+    if (renderHud.key !== hudKey) {   // the compass redraws on every map turn; only rebuild the text when the weather changes
+      renderHud.key = hudKey;
+      $("#hudWindText").innerHTML = (wx ? wxSvg(wx) : "") + `<span>${w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s`}</span>`
+        + (wx && typeof wx.temp === "number" ? `<span class="hud-temp">${Math.round(wx.temp)}°</span>` : "");
+    }
     const hasHead = Heading.on && Heading.deg !== null;
     if (hasHead) $("#hudHead").removeAttribute("hidden"); else $("#hudHead").setAttribute("hidden", "");
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
@@ -1403,40 +1481,6 @@
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
     Heading.on = false; Heading.deg = null; renderHud();
-  }
-
-  // ---------- export ----------
-  function buildGeoJSON() {
-    const f = [];
-    for (const s of Store.data.stands) f.push({ type: "Feature", properties: { kind: "stand", name: s.name, type: s.type, facing: s.facing, sector: s.width, range: s.range, notes: s.notes }, geometry: { type: "Point", coordinates: [s.lon, s.lat] } });
-    for (const x of Store.data.sightings) f.push({ type: "Feature", properties: { kind: "sighting", species: x.species, count: x.count, what: x.kind, when: x.when, wind: x.wind, notes: x.notes }, geometry: { type: "Point", coordinates: [x.lon, x.lat] } });
-    for (const r of Store.data.routes) f.push({ type: "Feature", properties: { kind: "route", name: r.name }, geometry: { type: "LineString", coordinates: pairs(r.pts) } });
-    if (Store.data.boundary) { const b = pairs(Store.data.boundary); f.push({ type: "Feature", properties: { kind: "boundary" }, geometry: { type: "Polygon", coordinates: [[...b, b[0]]] } }); }
-    return JSON.stringify(FC(f), null, 1);
-  }
-  function buildGPX() {
-    const x = (s) => esc(s);
-    const wpt = (lon, lat, name, desc, sym) => `<wpt lat="${lat.toFixed(7)}" lon="${lon.toFixed(7)}"><name>${x(name)}</name>${desc ? `<desc>${x(desc)}</desc>` : ""}<sym>${sym}</sym></wpt>`;
-    const trk = (name, ptsArr) => `<trk><name>${x(name)}</name><trkseg>${ptsArr.map(([lo, la]) => `<trkpt lat="${la.toFixed(7)}" lon="${lo.toFixed(7)}"/>`).join("")}</trkseg></trk>`;
-    let body = "";
-    for (const s of Store.data.stands) body += wpt(s.lon, s.lat, s.name || "Stand", `${STAND_TYPES[s.type] || ""}, faces ${Geo.compassName(s.facing)}. ${s.notes || ""}`, "Hunting Area");
-    for (const s of Store.data.sightings) { const sp = speciesById[s.species] || speciesById.other; body += wpt(s.lon, s.lat, `${sp.name}${s.count > 1 ? " x" + s.count : ""}`, `${KINDS[s.kind] || ""} ${s.when || ""} ${s.notes || ""}`, "Animal Tracks"); }
-    for (const r of Store.data.routes) body += trk(r.name || "Stalk route", pairs(r.pts));
-    if (Store.data.boundary) { const b = pairs(Store.data.boundary); body += trk("Hunting boundary", [...b, b[0]]); }
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Alnaryd hunting map" xmlns="http://www.topografix.com/GPX/1/1">${body}</gpx>`;
-  }
-  async function saveFile(name, text, mime) {
-    const c = window.claude;
-    let dl = null;
-    if (c && typeof c.use === "function") { try { dl = await c.use("downloads"); } catch { dl = null; } }
-    if (dl) {
-      const fname = name.endsWith(".gpx") ? name + ".txt" : name;
-      try { await dl.save({ filename: fname, data: text }); if (fname !== name) toast("Saved as .txt. Rename it to .gpx before importing.", 5000); }
-      catch (e) { if (e && e.code !== "declined") toast("The file couldn't be saved here."); }
-      return;
-    }
-    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: mime })); a.download = name;
-    document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
 
   function goHome() {
@@ -1614,11 +1658,6 @@
       if (e.target.checked) delete prefs.hideBy[k]; else prefs.hideBy[k] = true;
       savePrefs(); renderAll();
     });
-    $("#nightMode").checked = !!prefs.night;
-    $("#nightMode").addEventListener("change", (e) => {
-      prefs.night = e.target.checked; savePrefs();
-      document.documentElement.classList.toggle("night", prefs.night);
-    });
 
     // language (Swedish by default); switching reloads so every text is redrawn in the new language
     const lang = (window.I18N && window.I18N.lang) || "en";
@@ -1674,8 +1713,6 @@
       map.easeTo({ center: [x.lon, x.lat], zoom: Math.max(map.getZoom(), 16) });
       draftSighting = { ...x, isNew: false }; openSightForm();
     });
-    $("#exportGpx").addEventListener("click", () => saveFile("alnaryd.gpx", buildGPX(), "application/gpx+xml"));
-    $("#exportJson").addEventListener("click", () => saveFile("alnaryd.json", buildGeoJSON(), "application/geo+json"));
   }
 
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
