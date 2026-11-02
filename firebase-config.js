@@ -1,0 +1,1 @@
+window.FIREBASE_CONFIG = {"apiKey": "AIzaSyDJ8HmZyD126m53L9SxSuoTLcgn43dafyE", "authDomain": "alnaryd-jakt.firebaseapp.com", "projectId": "alnaryd-jakt", "storageBucket": "alnaryd-jakt.firebasestorage.app", "messagingSenderId": "825449541574", "appId": "1:825449541574:web:fc3255909233293a214cc7"};

@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Alnaryd">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+<script src="firebase-config.js"></script>
+<script type="module" src="fb.js"></script>
+</head>
+<body>
+<title>Alnaryd Hunting Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="maplibre-gl.css">
+<link rel="stylesheet" href="app.css">
+
+<div id="app" data-sheet="peek">
+  <aside id="panel" aria-label="Map controls">
+    <button id="sheetHandle" class="sheet-handle" type="button" aria-label="Expand or collapse panel"><span></span></button>
+    <header class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><path d="M16 3 29 27H3z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 27l6-10 6 10" fill="currentColor"/></svg>
+      </div>
+      <div>
+        <h1>Alnaryd</h1>
+        <p class="brand-sub">Hunting map · Karlskrona kommun</p>
+      </div>
+      <span id="syncState" class="sync" title="Where your stands and sightings are saved">Saved on this device</span>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="Panel sections">
+      <button role="tab" id="tab-map" aria-controls="pane-map" aria-selected="true" data-tab="map">Map</button>
+      <button role="tab" id="tab-wind" aria-controls="pane-wind" aria-selected="false" data-tab="wind">Wind</button>
+      <button role="tab" id="tab-stands" aria-controls="pane-stands" aria-selected="false" data-tab="stands">Stands</button>
+      <button role="tab" id="tab-log" aria-controls="pane-log" aria-selected="false" data-tab="log">Sightings</button>
+      <button role="tab" id="tab-family" aria-controls="pane-family" aria-selected="false" data-tab="family" hidden>Family</button>
+    </nav>
+
+    <div class="panes">
+      <!-- MAP -->
+      <section class="pane" id="pane-map" role="tabpanel" aria-labelledby="tab-map">
+        <h2 class="eyebrow">Ground</h2>
+        <div class="seg" role="radiogroup" aria-label="Base map">
+          <label><input type="radio" name="base" id="base-forest" value="forest" checked><span>Forest types</span></label>
+          <label><input type="radio" name="base" id="base-relief" value="relief"><span>Terrain relief</span></label>
+          <label><input type="radio" name="base" id="base-height" value="height"><span>Tree height</span></label>
+        </div>
+        <div id="legend" class="legend"></div>
+
+        <h2 class="eyebrow">Layers</h2>
+        <ul class="toggles">
+          <li><label><input type="checkbox" id="ov-trails" data-ov="trails" checked><span class="sw sw-trail"></span>Our trails &amp; places</label></li>
+          <li><label><input type="checkbox" id="ov-contours" data-ov="contours" checked><span class="sw sw-contour"></span>Contours <small>1 m · 5 m</small></label></li>
+          <li><label><input type="checkbox" id="ov-roads" data-ov="roads" checked><span class="sw sw-road"></span>Roads, tracks &amp; paths</label></li>
+          <li><label><input type="checkbox" id="ov-reserve" data-ov="reserve" checked><span class="sw sw-reserve"></span>Alnaryd nature reserve</label></li>
+          <li><label><input type="checkbox" id="ov-boundary" data-ov="boundary" checked><span class="sw sw-boundary"></span>Your hunting boundary</label></li>
+          <li><label><input type="checkbox" id="ov-wet" data-ov="wet"><span class="sw sw-wet"></span>Wet ground <small>mires, wet hollows</small></label></li>
+          <li><label><input type="checkbox" id="ov-drainage" data-ov="drainage"><span class="sw sw-drain"></span>Drainage &amp; cold-air flow</label></li>
+          <li><label><input type="checkbox" id="ov-steep" data-ov="steep"><span class="sw sw-steep"></span>Steep ground <small>&gt; 18°</small></label></li>
+        </ul>
+
+        <h2 class="eyebrow">3D view</h2>
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="threeD"><span>Tilt into 3D</span></label>
+        </div>
+        <label class="slider" for="exag">Height exaggeration <output id="exagOut">1.6×</output></label>
+        <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
+
+        <h2 class="eyebrow">Boundary</h2>
+        <p class="note" id="boundaryInfo">No hunting boundary drawn yet. Use the boundary tool to trace it on the map.</p>
+        <div class="row gap">
+          <button class="btn" id="editBoundary" type="button" hidden>Adjust points</button>
+          <button class="btn" id="drawBoundary" type="button">Draw boundary</button>
+          <button class="btn ghost" id="clearBoundary" type="button" hidden>Remove</button>
+        </div>
+
+        <h2 class="eyebrow">Trails &amp; places</h2>
+        <p class="note">Move place names, reshape trails, or add new ones.</p>
+        <div class="row gap">
+          <button class="btn" id="editLayout" type="button">Edit trails &amp; places</button>
+        </div>
+        <form id="featForm" class="editor" hidden autocomplete="off">
+          <h2 class="eyebrow" id="featTitle">Place</h2>
+          <label for="ff-name">Name</label>
+          <input id="ff-name" maxlength="40" placeholder="e.g. Ingång Syd">
+          <div id="ff-kindRow" class="grid2">
+            <div>
+              <label for="ff-kind">Type</label>
+              <select id="ff-kind">
+                <option value="entry">Entrance</option>
+                <option value="parking">Parking</option>
+                <option value="house">Building</option>
+                <option value="water">Water</option>
+                <option value="moose">Moose area</option>
+                <option value="deer">Deer area</option>
+                <option value="boar">Boar area</option>
+                <option value="wallow">Wallow</option>
+                <option value="other">Other name</option>
+              </select>
+            </div>
+          </div>
+          <p class="note small" id="ff-help"></p>
+          <div class="row gap">
+            <button class="btn primary" type="submit">Save</button>
+            <button class="btn ghost" type="button" id="ff-cancel">Close</button>
+            <button class="btn danger" type="button" id="ff-delete">Delete</button>
+          </div>
+        </form>
+
+        <h2 class="eyebrow">Sources</h2>
+        <p class="note small">Elevation: Lantmäteriet 1 m laser model (CC0) via Mapterhorn. Land cover: Naturvårdsverket NMD 2023 (CC0). Tree height: Meta &amp; WRI canopy model (CC BY 4.0), imagery about 2018–2020. Roads: © OpenStreetMap contributors. Reserve: Naturvårdsverket.</p>
+      </section>
+
+      <!-- WIND -->
+      <section class="pane" id="pane-wind" role="tabpanel" aria-labelledby="tab-wind" hidden>
+        <div class="wind-head">
+          <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
+          <div class="wind-read">
+            <div class="wind-big" id="windBig">SW</div>
+            <div class="wind-sub" id="windSub">Wind from 225°</div>
+            <div class="wind-sub" id="windScent">Scent drifts toward NE</div>
+          </div>
+        </div>
+        <label class="slider" for="windSpeed">Wind speed <output id="windSpeedOut">4 m/s</output></label>
+        <input type="range" id="windSpeed" min="0" max="15" step="0.5" value="4">
+        <div class="row">
+          <label class="switch"><input type="checkbox" id="showCones" checked><span>Show scent cones</span></label>
+        </div>
+        <p class="note small" id="coneNote">Each cone shows where scent from a stand is likely to carry. Light wind swirls, so cones get wider and shorter.</p>
+
+        <h2 class="eyebrow">Stands in this wind</h2>
+        <ol class="stand-status" id="windStands"></ol>
+
+        <h2 class="eyebrow">Thermals</h2>
+        <p class="note small">In calm mornings air warms and drifts uphill. In the evening it cools and slides downhill along hollows. Turn on <b>Drainage &amp; cold-air flow</b> to see which way scent pools at dusk.</p>
+      </section>
+
+      <!-- STANDS -->
+      <section class="pane" id="pane-stands" role="tabpanel" aria-labelledby="tab-stands" hidden>
+        <div class="row gap">
+          <button class="btn primary" id="addStand" type="button">Place a stand</button>
+          <button class="btn" id="addRoute" type="button">Plan stalk route</button>
+        </div>
+        <form id="standForm" class="editor" hidden autocomplete="off">
+          <h2 class="eyebrow" id="standFormTitle">Stand</h2>
+          <label for="sf-name">Name</label>
+          <input id="sf-name" required maxlength="40" placeholder="e.g. Tornet vid hygget">
+          <div class="grid2">
+            <div>
+              <label for="sf-type">Type</label>
+              <select id="sf-type">
+                <option value="tower">Tower / high seat</option>
+                <option value="ladder">Ladder stand</option>
+                <option value="ground">Ground blind</option>
+                <option value="pass">Drive post (pass)</option>
+              </select>
+            </div>
+            <div>
+              <label for="sf-height">Seat height (m)</label>
+              <input id="sf-height" type="number" min="0" max="12" step="0.5" value="3">
+            </div>
+          </div>
+          <label class="slider" for="sf-facing">Facing <output id="sf-facingOut">N</output></label>
+          <input type="range" id="sf-facing" min="0" max="355" step="5" value="0">
+          <label class="slider" for="sf-width">Shooting sector <output id="sf-widthOut">90°</output></label>
+          <input type="range" id="sf-width" min="20" max="240" step="5" value="90">
+          <label class="slider" for="sf-range">Max shooting distance <output id="sf-rangeOut">120 m</output></label>
+          <input type="range" id="sf-range" min="30" max="300" step="10" value="120">
+          <div class="viewbox">
+            <label class="switch"><input type="checkbox" id="sf-showView" checked><span>Show what I can see from here</span></label>
+            <div class="view-legend" id="sf-viewLegend">
+              <label for="sf-target" class="vl-target">Looking for
+                <select id="sf-target">
+                  <option value="0.8">roe deer, boar</option>
+                  <option value="1.2">fallow, red deer</option>
+                  <option value="1.7">moose</option>
+                </select>
+              </label>
+              <span><i class="vl-ok"></i>Clear: visible, ground catches a miss</span>
+              <span><i class="vl-open"></i>Visible, but a miss carries on</span>
+              <span><i class="vl-dead"></i>Dead ground behind terrain</span>
+              <span><i class="vl-veg"></i>Hidden by thick forest</span>
+            </div>
+            <p class="note small" id="sf-viewStats">Working out the view…</p>
+          </div>
+          <fieldset class="winds">
+            <legend>Works in wind from <small>(optional, overrides the automatic check)</small></legend>
+            <div class="wind-chips" id="sf-winds"></div>
+          </fieldset>
+          <label for="sf-notes">Notes</label>
+          <textarea id="sf-notes" rows="3" maxlength="600" placeholder="Approach from the track, sit before 16:00…"></textarea>
+          <div class="row gap">
+            <button class="btn primary" type="submit">Save stand</button>
+            <button class="btn ghost" type="button" id="sf-cancel">Close</button>
+            <button class="btn danger" type="button" id="sf-delete">Delete</button>
+          </div>
+          <p class="note small">Drag the stand on the map to move it.</p>
+        </form>
+        <h2 class="eyebrow">Stands</h2>
+        <ul class="items" id="standList"></ul>
+        <h2 class="eyebrow">Stalk routes</h2>
+        <ul class="items" id="routeList"></ul>
+      </section>
+
+      <!-- SIGHTINGS -->
+      <section class="pane" id="pane-log" role="tabpanel" aria-labelledby="tab-log" hidden>
+        <div class="row gap">
+          <button class="btn primary" id="addSighting" type="button">Log a sighting</button>
+          <select id="logFilter" aria-label="Filter sightings by species"></select>
+        </div>
+        <form id="sightForm" class="editor" hidden autocomplete="off">
+          <h2 class="eyebrow">Sighting</h2>
+          <div class="grid2">
+            <div>
+              <label for="lf-species">Species</label>
+              <select id="lf-species"></select>
+            </div>
+            <div>
+              <label for="lf-count">Count</label>
+              <input id="lf-count" type="number" min="1" max="99" value="1">
+            </div>
+          </div>
+          <div class="grid2">
+            <div>
+              <label for="lf-when">When</label>
+              <input id="lf-when" type="datetime-local">
+            </div>
+            <div>
+              <label for="lf-kind">What</label>
+              <select id="lf-kind">
+                <option value="seen">Seen</option>
+                <option value="shot">Shot</option>
+                <option value="tracks">Tracks / sign</option>
+                <option value="bed">Bed / daybed</option>
+                <option value="rub">Rub / wallow</option>
+              </select>
+            </div>
+          </div>
+          <label for="lf-notes">Notes</label>
+          <textarea id="lf-notes" rows="2" maxlength="400" placeholder="Cow with calf heading north along the ditch"></textarea>
+          <p class="note small" id="lf-wind"></p>
+          <div class="row gap">
+            <button class="btn primary" type="submit">Save sighting</button>
+            <button class="btn ghost" type="button" id="lf-cancel">Close</button>
+            <button class="btn danger" type="button" id="lf-delete">Delete</button>
+          </div>
+        </form>
+        <ul class="items" id="logList"></ul>
+        <h2 class="eyebrow">Export</h2>
+        <p class="note small">Save stands, routes, boundary and sightings as a file you can import into a GPS hunting app.</p>
+        <div class="row gap">
+          <button class="btn" id="exportGpx" type="button">Export GPX</button>
+          <button class="btn" id="exportJson" type="button">Export GeoJSON</button>
+        </div>
+      </section>
+
+      <!-- FAMILY (hosted site only) -->
+      <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
+        <div class="share-card">
+          <label class="switch big" for="shareMe"><input type="checkbox" id="shareMe"><span>Share my position</span></label>
+          <p class="note small" id="shareState">Off. Your family can't see you.</p>
+          <p class="note small">Positions only update while the map is open. On iPhone, set Auto-Lock to Never during the hunt.</p>
+        </div>
+        <h2 class="eyebrow">Family</h2>
+        <ul class="items" id="familyList"></ul>
+        <form id="memberForm" class="editor" hidden autocomplete="off">
+          <h2 class="eyebrow">Add someone</h2>
+          <div class="grid2">
+            <div><label for="mf-name">Name</label><input id="mf-name" maxlength="30" placeholder="Erik"></div>
+            <div><label for="mf-email">Email</label><input id="mf-email" type="email" required placeholder="erik@example.com"></div>
+          </div>
+          <p class="note small">They open the map, tap “First time? Create your password” and use this email.</p>
+          <div class="row gap"><button class="btn primary" type="submit">Add to family</button></div>
+        </form>
+        <div id="ownerTools" hidden>
+          <h2 class="eyebrow">Import map data</h2>
+          <p class="note small">Load stands, trails, place names and the boundary from an export file.</p>
+          <input type="file" id="importFile" accept=".json,application/json">
+        </div>
+        <h2 class="eyebrow">Your account</h2>
+        <p class="note" id="meInfo"></p>
+        <div class="row gap"><button class="btn" id="signOut" type="button">Sign out</button></div>
+      </section>
+    </div>
+  </aside>
+
+  <main id="stage">
+    <div id="map" aria-label="Map of the hunting ground"></div>
+
+    <div class="toolbar" role="toolbar" aria-label="Map tools">
+      <button type="button" class="tool" data-tool="stand" title="Place a stand" aria-label="Place a stand">
+        <svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg></button>
+      <button type="button" class="tool" data-tool="sighting" title="Log a sighting" aria-label="Log a sighting">
+        <svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
+      <button type="button" class="tool" data-tool="route" title="Plan a stalk route" aria-label="Plan a stalk route">
+        <svg viewBox="0 0 24 24"><path d="M5 19c3-1 3-5 6-6s5 1 8-3"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="10" r="1.8"/></svg></button>
+      <button type="button" class="tool" data-tool="measure" title="Measure distance" aria-label="Measure distance">
+        <svg viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg></button>
+      <button type="button" class="tool" data-tool="boundary" title="Draw hunting boundary" aria-label="Draw hunting boundary">
+        <svg viewBox="0 0 24 24"><path d="M4 6l6-3 9 4-2 11-9 3-5-7z" stroke-dasharray="3 2"/></svg></button>
+      <span class="tool-sep" aria-hidden="true"></span>
+      <button type="button" class="tool" id="locate" title="Show my position" aria-label="Show my position">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+      <button type="button" class="tool" id="tilt" title="Toggle 3D" aria-label="Toggle 3D">
+        <svg viewBox="0 0 24 24"><path d="M3 18 9 8l4 6 3-4 5 8z"/></svg></button>
+      <button type="button" class="tool" id="north" title="Reset to north up" aria-label="Reset to north up">
+        <svg viewBox="0 0 24 24" id="northIcon"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
+    </div>
+
+    <div id="toolbar-hint" class="hint" hidden>
+      <span id="hintText"></span>
+      <span class="hint-actions">
+        <button type="button" class="btn small" id="hintAddTrail" hidden>Add trail</button>
+        <button type="button" class="btn small" id="hintAddPlace" hidden>Add place</button>
+        <button type="button" class="btn small" id="hintUndo" hidden>Undo</button>
+        <button type="button" class="btn small" id="hintDelete" hidden>Delete point</button>
+        <button type="button" class="btn small primary" id="hintDone" hidden>Finish</button>
+        <button type="button" class="btn small ghost" id="hintCancel">Cancel</button>
+      </span>
+    </div>
+
+    <div id="readout" class="readout" aria-live="polite"></div>
+    <div id="toast" class="toast" role="status" hidden></div>
+    <div id="loading" class="loading">Loading terrain…</div>
+  </main>
+</div>
+
+<div id="gate" class="gate" hidden>
+  <div class="gate-card">
+    <div class="gate-brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 29 27H3z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M10 27l6-10 6 10" fill="currentColor"/></svg>
+      <div><h1>Alnaryd</h1><p>Family hunting map</p></div>
+    </div>
+    <div id="gate-loading"><p class="note">Loading…</p></div>
+    <div id="gate-signin" hidden>
+      <form id="gate-form" class="gate-form" autocomplete="on">
+        <div id="gate-nameRow" class="gate-form" hidden><label for="gate-name">Your name</label><input id="gate-name" autocomplete="name" maxlength="30"></div>
+        <label for="gate-email">Email</label><input id="gate-email" type="email" autocomplete="username" required>
+        <label for="gate-pw">Password</label><input id="gate-pw" type="password" autocomplete="current-password" minlength="6" required>
+        <button class="btn primary" id="gate-submit" type="submit">Sign in</button>
+      </form>
+      <div class="gate-links">
+        <button class="link" id="gate-toggle" type="button">First time? Create your password</button>
+        <button class="link" id="gate-forgot" type="button">Forgot password?</button>
+      </div>
+    </div>
+    <div id="gate-verify" hidden>
+      <p>We sent a link to <b id="gate-verifyEmail"></b>. Open it to confirm your email, then come back and tap Continue.</p>
+      <div class="row gap"><button class="btn primary" id="gate-verified" type="button">Continue</button><button class="btn" id="gate-resend" type="button">Send again</button></div>
+      <button class="link gate-signout" type="button">Use another email</button>
+    </div>
+    <div id="gate-noaccess" hidden>
+      <p><b id="gate-noaccessEmail"></b> isn't on the family list yet. Ask the map owner to add it under Family, then tap Try again.</p>
+      <div class="row gap"><button class="btn primary" id="gate-retry" type="button">Try again</button><button class="btn gate-signout" type="button">Sign out</button></div>
+    </div>
+    <p id="gate-msg" class="gate-msg" role="alert"></p>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
+<script src="geo.js"></script>
+<script src="view.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
