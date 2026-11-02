@@ -14,6 +14,7 @@
 
   const HOME = [15.43379, 56.35514]; // the point you gave
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
+  const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
   // The map data covers about 4 x 4.5 km. Keep the view (and GPS jumps) near it so nobody ends up over an empty map.
   const AREA = [15.401146, 56.328076, 15.466322, 56.368731];
@@ -407,7 +408,7 @@
     if (on) { map.setTerrain({ source: "dem", exaggeration: prefs.exag }); if (animate) map.easeTo({ pitch: 62, duration: 900 }); }
     else { map.setTerrain(null); if (animate) map.easeTo({ pitch: 0, duration: 600 }); }
   }
-  map.on("rotate", () => { $("#northIcon").style.transform = `rotate(${-map.getBearing()}deg)`; });
+
 
   // ---------- stands ----------
   let draftStand = null;   // stand being edited (new or existing copy)
@@ -575,7 +576,7 @@
     // sightings
     const filter = $("#logFilter").value;
     map.getSource("sightings").setData(FC(Store.data.sightings.filter((x) => !filter || x.species === filter).map((x) => ({
-      type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, label: `${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}` },
+      type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, label: tr(`${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}`) },
       geometry: { type: "Point", coordinates: [x.lon, x.lat] },
     }))));
     // boundary
@@ -742,6 +743,7 @@
     $("#windScent").textContent = w.speed < 1 ? "Calm: scent pools and swirls" : `Scent drifts toward ${Geo.compassName((w.from + 180) % 360)}`;
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
     $("#windSpeed").value = w.speed;
+    renderHud();
     const stands = Store.data.stands.map((s) => ({ s, st: standStatus(s) }));
     const order = { good: 0, warn: 1, bad: 2 };
     stands.sort((a, b) => order[a.st.cls] - order[b.st.cls]);
@@ -1111,6 +1113,7 @@
   function hideView() {
     viewKey = "";
     if (map.getLayer("view")) map.setLayoutProperty("view", "visibility", "none");
+    $("#mapLegend").hidden = true;
   }
   async function updateView() {
     const s = draftStand;
@@ -1133,6 +1136,8 @@
       map.addLayer({ id: "view", type: "raster", source: "view", paint: { "raster-fade-duration": 0, "raster-resampling": "nearest" } }, "cones");
     } else map.getSource("view").updateImage({ url: res.url, coordinates: res.coordinates });
     map.setLayoutProperty("view", "visibility", "visible");
+    $("#mapLegend").hidden = false;
+    $("#mapLegendTitle").textContent = `What you can see from ${s.name || "the stand"}`;
     const st = res.stats, pct = (k) => st.cells ? Math.round((st[k] / st.cells) * 100) : 0;
     const seen = pct(1) + pct(2);
     $("#sf-viewStats").textContent = st.cells
@@ -1190,7 +1195,11 @@
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
       myFix = { ll, acc: p.coords.accuracy, t: Date.now() };
-      if (!meMarker) { const el = document.createElement("div"); el.className = "me-dot"; meMarker = new maplibregl.Marker({ element: el }).setLngLat(ll).addTo(map); }
+      if (!meMarker) {
+        const el = document.createElement("div"); el.className = "me"; el.innerHTML = '<i class="me-beam"></i><i class="me-dot"></i>';
+        meMarker = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat(ll).addTo(map);
+        renderHud();
+      }
       meMarker.setLngLat(ll);
       map.getSource("me").setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [Geo.circle(ll, p.coords.accuracy)] } }]));
       if (firstFix) {
@@ -1219,6 +1228,55 @@
   function toggleLocate() {
     if (FAMILY && Family.ready) { Family.setSharing(!Family.sharing); return; }
     if (watchId !== null) stopGPS(); else startGPS();
+  }
+
+  // ---------- compass (top left): north, wind, and which way the phone faces ----------
+  const Heading = { on: false, deg: null, raf: 0, seen: false };
+  function renderHud() {
+    const b = map.getBearing(), w = prefs.wind;
+    $("#hudRing").setAttribute("transform", `rotate(${-b})`);
+    $("#hudWind").setAttribute("transform", `rotate(${w.from - b})`);
+    $("#hudWind").classList.toggle("calm", w.speed < 1);
+    $("#hudWindText").textContent = w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s`;
+    const hasHead = Heading.on && Heading.deg !== null;
+    $("#hudHead").hidden = !hasHead;
+    if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
+    $("#hudFacing").textContent = hasHead ? `Facing ${Geo.compassName(Heading.deg)} ${Math.round(Heading.deg)}°` : "";
+    $("#hudCompass").textContent = Heading.on ? "Hide facing" : "Show my facing";
+    if (meMarker) {
+      meMarker.getElement().classList.toggle("has-heading", hasHead);
+      if (hasHead) meMarker.setRotation(Heading.deg);
+    }
+  }
+  function onOrientation(e) {
+    let h = null;
+    if (typeof e.webkitCompassHeading === "number" && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading;  // iPhone
+    else if (e.absolute && typeof e.alpha === "number") h = 360 - e.alpha;                                          // Android
+    if (h === null) return;
+    const turn = (screen.orientation && screen.orientation.angle) || 0;
+    h = (h + turn + 360) % 360;
+    Heading.seen = true;
+    if (Heading.deg === null) Heading.deg = h;
+    else { const d = ((h - Heading.deg + 540) % 360) - 180; Heading.deg = (Heading.deg + d * 0.3 + 360) % 360; }  // smooth the jitter
+    if (!Heading.raf) Heading.raf = requestAnimationFrame(() => { Heading.raf = 0; renderHud(); });
+  }
+  async function enableHeading() {
+    const D = window.DeviceOrientationEvent;
+    if (!D) { toast("This device has no compass."); return; }
+    if (typeof D.requestPermission === "function") {
+      let r = "denied";
+      try { r = await D.requestPermission(); } catch { r = "denied"; }
+      if (r !== "granted") { toast("Compass access was refused. Close the app and open it again to be asked again.", 6000); return; }
+    }
+    window.addEventListener("deviceorientationabsolute", onOrientation, true);
+    window.addEventListener("deviceorientation", onOrientation, true);
+    Heading.on = true; Heading.seen = false; renderHud();
+    setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(); } }, 3000);
+  }
+  function disableHeading() {
+    window.removeEventListener("deviceorientationabsolute", onOrientation, true);
+    window.removeEventListener("deviceorientation", onOrientation, true);
+    Heading.on = false; Heading.deg = null; renderHud();
   }
 
   // ---------- export ----------
@@ -1288,7 +1346,10 @@
       prefs.exag = +e.target.value; $("#exagOut").textContent = prefs.exag.toFixed(1) + "×"; savePrefs();
       if ($("#threeD").checked) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
     });
-    $("#north").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
+    $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
+    $("#hudWindText").addEventListener("click", () => showTab("wind", true));
+    $("#hudCompass").addEventListener("click", () => (Heading.on ? disableHeading() : enableHeading()));
+    map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);
     $("#locate").addEventListener("click", toggleLocate);
 
@@ -1403,6 +1464,17 @@
       const r = Store.data.routes.find((x) => x.id === li.dataset.id); if (!r) return;
       const p = pairs(r.pts); const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
       map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 17 });
+    });
+
+    // language (Swedish by default); switching reloads so every text is redrawn in the new language
+    const lang = (window.I18N && window.I18N.lang) || "en";
+    $$('input[name="lang"]').forEach((r) => {
+      r.checked = r.value === lang;
+      r.addEventListener("change", () => {
+        prefs.lang = r.value;
+        try { localStorage.setItem("alnaryd-prefs", JSON.stringify(prefs)); } catch { /* ignore */ }
+        location.reload();
+      });
     });
 
     // wind

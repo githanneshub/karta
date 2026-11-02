@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "4f7b761704";</script>
-<script src="firebase-config.js?v=4f7b761704"></script>
-<script type="module" src="fb.js?v=4f7b761704"></script>
+<script>window.APP_VERSION = "41a6bc491e";</script>
+<script src="firebase-config.js?v=41a6bc491e"></script>
+<script type="module" src="fb.js?v=41a6bc491e"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=4f7b761704">
-<link rel="stylesheet" href="app.css?v=4f7b761704">
+<link rel="stylesheet" href="maplibre-gl.css?v=41a6bc491e">
+<link rel="stylesheet" href="app.css?v=41a6bc491e">
 
 <div id="app" data-sheet="peek">
   <aside id="panel" aria-label="Map controls">
@@ -118,6 +118,12 @@
           </div>
         </form>
 
+        <h2 class="eyebrow">Language</h2>
+        <div class="seg seg2" role="radiogroup" aria-label="Language">
+          <label><input type="radio" name="lang" id="lang-sv" value="sv"><span translate="no">Svenska</span></label>
+          <label><input type="radio" name="lang" id="lang-en" value="en"><span translate="no">English</span></label>
+        </div>
+
         <h2 class="eyebrow">Sources</h2>
         <p class="note small">Elevation: Lantmäteriet 1 m laser model (CC0) via Mapterhorn. Land cover: Naturvårdsverket NMD 2023 (CC0). Tree height: Meta &amp; WRI canopy model (CC BY 4.0), imagery about 2018–2020. Roads: © OpenStreetMap contributors. Reserve: Naturvårdsverket.</p>
       </section>
@@ -196,10 +202,10 @@
                   <option value="1.7">moose</option>
                 </select>
               </label>
-              <span><i class="vl-ok"></i>Clear: visible, ground catches a miss</span>
-              <span><i class="vl-open"></i>Visible, but a miss carries on</span>
-              <span><i class="vl-dead"></i>Dead ground behind terrain</span>
-              <span><i class="vl-veg"></i>Hidden by thick forest</span>
+              <span><i class="vl-ok"></i>No colour: you can see it, a miss hits the ground</span>
+              <span><i class="vl-open"></i>Yellow stripes: you can see it, but a miss flies on</span>
+              <span><i class="vl-dead"></i>Purple stripes: hidden behind a hill or in a hollow</span>
+              <span><i class="vl-veg"></i>Dark: hidden by thick forest</span>
             </div>
             <p class="note small" id="sf-viewStats">Working out the view…</p>
           </div>
@@ -325,8 +331,6 @@
         <svg viewBox="0 0 24 24"><path d="M3 18 9 8l4 6 3-4 5 8z"/></svg></button>
       <button type="button" class="tool" id="home" title="Back to the hunting ground" aria-label="Back to the hunting ground">
         <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg></button>
-      <button type="button" class="tool" id="north" title="Reset to north up" aria-label="Reset to north up">
-        <svg viewBox="0 0 24 24" id="northIcon"><path d="M12 3l5 16-5-4-5 4z"/></svg></button>
     </div>
 
     <div id="toolbar-hint" class="hint" hidden>
@@ -341,6 +345,31 @@
       </span>
     </div>
 
+    <div class="hud" id="hud">
+      <button type="button" class="hud-rose" id="hudRose" title="Tap to turn the map north up" aria-label="Compass. Tap to turn the map north up">
+        <svg viewBox="-50 -50 100 100" aria-hidden="true">
+          <g id="hudRing">
+            <circle r="46" class="hud-face"/>
+            <path class="hud-north" d="M0 -44 L6 -30 L-6 -30 Z"/>
+            <text y="-17">N</text><text x="23" y="2">E</text><text y="23">S</text><text x="-23" y="2">W</text>
+          </g>
+          <g id="hudHead" class="hud-head" hidden><path d="M0 -48 L9 -34 L-9 -34 Z"/></g>
+          <g id="hudWind" class="hud-wind"><path d="M-4 -26 L4 -26 L3 8 L9 8 L0 24 L-9 8 L-3 8 Z"/></g>
+        </svg>
+      </button>
+      <div class="hud-info">
+        <button type="button" class="hud-wind-text" id="hudWindText" title="Open the wind tab">Wind</button>
+        <span class="hud-facing" id="hudFacing"></span>
+        <button type="button" class="hud-btn" id="hudCompass">Show my facing</button>
+      </div>
+    </div>
+    <div class="map-legend" id="mapLegend" hidden>
+      <b id="mapLegendTitle">What you can see from the stand</b>
+      <span><i class="vl-ok"></i>No colour: you can see it, a miss hits the ground</span>
+      <span><i class="vl-open"></i>Yellow stripes: you can see it, but a miss flies on</span>
+      <span><i class="vl-dead"></i>Purple stripes: hidden behind a hill or in a hollow</span>
+      <span><i class="vl-veg"></i>Dark: hidden by thick forest</span>
+    </div>
     <div id="readout" class="readout" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
     <div id="loading" class="loading">Loading terrain…</div>
@@ -380,9 +409,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="geo.js?v=4f7b761704"></script>
-<script src="view.js?v=4f7b761704"></script>
-<script src="app.js?v=4f7b761704"></script>
+<script src="i18n.js?v=41a6bc491e"></script>
+<script src="geo.js?v=41a6bc491e"></script>
+<script src="view.js?v=41a6bc491e"></script>
+<script src="app.js?v=41a6bc491e"></script>
 
 </body>
 </html>
