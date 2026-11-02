@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "9c6151d01c";</script>
-<script src="firebase-config.js?v=9c6151d01c"></script>
-<script type="module" src="fb.js?v=9c6151d01c"></script>
+<script>window.APP_VERSION = "6e0fa0f6d9";</script>
+<script src="firebase-config.js?v=6e0fa0f6d9"></script>
+<script type="module" src="fb.js?v=6e0fa0f6d9"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=9c6151d01c">
-<link rel="stylesheet" href="app.css?v=9c6151d01c">
+<link rel="stylesheet" href="maplibre-gl.css?v=6e0fa0f6d9">
+<link rel="stylesheet" href="app.css?v=6e0fa0f6d9">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -45,6 +45,7 @@
       <button role="tab" id="tab-wind" aria-controls="pane-wind" aria-selected="false" data-tab="wind">Wind</button>
       <button role="tab" id="tab-stands" aria-controls="pane-stands" aria-selected="false" data-tab="stands">Stands</button>
       <button role="tab" id="tab-log" aria-controls="pane-log" aria-selected="false" data-tab="log">Log</button>
+      <button role="tab" id="tab-seasons" aria-controls="pane-seasons" aria-selected="false" data-tab="seasons">Seasons</button>
       <button role="tab" id="tab-family" aria-controls="pane-family" aria-selected="false" data-tab="family" hidden>Family</button>
     </nav>
 
@@ -267,6 +268,15 @@
         <ul class="items" id="logList"></ul>
       </section>
 
+      <!-- SEASONS: hunting seasons and shooting light in Blekinge (written in Swedish, it is Swedish law) -->
+      <section class="pane" id="pane-seasons" role="tabpanel" aria-labelledby="tab-seasons" hidden translate="no">
+        <div class="light-card" id="lightCard"></div>
+        <input type="search" id="seasonSearch" placeholder="Sök art, t.ex. rådjur" autocomplete="off" enterkeyhint="search">
+        <label class="switch season-open"><input type="checkbox" id="seasonOpen"><span>Bara de med jakt i dag</span></label>
+        <div id="seasonList"></div>
+        <p class="note small" id="seasonSource"></p>
+      </section>
+
       <!-- FAMILY (hosted site only) -->
       <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
         <div class="share-card">
@@ -428,11 +438,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=9c6151d01c"></script>
-<script src="geo.js?v=9c6151d01c"></script>
-<script src="view.js?v=9c6151d01c"></script>
-<script src="wind.js?v=9c6151d01c"></script>
-<script src="app.js?v=9c6151d01c"></script>
+<script src="i18n.js?v=6e0fa0f6d9"></script>
+<script src="geo.js?v=6e0fa0f6d9"></script>
+<script src="view.js?v=6e0fa0f6d9"></script>
+<script src="wind.js?v=6e0fa0f6d9"></script>
+<script src="jakt.js?v=6e0fa0f6d9"></script>
+<script src="app.js?v=6e0fa0f6d9"></script>
 
 </body>
 </html>

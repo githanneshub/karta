@@ -190,6 +190,7 @@
   function setSheet(state) { $("#app").dataset.sheet = state; }
   function showTab(name, expand) {
     prefs.tab = name; savePrefs();
+    if (name === "seasons") renderSeasons();
     $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
     $$(".pane").forEach((p) => { p.hidden = p.id !== "pane-" + name; });
     if (expand && isPhone()) setSheet("open");
@@ -1713,6 +1714,8 @@
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
     $("#showMyCone").checked = prefs.myCone;
     $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
+    $("#seasonSearch").addEventListener("input", renderSeasons);
+    $("#seasonOpen").addEventListener("change", renderSeasons);
     $("#showFlow").checked = prefs.windFlow;
     $("#showFlow").addEventListener("change", (e) => { prefs.windFlow = e.target.checked; savePrefs(); renderFlow(); });
     $("#showCones").checked = prefs.cones;
@@ -1744,6 +1747,37 @@
       map.easeTo({ center: [x.lon, x.lat], zoom: Math.max(map.getZoom(), 16) });
       draftSighting = { ...x, isNew: false }; openSightForm();
     });
+  }
+
+  // ---------- hunting seasons and shooting light (Blekinge län) ----------
+  function renderSeasons() {
+    const J = window.Jakttider; if (!J) return;
+    const now = new Date(), sun = sunTimes(now.getTime());
+    const hm = (t) => fcClock(t);
+    if (sun.up && sun.down) {
+      const a = sun.up - 3600e3, b = sun.down + 3600e3;
+      $("#lightCard").innerHTML = `<h2 class="eyebrow">Skjutljus i dag</h2>
+        <div class="lc-row"><b>${hm(a)} – ${hm(b)}</b><span>Älg, hjort, rådjur. Sista timmen bara smyg- eller vaktjakt.</span></div>
+        <div class="lc-row"><b>${hm(a)} – ${hm(b)}</b><span>Änder och gäss.</span></div>
+        <div class="lc-row"><b>Ingen gräns</b><span>Övrigt vilt, t.ex. vildsvin och räv.</span></div>
+        <div class="lc-sun">Sol upp ${hm(sun.up)} · ned ${hm(sun.down)}</div>`;
+    }
+    const q = $("#seasonSearch").value.trim().toLowerCase(), onlyOpen = $("#seasonOpen").checked;
+    const rows = J.SPECIES.map((sp) => ({ sp, st: J.status(sp, now) }))
+      // match the start of any word in the name, English name or group ("råd" finds rådjur, not "område")
+      .filter(({ sp, st }) => (!onlyOpen || st.open) && (!q || [sp.n, sp.en, sp.g].join(" ").toLowerCase().split(/[\s,()-]+/).some((w) => w.startsWith(q))));
+    const groups = [...new Set(rows.map((r) => r.sp.g))];
+    const per = (list) => list.map((p) => `${J.periodText(p)}${p[2] ? " <em>smyg/vakt</em>" : ""}`).join(", ");
+    $("#seasonList").innerHTML = rows.length ? groups.map((g) => `<h2 class="eyebrow">${esc(g)}</h2><ul class="seasons">` +
+      rows.filter((r) => r.sp.g === g).sort((a, b) => (b.st.open - a.st.open) || a.sp.n.localeCompare(b.sp.n, "sv")).map(({ sp, st }) => {
+        const pill = st.open ? `<span class="pill good">${st.partial ? "Delvis jakt i dag" : "Jakt i dag"}</span>`
+          : st.never ? `<span class="pill bad">Ingen allmän jakt</span>` : `<span class="pill">Öppnar ${esc(J.label(st.next))}</span>`;
+        return `<li class="${st.open ? "open" : ""}"><div class="ss-head"><b>${esc(sp.n)}</b>${pill}</div>
+          ${sp.p.length ? `<div class="ss-p">${per(sp.p)}</div>` : ""}
+          ${(sp.sub || []).map((x) => `<div class="ss-p"><span class="ss-sub">${esc(x.n)}:</span> ${per(x.p)}</div>`).join("")}
+          ${sp.none ? `<div class="ss-n">${esc(sp.none)}</div>` : ""}${sp.note ? `<div class="ss-n">${esc(sp.note)}</div>` : ""}</li>`;
+      }).join("") + "</ul>").join("") : `<p class="note">Ingen art matchar.</p>`;
+    $("#seasonSource").textContent = J.source + " Länsstyrelsen kan besluta annat. Kontrollera alltid innan jakt.";
   }
 
   // ---------- hunt day: quick messages, shot marker, who is on which stand, shooting-sector warning ----------

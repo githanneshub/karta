@@ -150,7 +150,7 @@
     "(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)": "(Flygbild i lagermenyn visar flygfoton, även från 1960 och 1975)",
     "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Log": "Obs", "Edit the map": "Redigera kartan", "Settings": "Inställningar", "Screen": "Skärm",
     "Night mode (dimmed screen)": "Nattläge (dämpad skärm)", "3D height exaggeration": "Höjdförstärkning i 3D", "3D terrain": "3D-terräng", "Adjust by hand": "Ställ in för hand",
-    "Add or draw": "Lägg till eller rita", "No stands yet. Add one with +.": "Inga pass än. Lägg till med +.", "No stalk routes yet.": "Inga smygrutter än.", "Message the team": "Meddela laget", "On my stand": "På pass", "Leaving my stand": "Lämnar passet",
+    "Add or draw": "Lägg till eller rita", "Seasons": "Jakttid", "No stands yet. Add one with +.": "Inga pass än. Lägg till med +.", "No stalk routes yet.": "Inga smygrutter än.", "Message the team": "Meddela laget", "On my stand": "På pass", "Leaving my stand": "Lämnar passet",
     "Shot fired": "Skott", "Animal down": "Djur skjutet", "Need help": "Behöver hjälp", "Today's messages": "Dagens meddelanden", "No messages today.": "Inga meddelanden i dag.",
     "Waiting for your position. Try again in a moment.": "Väntar på din position. Försök igen om en stund.", "No stand within 150 m of you.": "Inget pass inom 150 m från dig.",
     "Couldn't send. The owner needs to publish the new Firebase rules.": "Kunde inte skicka. Ägaren behöver publicera de nya Firebase-reglerna.", "Letter on the map": "Bokstav på kartan", "Colour": "Färg", "Wind lines in the terrain": "Vindlinjer i terrängen", "Position not working?": "Fungerar inte positionen?",
