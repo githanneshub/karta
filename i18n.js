@@ -181,7 +181,7 @@
     [/^(.+), (\d+) m ([A-Z]{1,3})$/, (m, a, b, c) => `${tr(a)}, ${b} m ${C(c)}`],
     [/^(\d+) m ([A-Z]{1,3})$/, (m, a, b) => `${a} m ${C(b)}`],
     [/^You're ([\d.]+) km from the hunting ground\. Your dot shows on the map once you're near it\.$/, (m, a) => `Du är ${a} km från jaktmarken. Din prick visas på kartan när du är nära.`],
-    [/^You're outside the map areas \(([\d.]+) km away\), so only your position shows here\.$/, (m, a) => `Du är utanför kartområdena (${a} km bort), så här visas bara din position.`],
+    [/^You're outside the detailed map areas \(([\d.]+) km away\), so only the terrain shows here\.$/, (m, a) => `Du är utanför de detaljerade kartområdena (${a} km bort), så här visas bara terrängen.`],
     [/^(\d+) min ago$/, (m, a) => `${a} min sedan`],
     [/^(\d+) h ago$/, (m, a) => `${a} tim sedan`],
     [/^(\d+) min$/, (m, a) => `${a} min`],

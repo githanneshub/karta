@@ -13,6 +13,8 @@
   const pairs = (arr) => { const out = []; for (let i = 0; i + 1 < (arr || []).length; i += 2) out.push([arr[i], arr[i + 1]]); return out; };
 
   const HOME = [15.43379, 56.35514]; // the point you gave
+  const BLEKINGE = [14.40, 55.95, 16.20, 56.65];
+  const LIVE_DEM = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
@@ -202,7 +204,7 @@
       version: 8,
       glyphs: "glyph://{fontstack}/{range}",
       sources: {},
-      layers: [{ id: "bg", type: "background", paint: { "background-color": "#d8d3c3" } }],
+      layers: [{ id: "bg", type: "background", paint: { "background-color": "#dcd7c8" } }],
     },
     center: START.center, zoom: START.zoom, minZoom: 12, maxZoom: 19.5,
     maxPitch: 75,
@@ -260,9 +262,16 @@
     AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
     const U = unionBounds();
 
-    map.addSource("dem", { type: "raster-dem", tiles: [abs("terrain/") + "{z}/{x}/{y}.webp"], tileSize: 512, encoding: "terrarium", minzoom: 10, maxzoom: 15, bounds: U });
+    // Elevation for all of Blekinge, loaded live for the part on screen (Lantmäteriet 1 m via Mapterhorn):
+    // relief shading under our detailed areas and 3D terrain everywhere in the county.
+    map.addSource("dem", { type: "raster-dem", tiles: [LIVE_DEM], tileSize: 512, encoding: "terrarium", minzoom: 6, maxzoom: 15, bounds: BLEKINGE });
     map.addImage("arrow-blue", arrowImage("#1f6fb5"), { pixelRatio: 2 });
 
+    // relief shading from the live elevation; our own images draw on top of it inside the areas
+    map.addLayer({ id: "relief-live", type: "hillshade", source: "dem", paint: {
+      "hillshade-method": "multidirectional", "hillshade-illumination-direction": [315, 270, 0, 225], "hillshade-illumination-altitude": [40, 40, 40, 40],
+      "hillshade-shadow-color": ["#2c3024", "#2c3024", "#3b3f30", "#3b3f30"], "hillshade-highlight-color": ["#fbf8ef", "#f3efe4", "#f3efe4", "#ebe6d8"],
+      "hillshade-accent-color": "#4a4c3e", "hillshade-exaggeration": 0.55 } });
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
@@ -1073,7 +1082,9 @@
     const key = `${z}/${x}/${y}`;
     if (!demCache.has(key)) {
       demCache.set(key, (async () => {
-        const img = new Image(); img.src = abs(`terrain/${key}.webp`); await img.decode();
+        let img = new Image(); img.src = abs(`terrain/${key}.webp`);
+        try { await img.decode(); }
+        catch { img = new Image(); img.crossOrigin = "anonymous"; img.src = LIVE_DEM.replace("{z}/{x}/{y}", key); await img.decode(); }
         const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
         const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0);
         return { w: img.width, data: g.getImageData(0, 0, img.width, img.height).data };
@@ -1198,7 +1209,7 @@
         firstFix = false;
         // always go to the person, wherever they are; outside the map areas only the dot is drawn
         map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
-        if (!nearArea(ll)) toast(`You're outside the map areas (${kmToNearestArea(ll).toFixed(1)} km away), so only your position shows here.`, 6000);
+        if (!nearArea(ll)) toast(`You're outside the detailed map areas (${kmToNearestArea(ll).toFixed(1)} km away), so only the terrain shows here.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
       followTick();
