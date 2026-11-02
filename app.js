@@ -1397,7 +1397,6 @@
     const hasHead = Heading.on && Heading.deg !== null;
     if (hasHead) $("#hudHead").removeAttribute("hidden"); else $("#hudHead").setAttribute("hidden", "");
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
-    $("#hudFacing").textContent = hasHead ? `Facing ${Geo.compassName(Heading.deg)} ${Math.round(Heading.deg)}°` : "";
     $("#hudCone").classList.toggle("on", !!prefs.myCone && watchId !== null);
     if (meMarker) {
       meMarker.getElement().classList.toggle("has-heading", hasHead);
