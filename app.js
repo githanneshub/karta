@@ -69,10 +69,16 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { base: "forest", ov: { trails: true, contours: true, roads: true, reserve: true, boundary: true, wet: false, drainage: false, steep: false },
+    const defaults = { base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false },
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
-    try { const p = JSON.parse(localStorage.getItem("alnaryd-prefs") || "null"); return p ? { ...defaults, ...p, ov: { ...defaults.ov, ...p.ov }, wind: { ...defaults.wind, ...p.wind } } : defaults; }
+    try {
+      const p = JSON.parse(localStorage.getItem("alnaryd-prefs") || "null");
+      if (!p) return defaults;
+      const merged = { ...defaults, ...p, ov: { ...defaults.ov, ...p.ov }, wind: { ...defaults.wind, ...p.wind } };
+      if (!(p.v >= 2)) { merged.ov.reserve = false; merged.v = 2; }   // one-time: the reserve layer is now off by default
+      return merged;
+    }
     catch { return defaults; }
   })();
   let prefsTimer = 0;
@@ -393,6 +399,7 @@
     contours: ["contour-1", "contour-5"],
     roads: ["road-case", "road", "track", "path", "power", "buildings", "road-label"],
     reserve: ["reserve-fill", "reserve-line-halo", "reserve-line"],
+    sightings: ["sightings", "sightings-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
