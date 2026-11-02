@@ -289,10 +289,6 @@
     map.addLayer({ id: "contour-5", type: "line", source: "contours", filter: [">=", ["get", "k"], 2],
       paint: { "line-color": "#4a2a0e", "line-opacity": ["interpolate", ["linear"], ["zoom"], 12, .5, 16, .75],
         "line-width": ["interpolate", ["linear"], ["zoom"], 12, ["case", ["==", ["get", "k"], 3], 1.3, .7], 16, ["case", ["==", ["get", "k"], 3], 2.2, 1.3]] } });
-    map.addLayer({ id: "contour-label", type: "symbol", source: "contours", minzoom: 14.5, filter: [">=", ["get", "k"], 2],
-      layout: { "symbol-placement": "line", "text-field": ["to-string", ["get", "e"]], "text-font": ["Open Sans Semibold"], "text-size": 11,
-        "symbol-spacing": 320, "text-max-angle": 30, "text-padding": 10 },
-      paint: { "text-color": "#6a3f18", "text-halo-color": "rgba(246,243,232,.9)", "text-halo-width": 1.6 } });
     // drainage / cold air
     map.addLayer({ id: "drainage", type: "line", source: "drainage", layout: { "line-cap": "round" },
       paint: { "line-color": "#1f6fb5", "line-opacity": .8, "line-width": ["interpolate", ["linear"], ["get", "ha"], 1.5, .8, 20, 2.2, 200, 3.4] } });
@@ -394,7 +390,7 @@
 
   // ---------- layer state ----------
   const OV_LAYERS = {
-    contours: ["contour-1", "contour-5", "contour-label"],
+    contours: ["contour-1", "contour-5"],
     roads: ["road-case", "road", "track", "path", "power", "buildings", "road-label"],
     reserve: ["reserve-fill", "reserve-line-halo", "reserve-line"],
     boundary: ["mask", "boundary-line"],
@@ -1301,7 +1297,14 @@
     Heading.on = true; Heading.seen = false; renderHud();
     setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(false); } }, 3000);
   }
-  const Follow = { on: false, warnedFar: false };
+  const Follow = { on: false, warnedFar: false, touches: 0 };
+  for (const ev of ["touchstart", "touchend", "touchcancel"]) {
+    map.getCanvasContainer().addEventListener(ev, (e) => {
+      Follow.touches = e.touches.length;
+      if (!Follow.touches) setTimeout(followTick, 60);   // catch up as soon as the fingers lift
+    }, { passive: true, capture: true });
+  }
+  map.on("zoomend", () => followTick());
   // While following, zooming (pinch, double tap, two-finger tap, wheel) stays free and keeps you in the centre;
   // panning and turning by hand are off because the map follows your position and the way you face.
   function followGestures(on) {
@@ -1332,7 +1335,7 @@
     renderHud();
   }
   function followTick() {
-    if (!Follow.on) return;
+    if (!Follow.on || Follow.touches > 0 || map.isZooming()) return;
     const cam = {};
     if (Heading.deg !== null) cam.bearing = Heading.deg;
     if (myFix) {
@@ -1877,12 +1880,17 @@
       const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
       const { v } = await r.json();
       if (!v || v === window.APP_VERSION) return;
-      const key = "alnaryd-update-" + v;
-      try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* ignore */ }
-      location.replace(location.pathname + "?v=" + v);
+      // Right after a release the server can still hand out the old page, so retry every couple of minutes
+      // instead of giving up for the session (iPhone home-screen apps can stay open for days).
+      let last = 0;
+      try { last = +(localStorage.getItem("alnaryd-update-try") || 0); localStorage.setItem("alnaryd-update-try", String(Date.now())); } catch { /* ignore */ }
+      if (Date.now() - last < 120000) return;
+      location.replace(location.pathname + "?v=" + v + "&r=" + Date.now());
     } catch { /* offline: keep running this version */ }
   }
   checkForUpdate();
+  setInterval(() => { if (document.visibilityState === "visible") checkForUpdate(); }, 5 * 60000);
+  $("#appVersion").textContent = window.APP_VERSION || "dev";
   if (prefs.gpsOn && !location.search.includes("shot=")) map.once("load", () => startGPS());
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();
