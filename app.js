@@ -1209,14 +1209,32 @@
 
   // ---------- compass (top left): north, wind, and which way the phone faces ----------
   const Heading = { on: false, deg: null, raf: 0, seen: false };
+  // Compass bezel: fine ticks every 5°, longer every 30°, cardinal letters kept upright as the ring turns.
+  const HUD_LETTERS = [["N", 0], ["E", 90], ["S", 180], ["W", 270]];
+  function buildHud() {
+    let h = "";
+    for (let d = 0; d < 360; d += 5) {
+      if (d % 90 === 0) continue;
+      const len = d % 30 === 0 ? 7 : d % 10 === 0 ? 4.5 : 3, cls = d % 30 === 0 ? "t30" : d % 10 === 0 ? "t10" : "t5";
+      h += `<line class="${cls}" x1="0" y1="${-47 + len}" x2="0" y2="-47" transform="rotate(${d})"/>`;
+    }
+    h += `<path class="hud-north" d="M0 -48 L4.5 -38 L-4.5 -38 Z"/>`;
+    for (const d of [90, 180, 270]) h += `<line class="t90" x1="0" y1="-38" x2="0" y2="-47" transform="rotate(${d})"/>`;
+    for (const [t, d] of HUD_LETTERS) {
+      const x = Math.sin(d * Math.PI / 180) * 29, y = -Math.cos(d * Math.PI / 180) * 29;
+      h += `<text class="${t === "N" ? "hud-n" : ""}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-x="${x}" data-y="${y}">${t}</text>`;
+    }
+    $("#hudRing").innerHTML = h;
+  }
   function renderHud() {
     const b = map.getBearing(), w = prefs.wind;
     $("#hudRing").setAttribute("transform", `rotate(${-b})`);
+    for (const t of $$("#hudRing text")) t.setAttribute("transform", `rotate(${b} ${t.dataset.x} ${t.dataset.y})`);
     $("#hudWind").setAttribute("transform", `rotate(${w.from - b})`);
     $("#hudWind").classList.toggle("calm", w.speed < 1);
     $("#hudWindText").textContent = w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s`;
     const hasHead = Heading.on && Heading.deg !== null;
-    $("#hudHead").hidden = !hasHead;
+    if (hasHead) $("#hudHead").removeAttribute("hidden"); else $("#hudHead").setAttribute("hidden", "");
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
     $("#hudFacing").textContent = hasHead ? `Facing ${Geo.compassName(Heading.deg)} ${Math.round(Heading.deg)}°` : "";
     $("#hudCompass").classList.toggle("on", Heading.on);
@@ -1353,6 +1371,7 @@
       prefs.exag = +e.target.value; $("#exagOut").textContent = prefs.exag.toFixed(1) + "×"; savePrefs();
       if ($("#threeD").checked) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
     });
+    buildHud();
     $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
     $("#hudCompass").addEventListener("click", () => (Heading.on ? disableHeading() : enableHeading()));
