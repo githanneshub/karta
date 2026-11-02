@@ -21,7 +21,7 @@
   if (FAMILY && "serviceWorker" in navigator && !location.search.includes("shot=")) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   }
-  const PLAN_KINDS = ["stands", "routes", "sightings"];  // things each person plans; tagged with who made them
+  const PLAN_KINDS = ["stands", "routes", "sightings", "tracks"];  // things each person plans; tagged with who made them
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
   // Areas with map data (Alnaryd, Bergåsa…), loaded from data/areas.json. GPS jumps only go to places near one,
@@ -93,7 +93,7 @@
   // ---------- storage: shared db when hosted on claude.ai, otherwise this browser ----------
   const Store = {
     db: null,
-    data: { stands: [], sightings: [], routes: [], boundary: null, trails: [], places: [] },
+    data: { stands: [], sightings: [], routes: [], boundary: null, trails: [], places: [], tracks: [] },
     hasLayout: false,       // trails/places have been saved at least once in this store
     onChange: () => {},
     loadLocal() {
@@ -128,7 +128,9 @@
       }
       if (!db) return;
       this.db = db;
-      this.data = { stands: [], sightings: [], routes: [], boundary: null, trails: [], places: [] };
+      this.data = { stands: [], sightings: [], routes: [], boundary: null, trails: [], places: [], tracks: [] };
+      // recorded tracks: their own list, so a site whose rules don't allow them yet still syncs the rest
+      db.collection("tracks").onSnapshot((snap) => { this.data.tracks = snap.docs.map((d) => ({ ...d.data(), id: d.id })); this.onChange(); }, () => {});
       setSync("loading");
       const waiting = new Set(["stands", "sightings", "routes", "trails", "places", "boundary"]);
       const timer = setTimeout(() => { if (waiting.size) setSync("slow"); }, 10000);
@@ -294,7 +296,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -372,6 +374,16 @@
     map.addLayer({ id: "routes-label", type: "symbol", source: "routes", filter: ["has", "label"], minzoom: 14,
       layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "symbol-spacing": 300, "text-max-angle": 35, "text-offset": [0, -1.1] },
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
+    // recorded tracks and blood-tracking marks
+    map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
+    map.addLayer({ id: "tracks", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["get", "color"], "line-width": 3 } });
+    map.addLayer({ id: "track-marks", type: "circle", source: "tracks", filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-radius": 6, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+    map.addLayer({ id: "track-marks-label", type: "symbol", source: "tracks", filter: ["==", ["geometry-type"], "Point"], minzoom: 15.5,
+      layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 11, "text-offset": [0, 1.2], "text-anchor": "top" },
+      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
     // sightings
     map.addLayer({ id: "sightings", type: "circle", source: "sightings",
       paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 10], "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
@@ -645,6 +657,7 @@
       if (FAMILY && pts.length >= 2) feats.push({ type: "Feature", properties: { label: tr(`${r.name || "Stalk route"} · ${whoName(r.by)}`) }, geometry: { type: "LineString", coordinates: pts } });
     }
     map.getSource("routes").setData(FC(feats));
+    renderTracks();
     renderLayout();
     // sightings
     const filter = $("#logFilter").value;
@@ -1338,6 +1351,7 @@
       if (firstFixDone !== watchId) { firstFixDone = watchId; renderPosBtn(); }
       followTick();
       renderMyCone();
+      Rec.onFix(ll, p.coords.accuracy);
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       clearTimeout(startGPS.slow);
@@ -1578,6 +1592,12 @@
       closeHunt(); Hunt.send(b.dataset.ev);
     });
     document.addEventListener("click", (e) => { if (!hmenu.hidden && !e.target.closest("#huntMenu")) closeHunt(); });
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-search-from]"); if (!b) return;
+      const ev = Hunt.events.find((x) => x.id === b.dataset.searchFrom); if (!ev) return;
+      document.querySelectorAll(".maplibregl-popup").forEach((p) => p.remove());
+      Rec.start("search", { lon: ev.lon, lat: ev.lat, label: tr(EVENT_TEXT.shot(ev)) });
+    });
     $("#eventList").addEventListener("click", (e) => {
       const li = e.target.closest("li[data-lon]"); if (!li) return;
       map.easeTo({ center: [+li.dataset.lon, +li.dataset.lat], zoom: Math.max(map.getZoom(), 16) });
@@ -1590,8 +1610,24 @@
       menu.hidden = !menu.hidden; $("#addBtn").setAttribute("aria-expanded", String(!menu.hidden));
     });
     menu.addEventListener("click", (e) => {
+      const r = e.target.closest("[data-rec]");
+      if (r) { closeMenu(); Rec.start(r.dataset.rec); return; }
       const b = e.target.closest("[data-tool]"); if (!b) return;
       closeMenu(); setTool(b.dataset.tool);
+    });
+    $("#recStop").addEventListener("click", () => Rec.stop());
+    $("#recMarks").addEventListener("click", (e) => { const b = e.target.closest("[data-mark]"); if (b) Rec.mark(b.dataset.mark); });
+    $("#trackList").addEventListener("click", async (e) => {
+      const del = e.target.closest("[data-del-track]");
+      if (del) {
+        if (del.dataset.confirm !== "1") { del.dataset.confirm = "1"; del.textContent = "Confirm"; setTimeout(() => { del.dataset.confirm = ""; del.textContent = "Delete"; }, 3000); return; }
+        if (Rec.on && Rec.on.id === del.dataset.delTrack) Rec.stop();
+        await Store.remove("tracks", del.dataset.delTrack); return;
+      }
+      const li = e.target.closest("li[data-id]"); if (!li) return;
+      const t = Store.data.tracks.find((x) => x.id === li.dataset.id); if (!t || !(t.pts || []).length) return;
+      const p = pairs(t.pts), b = p.reduce((a, q) => [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])], [180, 90, -180, -90]);
+      map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 80, maxZoom: 17 });
     });
     document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest("#addMenu")) closeMenu(); });
     map.on("movestart", closeMenu);
@@ -1753,6 +1789,91 @@
     });
   }
 
+  // ---------- recorded tracks and eftersök (blood tracking) ----------
+  const MARKS = { blood: { n: "Blood", c: "#e03131" }, sign: { n: "Tracks", c: "#f08c00" }, bed: { n: "Bed", c: "#7048e8" },
+    hair: { n: "Hair", c: "#adb5bd" }, found: { n: "Animal found", c: "#2b8a3e" } };
+  const Rec = {
+    on: null, lastSave: 0, wake: null, timer: 0,
+    start(kind, from) {
+      if (this.on) { toast("Already recording."); return; }
+      if (watchId === null) { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
+      const pts = from ? [from.lon, from.lat] : myFix ? [...myFix.ll] : [];
+      this.on = { id: newId("tk"), kind, pts, marks: [], start: Date.now(), from: from ? from.label || "" : "" };
+      try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => { this.wake = w; }).catch(() => {}); } catch { /* no wake lock */ }
+      this.timer = setInterval(() => this.renderBar(), 15000);
+      this.renderBar(); renderTracks(); this.save();
+      toast(kind === "search" ? "Blood tracking started. Mark what you find as you go." : "Recording your track. Keep the screen on.");
+    },
+    onFix(ll, acc) {
+      const r = this.on; if (!r || acc > 40) return;
+      const n = r.pts.length;
+      if (n >= 2 && Geo.distance([r.pts[n - 2], r.pts[n - 1]], ll) < 4) return;
+      r.pts.push(ll[0], ll[1]);
+      renderTracks(); this.renderBar();
+      if (Date.now() - this.lastSave > 20000) this.save();
+    },
+    mark(kind) {
+      if (!this.on) return;
+      if (!myFix) { toast("Waiting for your position. Try again in a moment."); return; }
+      this.on.marks.push({ kind, lon: myFix.ll[0], lat: myFix.ll[1], t: Date.now() });
+      renderTracks(); this.save();
+      toast(`${MARKS[kind].n} ✓`);
+      try { navigator.vibrate && navigator.vibrate(60); } catch { /* none */ }
+    },
+    save() {
+      const r = this.on; if (!r) return;
+      this.lastSave = Date.now();
+      const old = Store.data.tracks.find((x) => x.id === r.id);
+      Store.put("tracks", { ...(old || {}), id: r.id, kind: r.kind, pts: r.pts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: true });
+    },
+    stop() {
+      const r = this.on; if (!r) return;
+      this.save();
+      const old = Store.data.tracks.find((x) => x.id === r.id) || {};
+      Store.put("tracks", { ...old, id: r.id, kind: r.kind, pts: r.pts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: false });
+      this.on = null; clearInterval(this.timer);
+      if (this.wake) { this.wake.release().catch(() => {}); this.wake = null; }
+      this.renderBar(); renderTracks();
+      toast(`Saved: ${trackLen(r.pts)}`);
+    },
+    renderBar() {
+      const r = this.on, bar = $("#recBar");
+      bar.hidden = !r; document.documentElement.classList.toggle("recording", !!r);
+      if (!r) return;
+      const min = Math.round((Date.now() - r.start) / 60000);
+      $("#recInfo").textContent = `${r.kind === "search" ? "Blood tracking" : "Recording"} · ${trackLen(r.pts)} · ${min} min`;
+      $("#recMarks").hidden = r.kind !== "search";
+    },
+  };
+  function trackLen(pts) {
+    const p = pairs(pts); let d = 0;
+    for (let i = 1; i < p.length; i++) d += Geo.distance(p[i - 1], p[i]);
+    return d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`;
+  }
+  function renderTracks() {
+    const src = map.getSource("tracks"); if (!src) return;
+    const list = plans("tracks").filter((t) => !Rec.on || t.id !== Rec.on.id);
+    if (Rec.on) list.push({ ...Rec.on, by: FAMILY && Family.user ? Family.user.email.toLowerCase() : "" });
+    const feats = [];
+    for (const t of list) {
+      const color = t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e";
+      const p = pairs(t.pts || []);
+      if (p.length >= 2) feats.push({ type: "Feature", properties: { color, id: t.id }, geometry: { type: "LineString", coordinates: p } });
+      for (const m of t.marks || []) feats.push({ type: "Feature", properties: { color: (MARKS[m.kind] || MARKS.sign).c, label: tr((MARKS[m.kind] || MARKS.sign).n) },
+        geometry: { type: "Point", coordinates: [m.lon, m.lat] } });
+    }
+    src.setData(FC(feats));
+    const tl = $("#trackList");
+    const saved = plans("tracks").slice().sort((a, b) => (b.start || 0) - (a.start || 0));
+    tl.innerHTML = saved.length ? saved.map((t) => {
+      const d = new Date(t.start || 0).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" });
+      return `<li data-id="${esc(t.id)}"><span class="dot" style="background:${t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e"}"></span>
+        <span class="it-main"><div class="it-name"><span>${t.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(d)}${t.live ? " <span>· live</span>" : ""}</div>
+        <div class="it-sub">${trackLen(t.pts || [])}${(t.marks || []).length ? ` · ${(t.marks || []).length} marks` : ""}${whoTag(t)}</div></span>
+        <button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button></li>`;
+    }).join("") : `<li class="empty">No recorded tracks yet. Start one with +.</li>`;
+  }
+
   // ---------- hunting seasons and shooting light (Blekinge län) ----------
   function renderSeasons() {
     const J = window.Jakttider; if (!J) return;
@@ -1855,7 +1976,8 @@
             ev.stopPropagation();
             const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
             new maplibregl.Popup({ closeButton: false, offset: 14 }).setLngLat([e.lon, e.lat])
-              .setHTML(`<div class="pop"><b>${esc(tr(EVENT_TEXT[e.type](e)))}</b><br>${t}</div>`).addTo(map);
+              .setHTML(`<div class="pop"><b>${esc(tr(EVENT_TEXT[e.type](e)))}</b><br>${t}` +
+                (e.type === "shot" ? `<br><button class="btn small primary" type="button" data-search-from="${esc(e.id)}">${esc(tr("Start blood tracking here"))}</button>` : "") + `</div>`).addTo(map);
           });
           m = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat([e.lon, e.lat]).addTo(map);
           this.markers.set(e.id, m);
