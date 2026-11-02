@@ -1299,19 +1299,35 @@
     window.addEventListener("deviceorientationabsolute", onOrientation, true);
     window.addEventListener("deviceorientation", onOrientation, true);
     Heading.on = true; Heading.seen = false; renderHud();
-    setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(); } }, 3000);
+    setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(false); } }, 3000);
   }
   const Follow = { on: false, warnedFar: false };
-  function setFollow(on, byHand = false) {
+  // While following, zooming (pinch, double tap, two-finger tap, wheel) stays free and keeps you in the centre;
+  // panning and turning by hand are off because the map follows your position and the way you face.
+  function followGestures(on) {
+    if (on) {
+      map.dragPan.disable(); map.dragRotate.disable(); map.keyboard.disableRotation();
+      map.touchZoomRotate.disable(); map.touchZoomRotate.enable({ around: "center" }); map.touchZoomRotate.disableRotation();
+      map.scrollZoom.disable(); map.scrollZoom.enable({ around: "center" });
+      map.touchPitch.disable();
+    } else {
+      map.dragPan.enable(); map.dragRotate.enable(); map.keyboard.enableRotation();
+      map.touchZoomRotate.disable(); map.touchZoomRotate.enable(); map.touchZoomRotate.enableRotation();
+      map.scrollZoom.disable(); map.scrollZoom.enable();
+      map.touchPitch.enable();
+    }
+  }
+  function setFollow(on) {
     if (on) {
       if (!Heading.on) enableHeading();   // first: the iPhone asks for compass access only from a tap
       if (!startGPS()) return;
       Follow.on = true; Follow.warnedFar = false; Follow.zoomed = false;
+      followGestures(true);
       if (myFix) map.jumpTo({ center: myFix.ll, zoom: Math.max(map.getZoom(), 17) });
     } else {
+      if (Follow.on) followGestures(false);
       Follow.on = false;
-      if (byHand) toast("Follow mode paused. Tap Follow me to continue.");
-      else map.easeTo({ bearing: 0, duration: 500 });
+      map.easeTo({ bearing: 0, duration: 500 });
     }
     renderHud();
   }
@@ -1325,8 +1341,8 @@
     }
     if (cam.bearing !== undefined || cam.center) map.jumpTo(cam);
   }
-  function disableHeading() {
-    if (Follow.on) setFollow(false);
+  function disableHeading(stopFollow = true) {   // without a compass, follow mode keeps following north-up
+    if (Follow.on && stopFollow) setFollow(false);
     window.removeEventListener("deviceorientationabsolute", onOrientation, true);
     window.removeEventListener("deviceorientation", onOrientation, true);
     Heading.on = false; Heading.deg = null; renderHud();
@@ -1411,7 +1427,6 @@
       renderMyCone(); renderHud();
     });
     // moving the map by hand ends follow mode
-    for (const ev of ["dragstart", "rotatestart", "pitchstart"]) map.on(ev, (e) => { if (Follow.on && e.originalEvent) setFollow(false, true); });
     map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);
     $("#locate").addEventListener("click", toggleLocate);
