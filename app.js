@@ -1293,7 +1293,10 @@
     if (!("geolocation" in navigator)) { toast("This browser can't share your position."); return false; }
     firstFix = true;
     prefs.gpsOn = true; savePrefs();
-    armHeading();
+    clearTimeout(startGPS.slow);
+    startGPS.slow = setTimeout(() => {
+      if (watchId !== null && !myFix) toast("Still no GPS position. If no question about location appeared, location is blocked for Safari. See Family → Position not working?", 9000);
+    }, 20000);
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
       myFix = { ll, acc: p.coords.accuracy, t: Date.now() };
@@ -1306,6 +1309,8 @@
       map.getSource("me").setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [Geo.circle(ll, p.coords.accuracy)] } }]));
       if (firstFix) {
         firstFix = false;
+        clearTimeout(startGPS.slow);
+        armHeading();   // location works; the compass is asked for on the next tap
         // always go to the person, wherever they are; outside the map areas only the dot is drawn
         map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
         if (!nearArea(ll)) toast(`You're outside the detailed map areas (${kmToNearestArea(ll).toFixed(1)} km away), so only the terrain shows here.`, 6000);
@@ -1316,8 +1321,9 @@
       renderMyCone();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
-      toast(FAMILY ? "Location is blocked. On iPhone: Settings → Privacy → Location Services → Safari Websites → While Using."
-        : "Your position isn't available here. On a phone, open the map from its web address and allow location.", 7000);
+      clearTimeout(startGPS.slow);
+      toast("Location is blocked for this site. See Family → Position not working?", 9000);
+      if (FAMILY) { showTab("family"); $("#gpsHelp").open = true; }
       stopGPS();
       if (FAMILY) Family.setSharing(false);
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
@@ -1345,7 +1351,7 @@
   }
   function cyclePosition() {
     const st = posState();
-    if (st === "off") { enableHeading(true); if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
+    if (st === "off") { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
     else if (st === "on") setFollow(true);
     else { setFollow(false); if (FAMILY && Family.ready) Family.setSharing(false); else stopGPS(); }
     renderPosBtn();

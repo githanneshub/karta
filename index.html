@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "dcf4d55285";</script>
-<script src="firebase-config.js?v=dcf4d55285"></script>
-<script type="module" src="fb.js?v=dcf4d55285"></script>
+<script>window.APP_VERSION = "cb5b7e5e9a";</script>
+<script src="firebase-config.js?v=cb5b7e5e9a"></script>
+<script type="module" src="fb.js?v=cb5b7e5e9a"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=dcf4d55285">
-<link rel="stylesheet" href="app.css?v=dcf4d55285">
+<link rel="stylesheet" href="maplibre-gl.css?v=cb5b7e5e9a">
+<link rel="stylesheet" href="app.css?v=cb5b7e5e9a">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -282,6 +282,13 @@
           <p class="note small" id="shareState">Off. Your family can't see you.</p>
           <p class="note small">Positions only update while the map is open. On iPhone, set Auto-Lock to Never during the hunt.</p>
         </div>
+        <details class="sect" id="gpsHelp">
+          <summary>Position not working?</summary>
+          <p class="note small"><b>1. iPhone settings:</b> Settings → Privacy &amp; Security → Location Services: on. Scroll down to Safari Websites → While Using the App, and turn on Precise Location.</p>
+          <p class="note small"><b>2. Safari, for this site:</b> tap aA (or the icon left of the address) → Website Settings → Location → Allow.</p>
+          <p class="note small"><b>3. Close and open again:</b> swipe the app or Safari away and open the map again, then tap the position button. Answer Allow when it asks about location.</p>
+          <p class="note small">The compass is asked for on the next tap on the map, after the position works.</p>
+        </details>
         <h2 class="eyebrow">Family</h2>
         <ul class="items" id="familyList"></ul>
         <div id="whoBox" hidden>
@@ -409,10 +416,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=dcf4d55285"></script>
-<script src="geo.js?v=dcf4d55285"></script>
-<script src="view.js?v=dcf4d55285"></script>
-<script src="app.js?v=dcf4d55285"></script>
+<script src="i18n.js?v=cb5b7e5e9a"></script>
+<script src="geo.js?v=cb5b7e5e9a"></script>
+<script src="view.js?v=cb5b7e5e9a"></script>
+<script src="app.js?v=cb5b7e5e9a"></script>
 
 </body>
 </html>

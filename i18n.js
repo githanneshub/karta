@@ -150,7 +150,17 @@
     "(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)": "(Flygbild i lagermenyn visar flygfoton, även från 1960 och 1975)",
     "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Log": "Obs", "Edit the map": "Redigera kartan", "Settings": "Inställningar", "Screen": "Skärm",
     "Night mode (dimmed screen)": "Nattläge (dämpad skärm)", "3D height exaggeration": "Höjdförstärkning i 3D", "3D terrain": "3D-terräng", "Adjust by hand": "Ställ in för hand",
-    "Add or draw": "Lägg till eller rita", "Scent from me": "Vittring från mig", "Scent from stands": "Vittring från passen",
+    "Add or draw": "Lägg till eller rita", "Position not working?": "Fungerar inte positionen?",
+    "Still no GPS position. If no question about location appeared, location is blocked for Safari. See Family → Position not working?":
+      "Ingen GPS-position än. Om ingen fråga om plats dök upp är platsen blockerad för Safari. Se Familj → Fungerar inte positionen?",
+    "Location is blocked for this site. See Family → Position not working?": "Platsen är blockerad för den här sidan. Se Familj → Fungerar inte positionen?",
+    "1. iPhone settings:": "1. iPhone-inställningar:", "2. Safari, for this site:": "2. Safari, för den här sidan:", "3. Close and open again:": "3. Stäng och öppna igen:",
+    "Settings → Privacy & Security → Location Services: on. Scroll down to Safari Websites → While Using the App, and turn on Precise Location.":
+      "Inställningar → Integritetsskydd och säkerhet → Platstjänster: på. Scrolla ner till Safari-webbplatser → När appen används, och slå på Exakt plats.",
+    "tap aA (or the icon left of the address) → Website Settings → Location → Allow.": "tryck på aA (eller ikonen till vänster om adressen) → Webbplatsinställningar → Plats → Tillåt.",
+    "swipe the app or Safari away and open the map again, then tap the position button. Answer Allow when it asks about location.":
+      "svep bort appen eller Safari och öppna kartan igen, tryck sedan på positionsknappen. Svara Tillåt när den frågar om plats.",
+    "The compass is asked for on the next tap on the map, after the position works.": "Kompassen frågas efter vid nästa tryck på kartan, när positionen fungerar.", "Scent from me": "Vittring från mig", "Scent from stands": "Vittring från passen",
     "Calm mornings scent rises uphill, evenings it sinks along hollows.": "Stilla morgnar stiger vittringen uppför, på kvällen sjunker den längs sänkorna.",
     "Clear": "Klart", "Nearly clear": "Nästan klart", "Variable cloud": "Växlande molnighet", "Half clear": "Halvklart", "Cloudy": "Molnigt", "Overcast": "Mulet",
     "Fog": "Dimma", "Light rain showers": "Lätta regnskurar", "Rain showers": "Regnskurar", "Heavy rain showers": "Kraftiga regnskurar", "Thunderstorm": "Åskväder",
