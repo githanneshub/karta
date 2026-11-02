@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "aaf349f549";</script>
-<script src="firebase-config.js?v=aaf349f549"></script>
-<script type="module" src="fb.js?v=aaf349f549"></script>
+<script>window.APP_VERSION = "dcf4d55285";</script>
+<script src="firebase-config.js?v=dcf4d55285"></script>
+<script type="module" src="fb.js?v=dcf4d55285"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=aaf349f549">
-<link rel="stylesheet" href="app.css?v=aaf349f549">
+<link rel="stylesheet" href="maplibre-gl.css?v=dcf4d55285">
+<link rel="stylesheet" href="app.css?v=dcf4d55285">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -139,9 +139,8 @@
         <div class="wx-now">
           <span class="wx-icon" id="wxIcon"></span>
           <div class="wx-main">
-            <div class="wx-wind"><span class="wind-big" id="windBig">SW</span> <span class="wx-speed" id="windSpeedNow">4 m/s</span></div>
+            <div class="wx-wind"><span class="wind-big" id="windBig">SW</span> <span class="wx-speed" id="windSpeedNow">4 m/s</span> <span class="wx-speed" id="wxTemp"></span></div>
             <div class="wind-sub" id="wxLine"></div>
-            <div class="wind-sub" id="windScent">Scent drifts toward NE</div>
             <div class="wind-sub" id="sunLine"></div>
           </div>
         </div>
@@ -155,18 +154,16 @@
           <label class="switch"><input type="checkbox" id="showCones" checked><span>Scent from stands</span></label>
         </div>
 
-        <h2 class="eyebrow">Stands in this wind</h2>
-        <ol class="stand-status" id="windStands"></ol>
         <p class="note small">Calm mornings scent rises uphill, evenings it sinks along hollows.</p>
 
-        <details class="sect" id="windManual">
-          <summary>Adjust by hand</summary>
+        <div id="windManual">
+          <h2 class="eyebrow">Adjust by hand</h2>
           <div class="wind-head">
             <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
           </div>
           <label class="slider" for="windSpeed">Wind speed <output id="windSpeedOut">4 m/s</output></label>
           <input type="range" id="windSpeed" min="0" max="15" step="0.5" value="4">
-        </details>
+        </div>
       </section>
 
       <!-- STANDS -->
@@ -412,10 +409,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=aaf349f549"></script>
-<script src="geo.js?v=aaf349f549"></script>
-<script src="view.js?v=aaf349f549"></script>
-<script src="app.js?v=aaf349f549"></script>
+<script src="i18n.js?v=dcf4d55285"></script>
+<script src="geo.js?v=dcf4d55285"></script>
+<script src="view.js?v=dcf4d55285"></script>
+<script src="app.js?v=dcf4d55285"></script>
 
 </body>
 </html>

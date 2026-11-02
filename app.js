@@ -861,25 +861,15 @@
     $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
     $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "");
-    $("#windScent").textContent = w.speed < 1 ? "Calm: scent pools and swirls" : `Scent drifts toward ${Geo.compassName((w.from + 180) % 360)}`;
     const wx = wxHour();
     $("#wxIcon").innerHTML = wx ? wxSvg(wx) : "";
-    $("#wxLine").textContent = wx ? [
-      typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : null, wxName(wx) || null,
-      typeof wx.vis === "number" && wx.vis < 4 ? `visibility ${wx.vis < 1 ? Math.round(wx.vis * 1000) + " m" : wx.vis.toFixed(1) + " km"}` : null,
-      wx.rain >= 0.1 ? `${wx.rain.toFixed(1)} mm/h` : null,
-    ].filter(Boolean).join(" · ") : "";
+    $("#wxTemp").textContent = wx && typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : "";
+    $("#wxLine").textContent = wx ? wxName(wx) : "";
     const sun = sunTimes(wx ? wx.t : Date.now());
     $("#sunLine").textContent = sun.up && sun.down ? `Sunrise ${fcClock(sun.up)} · Sunset ${fcClock(sun.down)}` : "";
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
     $("#windSpeed").value = w.speed;
     renderHud();
-    const stands = plans("stands").map((s) => ({ s, st: standStatus(s) }));
-    const order = { good: 0, warn: 1, bad: 2 };
-    stands.sort((a, b) => order[a.st.cls] - order[b.st.cls]);
-    $("#windStands").innerHTML = stands.length ? stands.map(({ s, st }) =>
-      `<li data-id="${esc(s.id)}"><span>${esc(s.name || "Unnamed stand")}</span><span class="pill ${st.cls}">${st.text}</span></li>`).join("")
-      : `<li class="note small">Place stands to see which ones work in this wind.</li>`;
   }
 
   // ---------- drawing tools ----------
@@ -1648,10 +1638,6 @@
       const li = e.target.closest("li[data-id]"); if (!li) return;
       const s = Store.data.stands.find((x) => x.id === li.dataset.id); if (!s) return;
       map.easeTo({ center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 16) }); editStand(s.id);
-    });
-    $("#windStands").addEventListener("click", (e) => {
-      const li = e.target.closest("li[data-id]"); if (!li) return;
-      const s = Store.data.stands.find((x) => x.id === li.dataset.id); if (s) map.easeTo({ center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 15.5) });
     });
     $("#routeList").addEventListener("click", async (e) => {
       const del = e.target.closest("[data-del-route]");
