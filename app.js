@@ -216,10 +216,9 @@
     },
     center: START.center, zoom: START.zoom, minZoom: 12, maxZoom: 19.5,
     maxPitch: 75,
-    attributionControl: { compact: true, customAttribution: "Lantmäteriet (CC0) via Mapterhorn · Naturvårdsverket NMD · Meta/WRI canopy height · © OpenStreetMap" },
+    attributionControl: false,   // sources are listed under Settings → Sources
   });
   if (location.search.includes("shot=")) window.__map = map;  // test hook for screenshot mode
-  map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-left");
 
   let manifests = [];   // one per area
   const loadedImageSets = new Set();
@@ -1304,6 +1303,7 @@
     if (!("geolocation" in navigator)) { toast("This browser can't share your position."); return false; }
     firstFix = true;
     prefs.gpsOn = true; savePrefs();
+    armHeading();
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
       myFix = { ll, acc: p.coords.accuracy, t: Date.now() };
@@ -1338,6 +1338,7 @@
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     watchId = null; myFix = null;
     prefs.gpsOn = false; savePrefs();
+    if (Heading.on) disableHeading(false);
     if (Follow.on) setFollow(false);
     if (typeof renderHud === "function" && map.getSource("me")) renderHud();
     renderMyCone();
@@ -1354,7 +1355,7 @@
   }
   function cyclePosition() {
     const st = posState();
-    if (st === "off") { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
+    if (st === "off") { enableHeading(true); if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
     else if (st === "on") setFollow(true);
     else { setFollow(false); if (FAMILY && Family.ready) Family.setSharing(false); else stopGPS(); }
     renderPosBtn();
@@ -1415,18 +1416,31 @@
     else { const d = ((h - Heading.deg + 540) % 360) - 180; Heading.deg = (Heading.deg + d * 0.3 + 360) % 360; }  // smooth the jitter
     if (!Heading.raf) Heading.raf = requestAnimationFrame(() => { Heading.raf = 0; followTick(); renderHud(); });
   }
-  async function enableHeading() {
+  // quiet: no "no compass" message (a PC simply shows no facing arrow)
+  async function enableHeading(quiet = false) {
+    if (Heading.on || Heading.pending) return;
     const D = window.DeviceOrientationEvent;
-    if (!D) { toast("This device has no compass."); return; }
+    if (!D) { if (!quiet) toast("This device has no compass."); return; }
+    Heading.pending = true;
     if (typeof D.requestPermission === "function") {
       let r = "denied";
       try { r = await D.requestPermission(); } catch { r = "denied"; }
-      if (r !== "granted") { toast("Compass access was refused. Close the app and open it again to be asked again.", 6000); return; }
+      if (r !== "granted") { Heading.pending = false; if (!quiet) toast("Compass access was refused. Close the app and open it again to be asked again.", 6000); return; }
     }
+    Heading.pending = false;
     window.addEventListener("deviceorientationabsolute", onOrientation, true);
     window.addEventListener("deviceorientation", onOrientation, true);
     Heading.on = true; Heading.seen = false; renderHud();
-    setTimeout(() => { if (Heading.on && !Heading.seen) { toast("This device has no compass."); disableHeading(false); } }, 3000);
+    setTimeout(() => { if (Heading.on && !Heading.seen) { if (!quiet) toast("This device has no compass."); disableHeading(false); } }, 3000);
+  }
+  // Position turned on without a tap (app reopened): the iPhone only asks for the compass from a tap, so use the next one.
+  function armHeading() {
+    if (Heading.on || Heading.pending) return;
+    const D = window.DeviceOrientationEvent;
+    if (!D) return;
+    if (typeof D.requestPermission !== "function") { enableHeading(true); return; }
+    const go = () => { if (watchId !== null) enableHeading(true); };
+    document.addEventListener("touchend", go, { once: true, capture: true });
   }
   const Follow = { on: false, warnedFar: false, touches: 0 };
   for (const ev of ["touchstart", "touchend", "touchcancel"]) {
@@ -1461,7 +1475,7 @@
     } else {
       if (Follow.on) followGestures(false);
       Follow.on = false;
-      if (Heading.on) disableHeading(false);
+      if (Heading.on && watchId === null) disableHeading(false);
       map.easeTo({ bearing: 0, duration: 500 });
     }
     renderHud(); renderPosBtn();

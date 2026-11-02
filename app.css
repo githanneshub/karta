@@ -484,3 +484,8 @@ details.sect > .eyebrow:first-of-type { margin-top: 2px; }
 .hud-temp { color: #aab4a3; font-weight: 500; }
 svg.wx { fill: none; overflow: visible; }
 #whoBox { margin-top: 14px; }
+/* the way you face: a longer, clearer blue beam from your dot */
+.me { width: 120px; height: 120px; }
+.me .me-beam { width: 120px; height: 120px;
+  background: conic-gradient(from -25deg at 50% 50%, rgb(29 124 242 / .75) 0deg 50deg, transparent 50deg);
+  -webkit-mask: radial-gradient(circle, #000 0 18px, rgb(0 0 0 / .55) 38px, transparent 59px); mask: radial-gradient(circle, #000 0 18px, rgb(0 0 0 / .55) 38px, transparent 59px); }
