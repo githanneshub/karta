@@ -489,3 +489,37 @@ svg.wx { fill: none; overflow: visible; }
 .me .me-beam { width: 120px; height: 120px;
   background: conic-gradient(from -25deg at 50% 50%, rgb(29 124 242 / .75) 0deg 50deg, transparent 50deg);
   -webkit-mask: radial-gradient(circle, #000 0 18px, rgb(0 0 0 / .55) 38px, transparent 59px); mask: radial-gradient(circle, #000 0 18px, rgb(0 0 0 / .55) 38px, transparent 59px); }
+
+.wind-flow { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.wind-flow[hidden] { display: none; }
+
+.fam-dot { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font: 700 12px var(--f-ui);
+  text-shadow: 0 1px 2px rgb(0 0 0 / .45); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px rgb(0 0 0 / .25); }
+.swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 8px; }
+.swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgb(0 0 0 / .25); cursor: pointer; appearance: none; padding: 0; }
+.swatch.on { outline: 3px solid var(--accent); outline-offset: 2px; }
+#lookLetter { width: 80px; font-weight: 700; text-transform: uppercase; }
+
+/* hunt day */
+.family-only { display: none; }
+html.family .family-only { display: grid; }
+.huntmenu { min-width: 210px; }
+.huntmenu .ev-ico { width: 24px; text-align: center; font-weight: 800; font-size: 18px; color: var(--accent); }
+.huntmenu .ev-help { color: #ff6b6b; }
+.huntmenu .ev-down { color: #51cf66; }
+.stand-marker { position: relative; }
+.stand-who { position: absolute; right: -8px; top: -8px; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  color: #fff; font: 800 10px var(--f-ui); box-shadow: 0 0 0 2px #fff; }
+.stand-who[hidden] { display: none; }
+.ev-marker { width: 26px; height: 26px; position: relative; display: grid; place-items: center; cursor: pointer; }
+.ev-marker b { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--c, #e03131); color: #fff;
+  font: 800 14px var(--f-ui); box-shadow: 0 0 0 2px #fff, 0 2px 6px rgb(0 0 0 / .45); z-index: 1; }
+.ev-marker.ev-help b { background: #e03131; animation: pulse 1.2s infinite; }
+.ev-marker i { position: absolute; left: 50%; top: 50%; width: 4px; height: 46px; margin: -46px 0 0 -2px; transform-origin: 50% 100%;
+  background: linear-gradient(to top, transparent 10px, #ff3b30 10px); border-radius: 2px; }
+.ev-marker i[hidden] { display: none; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px rgb(224 49 49 / .35), 0 2px 6px rgb(0 0 0 / .45); } }
+.safety { position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); top: calc(84px + env(safe-area-inset-top, 0px));
+  max-width: calc(100% - 32px); padding: 10px 14px; border-radius: 10px; background: #c92a2a; color: #fff; font: 700 15px var(--f-ui);
+  box-shadow: 0 4px 18px rgb(0 0 0 / .45); text-align: center; }
+.safety[hidden] { display: none; }

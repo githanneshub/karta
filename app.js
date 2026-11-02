@@ -16,6 +16,7 @@
   const BLEKINGE = [14.40, 55.95, 16.20, 56.65];
   const LIVE_DEM = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
+  if (FAMILY) document.documentElement.classList.add("family");
   const PLAN_KINDS = ["stands", "routes", "sightings"];  // things each person plans; tagged with who made them
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
@@ -70,7 +71,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false },
+    const defaults = { windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false },
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -268,6 +269,12 @@
     } catch { $("#loading").textContent = "Map data didn't load. Reload the page."; return; }
     AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
     const U = unionBounds();
+    // terrain wind (WindNinja) where it has been modelled; straight cones elsewhere
+    window.TerrainWind.load(abs, AREAS.map((a) => a.id)).then((ok) => {
+      if (!ok) return;
+      terrainWind = true; flow = window.TerrainWind.Flow(map);
+      renderAll(); renderFlow();
+    });
 
     // Elevation for all of Blekinge, loaded live for the part on screen (Lantmäteriet 1 m via Mapterhorn):
     // relief shading under our detailed areas and 3D terrain everywhere in the county.
@@ -446,21 +453,29 @@
 
   function standStatus(s) {
     const w = prefs.wind;
-    if (s.winds && s.winds.length) {
-      return s.winds.includes(dir8(w.from)) ? { cls: "good", text: "Its wind" } : { cls: "bad", text: "Not its wind" };
-    }
     if (w.speed < 1) return { cls: "warn", text: "Calm, swirling" };
-    const down = (w.from + 180) % 360;
+    const down = (localFrom(s.lon, s.lat) + 180) % 360;
     const d = Geo.angleDiff(down, s.facing);
     if (d <= s.width / 2 + 15) return { cls: "bad", text: "Scent into sector" };
     if (d <= 100) return { cls: "warn", text: "Side wind" };
     return { cls: "good", text: "Good wind" };
   }
+  // Scent from a point: follows the modelled airflow through the terrain where we have it, otherwise a straight wedge.
+  let terrainWind = false, flow = null;
   function coneGeom(s) {
     const w = prefs.wind;
     const half = clamp(40 - w.speed * 2.5, 12, 40);
     const len = clamp(120 + w.speed * 70, 120, 700);
-    return Geo.wedge([s.lon, s.lat], (w.from + 180) % 360, half, len);
+    const curved = terrainWind && window.TerrainWind.plume(s.lon, s.lat, w.from, len, half);
+    return curved || Geo.wedge([s.lon, s.lat], (w.from + 180) % 360, half, len);
+  }
+  // The wind where you stand: turned by hills and valleys when the terrain model covers the spot.
+  function localFrom(lon, lat) {
+    const l = terrainWind && window.TerrainWind.local(lon, lat, prefs.wind.from);
+    return l ? l.from : prefs.wind.from;
+  }
+  function renderFlow() {
+    if (flow) flow.set({ on: prefs.windFlow, from: prefs.wind.from, speed: prefs.wind.speed });
   }
   const STAND_ICON = {
     tower: '<svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg>',
@@ -477,7 +492,7 @@
     const m = FAMILY && Family.members.find((x) => x.email === by);
     return (m && m.name) || by.split("@")[0];
   }
-  function whoTag(x) { return FAMILY ? ` · ${esc(whoName(x.by))}` : ""; }
+  function whoTag(x) { return FAMILY && x.by ? ` · ${esc(whoName(x.by))}` : ""; }
   function renderWho() {
     const box = $("#whoBox");
     if (!FAMILY || !Family.user) { box.hidden = true; return; }
@@ -508,7 +523,7 @@
       if (!m) {
         const el = document.createElement("div");
         el.className = "stand-marker";
-        el.innerHTML = `<div class="disc"></div><div class="stand-label"></div>`;
+        el.innerHTML = `<div class="disc"></div><div class="stand-label"></div><b class="stand-who" hidden></b>`;
         el.addEventListener("click", (e) => { e.stopPropagation(); if (!tool) editStand(s.id); });
         m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([s.lon, s.lat]).addTo(map);
         m.on("drag", () => {
@@ -529,6 +544,9 @@
       el.style.setProperty("--ring", STATUS_COLORS[st.cls]);
       el.querySelector(".disc").innerHTML = STAND_ICON[s.type] || STAND_ICON.tower;
       el.querySelector(".stand-label").textContent = s.name || "New stand";
+      const who = FAMILY ? Hunt.onStand(s.id) : null, badge = el.querySelector(".stand-who");
+      badge.hidden = !who;
+      if (who) { badge.textContent = Family.letterFor(who.email, who.name); badge.style.background = Family.colorFor(who.email); }
       el.title = `${s.name || "Stand"} · ${st.text}`;
     }
   }
@@ -576,9 +594,8 @@
     $("#standFormTitle").textContent = s.isNew ? "New stand" : "Edit stand";
     $("#sf-name").value = s.name; $("#sf-type").value = s.type; $("#sf-height").value = s.height;
     $("#sf-facing").value = s.facing; $("#sf-width").value = s.width; $("#sf-range").value = s.range; $("#sf-notes").value = s.notes || "";
-    $$("#sf-winds input").forEach((i) => { i.checked = s.winds.includes(i.value); });
     $("#sf-delete").hidden = s.isNew;
-    viewKey = ""; $("#sf-viewStats").textContent = prefs.view ? "Working out the view…" : "";
+    viewKey = ""; $("#sf-viewStats").textContent = "";
     updateStandOutputs();
     renderAll();
     setTimeout(() => $("#sf-name").focus({ preventScroll: true }), 50);
@@ -592,7 +609,6 @@
     Object.assign(draftStand, {
       name: $("#sf-name").value.trim(), type: $("#sf-type").value, height: +$("#sf-height").value || 0,
       facing: +$("#sf-facing").value, width: +$("#sf-width").value, range: +$("#sf-range").value, notes: $("#sf-notes").value.trim(),
-      winds: $$("#sf-winds input").filter((i) => i.checked).map((i) => i.value),
     });
   }
   function closeStandForm() { draftStand = null; $("#standForm").hidden = true; renderAll(); }
@@ -654,7 +670,7 @@
         <span class="it-main"><div class="it-name">${esc(s.name || "Unnamed stand")}</div>
         <div class="it-sub">${esc(STAND_TYPES[s.type] || "")} · faces ${Geo.compassName(s.facing)} · ${s.range} m${whoTag(s)}</div></span>
         <span class="pill ${st.cls}">${st.text}</span></li>`;
-    }).join("") : `<li class="empty">No stands yet. Tap <b>Place a stand</b>, then tap the map where it is.</li>`;
+    }).join("") : `<li class="empty">No stands yet. Add one with +.</li>`;
 
     const rl = $("#routeList");
     const routes = plans("routes");
@@ -663,7 +679,7 @@
       return `<li data-id="${esc(r.id)}"><span class="it-main"><div class="it-name">${esc(r.name || "Stalk route")}</div>
         <div class="it-sub">${Math.round(st.len)} m · ${st.intoPct}% into the wind now${whoTag(r)}</div></span>
         <button class="btn small ghost" data-del-route="${esc(r.id)}" type="button">Delete</button></li>`;
-    }).join("") : `<li class="empty">Draw a stalking route to check each leg against the wind. Green legs head into the wind.</li>`;
+    }).join("") : `<li class="empty">No stalk routes yet.</li>`;
 
     const filter = $("#logFilter").value;
     const logs = plans("sightings").filter((x) => !filter || x.species === filter).sort((a, b) => (b.when || "").localeCompare(a.when || ""));
@@ -868,6 +884,7 @@
     const sun = sunTimes(wx ? wx.t : Date.now());
     $("#sunLine").textContent = sun.up && sun.down ? `Sunrise ${fcClock(sun.up)} · Sunset ${fcClock(sun.down)}` : "";
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
+    renderFlow();
     $("#windSpeed").value = w.speed;
     renderHud();
   }
@@ -1251,7 +1268,7 @@
     if (key === viewKey) return;
     viewKey = key;
     const seq = ++viewSeq;
-    $("#sf-viewStats").textContent = "Working out the view…";
+    $("#sf-viewStats").textContent = "";
     const ground = await groundSampler(s.lon, s.lat, radius);
     if (seq !== viewSeq || draftStand !== s) return;
     const res = Viewshed.compute({
@@ -1268,10 +1285,7 @@
     $("#mapLegendTitle").textContent = `What you can see from ${s.name || "the stand"}`;
     const st = res.stats, pct = (k) => st.cells ? Math.round((st[k] / st.cells) * 100) : 0;
     const seen = pct(1) + pct(2);
-    $("#sf-viewStats").textContent = st.cells
-      ? `In the shooting sector: ${seen}% visible, ${pct(3)}% dead ground, ${pct(4)}% hidden by thick forest. ` +
-        `${seen ? Math.round((st[1] / (st[1] + st[2])) * 100) : 0}% of the visible ground has a natural backstop within 50 m.`
-      : "No ground inside the shooting sector.";
+    $("#sf-viewStats").textContent = st.cells ? `${seen}% visible · ${pct(3)}% behind terrain · ${pct(4)}% thick forest` : "";
   }
 
   let moveRaf = 0;
@@ -1549,6 +1563,20 @@
     });
 
     // tools
+    const hmenu = $("#huntMenu");
+    const closeHunt = () => { hmenu.hidden = true; $("#huntBtn").setAttribute("aria-expanded", "false"); };
+    $("#huntBtn").addEventListener("click", (e) => {
+      e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
+    });
+    hmenu.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-ev]"); if (!b) return;
+      closeHunt(); Hunt.send(b.dataset.ev);
+    });
+    document.addEventListener("click", (e) => { if (!hmenu.hidden && !e.target.closest("#huntMenu")) closeHunt(); });
+    $("#eventList").addEventListener("click", (e) => {
+      const li = e.target.closest("li[data-lon]"); if (!li) return;
+      map.easeTo({ center: [+li.dataset.lon, +li.dataset.lat], zoom: Math.max(map.getZoom(), 16) });
+    });
     const menu = $("#addMenu");
     const closeMenu = () => { menu.hidden = true; $("#addBtn").setAttribute("aria-expanded", "false"); };
     $("#addBtn").addEventListener("click", (e) => {
@@ -1607,12 +1635,9 @@
       if (e.key === "Escape" && tool) $("#hintCancel").hidden ? $("#hintDone").click() : $("#hintCancel").click();
       if (e.key === "Enter" && tool && ["route", "boundary"].includes(tool) && document.activeElement === document.body) finishTool();
     });
-    $("#addStand").addEventListener("click", () => setTool("stand"));
-    $("#addRoute").addEventListener("click", () => setTool("route"));
     $("#addSighting").addEventListener("click", () => setTool("sighting"));
 
     // stand form
-    $("#sf-winds").innerHTML = WIND8.map((d) => `<label><input type="checkbox" value="${d}" id="sfw-${d}"><span>${d}</span></label>`).join("");
     for (const id of ["sf-facing", "sf-width", "sf-range"]) $("#" + id).addEventListener("input", () => { updateStandOutputs(); if (draftStand) { readStandForm(); renderAll(); } });
     for (const id of ["sf-type", "sf-name"]) $("#" + id).addEventListener("change", () => { if (draftStand) { readStandForm(); renderAll(); } });
     $("#sf-showView").checked = prefs.view;
@@ -1620,11 +1645,10 @@
     $("#sf-viewLegend").hidden = !prefs.view;
     $("#sf-showView").addEventListener("change", (e) => {
       prefs.view = e.target.checked; savePrefs(); $("#sf-viewLegend").hidden = !prefs.view;
-      $("#sf-viewStats").textContent = prefs.view ? "Working out the view…" : "";
+      $("#sf-viewStats").textContent = "";
       viewKey = ""; renderStandGeometry();
     });
     $("#sf-target").addEventListener("change", (e) => { prefs.target = +e.target.value; savePrefs(); renderStandGeometry(); });
-    $("#sf-winds").addEventListener("change", () => { if (draftStand) { readStandForm(); renderAll(); } });
     $("#standForm").addEventListener("submit", async (e) => {
       e.preventDefault(); if (!draftStand) return;
       readStandForm();
@@ -1689,6 +1713,8 @@
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
     $("#showMyCone").checked = prefs.myCone;
     $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
+    $("#showFlow").checked = prefs.windFlow;
+    $("#showFlow").addEventListener("change", (e) => { prefs.windFlow = e.target.checked; savePrefs(); renderFlow(); });
     $("#showCones").checked = prefs.cones;
     $("#showCones").addEventListener("change", (e) => { prefs.cones = e.target.checked; savePrefs(); applyLayers(); });
 
@@ -1720,17 +1746,157 @@
     });
   }
 
+  // ---------- hunt day: quick messages, shot marker, who is on which stand, shooting-sector warning ----------
+  const SAFETY_RANGE = 600;   // m: a bullet carries far past the stand's own range, so warn well beyond it
+  const EVENT_TEXT = {
+    onstand: (e) => `${e.name} is on stand ${e.standName || ""}`.trim(),
+    offstand: (e) => `${e.name} left the stand`,
+    shot: (e) => `${e.name}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
+    down: (e) => `${e.name}: animal down`,
+    help: (e) => `${e.name} needs help`,
+  };
+  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!" };
+  const Hunt = {
+    events: [], stand: null, seen: null, markers: new Map(), last: new Map(), blocked: false,
+    start(db) {
+      this.stand = prefs.onStand || null;
+      db.collection("events").onSnapshot((snap) => {
+        const all = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        const fresh = this.seen ? all.filter((e) => !this.seen.has(e.id)) : [];
+        this.seen = new Set(all.map((e) => e.id));
+        this.events = all.filter((e) => Date.now() - (e.tc || 0) < 12 * 3600e3).sort((a, b) => b.tc - a.tc);
+        const me = Family.user && Family.user.email.toLowerCase();
+        for (const e of fresh) if (e.email !== me && Date.now() - e.tc < 10 * 60e3) this.notify(e);
+        this.render();
+        // tidy: my own messages older than two days
+        for (const e of all) if (e.email === me && Date.now() - (e.tc || 0) > 48 * 3600e3) db.doc(`events/${e.id}`).delete().catch(() => {});
+      }, () => { this.blocked = true; });
+    },
+    onStand(standId) {
+      for (const [, v] of Family.positions) if (v.stand === standId && v.sharing && Family.ageMin(v) !== null && Family.ageMin(v) < 30) return v;
+      if (this.stand === standId && Family.user) return { email: Family.user.email.toLowerCase(), name: Family.member && Family.member.name };
+      return null;
+    },
+    async send(type) {
+      if (!myFix) {
+        if (FAMILY && !Family.sharing) Family.setSharing(true); else startGPS();
+        toast("Waiting for your position. Try again in a moment."); return;
+      }
+      if (FAMILY && !Family.sharing) Family.setSharing(true);
+      const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0],
+        lon: myFix.ll[0], lat: myFix.ll[1], tc: Date.now() };
+      if (Heading.on && Heading.deg !== null) e.heading = Math.round(Heading.deg);
+      if (type === "onstand") {
+        let best = null, bd = 150;
+        for (const st of Store.data.stands) { const d = Geo.distance(myFix.ll, [st.lon, st.lat]); if (d < bd) { bd = d; best = st; } }
+        if (!best) { toast("No stand within 150 m of you."); return; }
+        this.stand = best.id; e.standId = best.id; e.standName = best.name || "";
+      }
+      if (type === "offstand") { if (!this.stand) return; this.stand = null; }
+      prefs.onStand = this.stand; savePrefs();
+      Family.lastWrite = null; Family.onFix({ coords: { longitude: myFix.ll[0], latitude: myFix.ll[1], accuracy: myFix.acc } });
+      try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); }
+      catch { toast("Couldn't send. The owner needs to publish the new Firebase rules.", 7000); }
+      syncMarkers(); this.render();
+    },
+    notify(e) {
+      toast(tr(EVENT_TEXT[e.type](e)), e.type === "help" ? 15000 : 7000);
+      try { navigator.vibrate && navigator.vibrate(e.type === "help" ? [300, 120, 300, 120, 300] : [200, 100, 200]); } catch { /* no vibration */ }
+    },
+    render() {
+      if (!map.getSource("me")) return;
+      const keep = new Set();
+      for (const e of this.events) {
+        if (!["shot", "down", "help"].includes(e.type)) continue;
+        keep.add(e.id);
+        let m = this.markers.get(e.id);
+        if (!m) {
+          const el = document.createElement("div"); el.className = `ev-marker ev-${e.type}`;
+          el.innerHTML = `<i></i><b>${EVENT_ICON[e.type]}</b>`;
+          el.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+            new maplibregl.Popup({ closeButton: false, offset: 14 }).setLngLat([e.lon, e.lat])
+              .setHTML(`<div class="pop"><b>${esc(tr(EVENT_TEXT[e.type](e)))}</b><br>${t}</div>`).addTo(map);
+          });
+          m = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat([e.lon, e.lat]).addTo(map);
+          this.markers.set(e.id, m);
+        }
+        const arrow = m.getElement().querySelector("i");
+        arrow.hidden = typeof e.heading !== "number";
+        if (typeof e.heading === "number") arrow.style.transform = `rotate(${e.heading}deg)`;
+        m.getElement().style.setProperty("--c", Family.colorFor(e.email));
+      }
+      for (const [id, m] of this.markers) if (!keep.has(id)) { m.remove(); this.markers.delete(id); }
+      $("#huntOff").hidden = !this.stand;
+      $("#huntOn").hidden = !!this.stand;
+      $("#eventList").innerHTML = this.events.length ? this.events.slice(0, 30).map((e) => `<li data-lon="${e.lon}" data-lat="${e.lat}">
+          <span class="fam-dot" style="background:${Family.colorFor(e.email)}" translate="no">${esc(Family.letterFor(e.email, e.name))}</span>
+          <span class="it-main"><div class="it-name">${esc(EVENT_TEXT[e.type] ? EVENT_TEXT[e.type](e) : e.type)}</div>
+          <div class="it-sub">${new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</div></span></li>`).join("")
+        : `<li class="empty">No messages today.</li>`;
+    },
+    // A person inside a shooting sector (stand facing ± half the width, out to SAFETY_RANGE): warn both sides.
+    inSector(stand, ll) {
+      const d = Geo.distance([stand.lon, stand.lat], ll);
+      return d > 8 && d < SAFETY_RANGE && Geo.angleDiff(Geo.bearing([stand.lon, stand.lat], ll), stand.facing) <= (stand.width || 90) / 2;
+    },
+    checkSafety() {
+      if (!FAMILY || !Family.user) return;
+      const msgs = [], uid = Family.user.uid;
+      const live = [...Family.positions].filter(([id, v]) => id !== uid && v.sharing && typeof v.lon === "number" && Family.ageMin(v) !== null && Family.ageMin(v) < 5);
+      const mine = this.stand && Store.data.stands.find((x) => x.id === this.stand);
+      if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${v.name || v.email} is in your shooting sector` });
+      if (myFix) for (const [, v] of live) {
+        const st = v.stand && Store.data.stands.find((x) => x.id === v.stand);
+        if (st && this.inSector(st, myFix.ll)) msgs.push({ key: "me:" + v.email, text: `You're in ${v.name || v.email}'s shooting sector` });
+      }
+      const banner = $("#safety");
+      banner.hidden = !msgs.length;
+      banner.textContent = msgs.map((m) => tr(m.text)).join(" · ");
+      for (const m of msgs) {
+        const t = this.last.get(m.key) || 0;
+        if (Date.now() - t > 60000) { this.last.set(m.key, Date.now()); try { navigator.vibrate && navigator.vibrate([500, 200, 500]); } catch { /* none */ } }
+      }
+    },
+  };
+
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
+  const LOOK_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d", "#e03131", "#495057", "#f5c518", "#ffffff"];
   const FAMILY_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d"];
   const Family = {
     ready: false, user: null, member: null, members: [], positions: new Map(), sharing: false, lastWrite: null,
-    markers: new Map(), wakeLock: null,
+    markers: new Map(), wakeLock: null, looks: {}, editing: null,
 
-    colorFor(email) {  // distinct colours in a stable order (by email) for everyone on the list
+    colorFor(email) {  // chosen colour, else distinct colours in a stable order (by email) for everyone on the list
+      const look = this.looks[email];
+      if (look && /^#[0-9a-f]{6}$/i.test(look.color || "")) return look.color;
       const i = this.members.map((m) => m.email).sort().indexOf(email);
       if (i >= 0) return FAMILY_COLORS[i % FAMILY_COLORS.length];
       let h = 0; for (const c of email || "") h = (h * 31 + c.charCodeAt(0)) >>> 0;
       return FAMILY_COLORS[h % FAMILY_COLORS.length];
+    },
+    letterFor(email, name) {
+      const look = this.looks[email];
+      return (look && look.letter) || (name || email || "?").trim().charAt(0).toUpperCase();
+    },
+    openLook(email) {
+      const m = this.members.find((x) => x.email === email); if (!m) return;
+      this.editing = email;
+      const f = $("#lookForm");
+      $("#lookName").textContent = m.name || email;
+      $("#lookLetter").value = this.letterFor(email, m.name);
+      const cur = this.colorFor(email);
+      $("#lookColors").innerHTML = LOOK_COLORS.map((c) => `<button type="button" class="swatch${c === cur ? " on" : ""}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join("");
+      f.hidden = false; f.scrollIntoView({ block: "nearest" });
+    },
+    async saveLook() {
+      const email = this.editing; if (!email) return;
+      const letter = $("#lookLetter").value.trim().toUpperCase().slice(0, 2);
+      const on = $("#lookColors .swatch.on"), color = on ? on.dataset.color : this.colorFor(email);
+      $("#lookForm").hidden = true; this.editing = null;
+      try { await window.FB.db.doc("map/looks").update({ [email]: { letter, color } }); }
+      catch { toast("Couldn't save. Check your connection."); }
     },
     async init() {
       $("#gate").hidden = false; this.gate("loading");
@@ -1776,6 +1942,12 @@
       db.collection("positions").onSnapshot((snap) => {
         this.positions = new Map(snap.docs.map((d) => [d.id, d.data()]));
         this.render();
+        syncMarkers(); Hunt.checkSafety();
+      }, () => {});
+      Hunt.start(db);
+      db.doc("map/looks").onSnapshot((snap) => {
+        this.looks = snap.exists ? snap.data() : {};
+        this.render(); renderAll();
       }, () => {});
       setInterval(() => this.render(), 30000);
       document.addEventListener("visibilitychange", () => {
@@ -1810,8 +1982,10 @@
       window.FB.db.doc(`positions/${this.user.uid}`).set({
         name: (this.member && this.member.name) || this.user.displayName || this.user.email, email: this.user.email.toLowerCase(),
         lon: ll[0], lat: ll[1], acc: Math.round(p.coords.accuracy), t: window.FB.serverTimestamp(), tc: now, sharing: true,
+        stand: Hunt.stand || null,
       }).catch(() => {});
       this.render();
+      Hunt.checkSafety();
     },
     ageMin(pos) {
       const t = pos.t && pos.t.toMillis ? pos.t.toMillis() : pos.tc;
@@ -1840,9 +2014,10 @@
         : "Off. Your family can't see you.";
       const list = this.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
       $("#familyList").innerHTML = list.length ? list.map((m) => `<li data-email="${esc(m.email)}">
-          <span class="dot" style="background:${this.colorFor(m.email)}"></span>
+          <span class="fam-dot" style="background:${this.colorFor(m.email)}" translate="no">${esc(this.letterFor(m.email, m.name))}</span>
           <span class="it-main"><div class="it-name">${esc(m.name || m.email)}${m.role === "owner" ? " · owner" : ""}</div>
           <div class="it-sub">${esc(this.statusFor(m.email))}</div></span>
+          <button class="btn small ghost" type="button" data-look="${esc(m.email)}">Edit</button>
           ${owner && m.role !== "owner" ? `<button class="btn small ghost" type="button" data-remove="${esc(m.email)}">Remove</button>` : ""}</li>`).join("")
         : `<li class="empty">Nobody added yet.</li>`;
       // markers for everyone else who has shared
@@ -1864,7 +2039,7 @@
         const el = m.getElement(), live = v.sharing && age < 10;
         el.style.setProperty("--c", this.colorFor(v.email));
         el.classList.toggle("stale", !live);
-        el.querySelector("b").textContent = (v.name || "?").trim().charAt(0).toUpperCase();
+        el.querySelector("b").textContent = this.letterFor(v.email, v.name);
         el.querySelector("span").textContent = `${v.name || ""}${live ? (age ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}`;
       }
       for (const [uid, m] of this.markers) if (!keep.has(uid)) { m.remove(); this.markers.delete(uid); }
@@ -1938,6 +2113,8 @@
       if (await Family.addMember($("#mf-name").value, $("#mf-email").value)) { $("#mf-name").value = ""; $("#mf-email").value = ""; }
     });
     $("#familyList").addEventListener("click", async (e) => {
+      const lk = e.target.closest("[data-look]");
+      if (lk) { Family.openLook(lk.dataset.look); return; }
       const rm = e.target.closest("[data-remove]");
       if (rm) {
         if (rm.dataset.confirm !== "1") { rm.dataset.confirm = "1"; rm.textContent = "Confirm"; setTimeout(() => { rm.dataset.confirm = ""; rm.textContent = "Remove"; }, 3000); return; }
@@ -1948,6 +2125,12 @@
       const pos = [...Family.positions.values()].find((v) => v.email === li.dataset.email);
       if (pos && typeof pos.lon === "number") map.easeTo({ center: [pos.lon, pos.lat], zoom: Math.max(map.getZoom(), 16) });
     });
+    $("#lookColors").addEventListener("click", (e) => {
+      const b = e.target.closest(".swatch"); if (!b) return;
+      $$("#lookColors .swatch").forEach((x) => x.classList.toggle("on", x === b));
+    });
+    $("#lookForm").addEventListener("submit", (e) => { e.preventDefault(); Family.saveLook(); });
+    $("#lookCancel").addEventListener("click", () => { $("#lookForm").hidden = true; Family.editing = null; });
     $("#importFile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) Family.importFile(f); e.target.value = ""; });
     setMode("signin");
   }
