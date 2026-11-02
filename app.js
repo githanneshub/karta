@@ -259,7 +259,6 @@
     } catch { $("#loading").textContent = "Map data didn't load. Reload the page."; return; }
     AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
     const U = unionBounds();
-    map.setMaxBounds([[U[0] - 0.09, U[1] - 0.05], [U[2] + 0.09, U[3] + 0.05]]);
 
     map.addSource("dem", { type: "raster-dem", tiles: [abs("terrain/") + "{z}/{x}/{y}.webp"], tileSize: 512, encoding: "terrarium", minzoom: 10, maxzoom: 15, bounds: U });
     map.addImage("arrow-blue", arrowImage("#1f6fb5"), { pixelRatio: 2 });
@@ -1197,8 +1196,9 @@
       map.getSource("me").setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [Geo.circle(ll, p.coords.accuracy)] } }]));
       if (firstFix) {
         firstFix = false;
-        if (nearArea(ll)) map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
-        else toast(`You're ${kmToNearestArea(ll).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
+        // always go to the person, wherever they are; outside the map areas only the dot is drawn
+        map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
+        if (!nearArea(ll)) toast(`You're outside the map areas (${kmToNearestArea(ll).toFixed(1)} km away), so only your position shows here.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
       followTick();
@@ -1296,7 +1296,7 @@
       if (!Heading.on) enableHeading();   // first: the iPhone asks for compass access only from a tap
       if (!startGPS()) return;
       Follow.on = true; Follow.warnedFar = false; Follow.zoomed = false;
-      if (myFix && nearArea(myFix.ll)) map.jumpTo({ center: myFix.ll, zoom: Math.max(map.getZoom(), 17) });
+      if (myFix) map.jumpTo({ center: myFix.ll, zoom: Math.max(map.getZoom(), 17) });
     } else {
       Follow.on = false;
       if (byHand) toast("Follow mode paused. Tap Follow me to continue.");
@@ -1309,11 +1309,8 @@
     const cam = {};
     if (Heading.deg !== null) cam.bearing = Heading.deg;
     if (myFix) {
-      if (nearArea(myFix.ll)) {
-        cam.center = myFix.ll;
-        if (!Follow.zoomed) { Follow.zoomed = true; if (map.getZoom() < 16.5) cam.zoom = 17; }
-      }
-      else if (!Follow.warnedFar) { Follow.warnedFar = true; toast(`You're ${kmToNearestArea(myFix.ll).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000); }
+      cam.center = myFix.ll;
+      if (!Follow.zoomed) { Follow.zoomed = true; if (map.getZoom() < 16.5) cam.zoom = 17; }
     }
     if (cam.bearing !== undefined || cam.center) map.jumpTo(cam);
   }
