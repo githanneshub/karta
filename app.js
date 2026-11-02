@@ -16,10 +16,17 @@
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
-  // The map data covers about 4 x 4.5 km. Keep the view (and GPS jumps) near it so nobody ends up over an empty map.
-  const AREA = [15.401146, 56.328076, 15.466322, 56.368731];
-  const nearArea = ([lon, lat], pad = 0.02) =>
-    lon > AREA[0] - pad * 1.8 && lon < AREA[2] + pad * 1.8 && lat > AREA[1] - pad && lat < AREA[3] + pad;
+  // Areas with map data (Alnaryd, Bergåsa…), loaded from data/areas.json. GPS jumps only go to places near one,
+  // so nobody ends up over an empty map.
+  let AREAS = [{ id: "alnaryd", name: "Alnaryd", bounds: [15.4180, 56.3405, 15.4462, 56.3576] }];
+  const inBox = ([lon, lat], b, pad) => lon > b[0] - pad * 1.8 && lon < b[2] + pad * 1.8 && lat > b[1] - pad && lat < b[3] + pad;
+  const nearArea = (ll, pad = 0.02) => AREAS.some((a) => inBox(ll, a.bounds, pad));
+  const areaCenter = (a) => [(a.bounds[0] + a.bounds[2]) / 2, (a.bounds[1] + a.bounds[3]) / 2];
+  const kmToNearestArea = (ll) => Math.min(...AREAS.map((a) => Geo.distance(ll, areaCenter(a)))) / 1000;
+  function unionBounds() {
+    return AREAS.reduce((u, a) => [Math.min(u[0], a.bounds[0]), Math.min(u[1], a.bounds[1]), Math.max(u[2], a.bounds[2]), Math.max(u[3], a.bounds[3])],
+      [180, 90, -180, -90]);
+  }
 
   // ---------- reference data ----------
   const LAND = {
@@ -201,16 +208,15 @@
     maxPitch: 75,
     attributionControl: { compact: true, customAttribution: "Lantmäteriet (CC0) via Mapterhorn · Naturvårdsverket NMD · Meta/WRI canopy height · © OpenStreetMap" },
   });
-  map.setMaxBounds([[AREA[0] - 0.09, AREA[1] - 0.05], [AREA[2] + 0.09, AREA[3] + 0.05]]);
   if (location.search.includes("shot=")) window.__map = map;  // test hook for screenshot mode
   map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-left");
 
-  let manifest = null;
+  let manifests = [];   // one per area
   const loadedImageSets = new Set();
   const FC = (features = []) => ({ type: "FeatureCollection", features });
   // Outside-the-boundary mask: a counter-clockwise frame around the area with the boundary as a clockwise hole
   function maskOuter() {
-    const [w, s, e, n] = manifest ? manifest.bounds : [15.35, 56.3, 15.5, 56.4];
+    const [w, s, e, n] = unionBounds();
     return [[w - .3, s - .3], [e + .3, s - .3], [e + .3, n + .3], [w - .3, n + .3], [w - .3, s - .3]];
   }
   function clockwise(ring) {
@@ -219,19 +225,21 @@
     return area > 0 ? ring : ring.slice().reverse();
   }
 
+  const imageIds = (name) => manifests.flatMap((m) => m.layers[name].map((_, i) => `${name}-${m.id}-${i}`));
   function addImageSet(name, beforeId) {
-    if (loadedImageSets.has(name) || !manifest) return;
+    if (loadedImageSets.has(name) || !manifests.length) return;
     loadedImageSets.add(name);
-    manifest.layers[name].forEach((chunk, i) => {
-      const sid = `${name}-${i}`;
-      map.addSource(sid, { type: "image", url: abs(chunk.url), coordinates: chunk.coordinates });
-      map.addLayer({ id: sid, type: "raster", source: sid, paint: { "raster-fade-duration": 0, "raster-resampling": "linear" } }, beforeId);
-    });
+    for (const m of manifests) {
+      m.layers[name].forEach((chunk, i) => {
+        const sid = `${name}-${m.id}-${i}`;
+        map.addSource(sid, { type: "image", url: abs(chunk.url), coordinates: chunk.coordinates });
+        map.addLayer({ id: sid, type: "raster", source: sid, paint: { "raster-fade-duration": 0, "raster-resampling": "linear" } }, beforeId);
+      });
+    }
   }
   function setImageSetVisible(name, on) {
     if (on) addImageSet(name, name === "wet" || name === "steep" ? "anchor-overlays" : "anchor-base");
-    if (!manifest) return;
-    manifest.layers[name].forEach((_, i) => { const id = `${name}-${i}`; if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none"); });
+    for (const id of imageIds(name)) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
   }
 
   function arrowImage(color) {
@@ -245,10 +253,15 @@
   async function getJSON(p) { const r = await fetch(abs(p)); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
 
   map.on("load", async () => {
-    try { manifest = await getJSON("data/manifest.json"); }
-    catch { $("#loading").textContent = "Map data didn't load. Reload the page."; return; }
+    try {
+      const list = await getJSON("data/areas.json");
+      manifests = await Promise.all(list.map((a) => getJSON(`data/${a.id}/manifest.json`)));
+    } catch { $("#loading").textContent = "Map data didn't load. Reload the page."; return; }
+    AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
+    const U = unionBounds();
+    map.setMaxBounds([[U[0] - 0.09, U[1] - 0.05], [U[2] + 0.09, U[3] + 0.05]]);
 
-    map.addSource("dem", { type: "raster-dem", tiles: [abs("terrain/") + "{z}/{x}/{y}.webp"], tileSize: 512, encoding: "terrarium", minzoom: 10, maxzoom: 15, bounds: manifest.bounds });
+    map.addSource("dem", { type: "raster-dem", tiles: [abs("terrain/") + "{z}/{x}/{y}.webp"], tileSize: 512, encoding: "terrarium", minzoom: 10, maxzoom: 15, bounds: U });
     map.addImage("arrow-blue", arrowImage("#1f6fb5"), { pixelRatio: 2 });
 
     // invisible anchors keep layer groups in order however late images are added
@@ -354,10 +367,11 @@
 
     // data
     addImageSet(prefs.base, "anchor-base");
-    getJSON("data/osm.geojson").then((d) => map.getSource("osm").setData(d)).catch(() => toast("Roads didn't load."));
-    getJSON("data/reserves.geojson").then((d) => map.getSource("reserves").setData(d)).catch(() => {});
-    getJSON("data/drainage.geojson").then((d) => map.getSource("drainage").setData(d)).catch(() => {});
-    getJSON("data/contours.geojson").then((d) => map.getSource("contours").setData(d)).catch(() => toast("Contours didn't load."));
+    // vector layers: one file per area, merged into one map source each
+    for (const k of ["osm", "reserves", "drainage", "contours"]) {
+      Promise.all(manifests.map((m) => getJSON(`data/${m.id}/${k}.geojson`).catch(() => FC())))
+        .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
+    }
     loadInfoGrid();
 
     applyLayers();
@@ -380,7 +394,7 @@
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
   };
   function applyLayers() {
-    if (!manifest) return;
+    if (!manifests.length) return;
     for (const b of ["forest", "relief", "height"]) setImageSetVisible(b, prefs.base === b);
     for (const [k, ids] of Object.entries(OV_LAYERS)) ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", prefs.ov[k] ? "visible" : "none"));
     setImageSetVisible("wet", prefs.ov.wet);
@@ -1030,24 +1044,30 @@
   }
 
   // ---------- tap-to-inspect ----------
-  let info = null;
+  let info = null;   // forest and wetness lookup grids, one per area
   async function loadInfoGrid() {
-    try {
-      const img = new Image(); img.decoding = "async"; img.src = abs(manifest.info.url);
-      await img.decode();
-      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
-      const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0);
-      info = { ...manifest.info, px: g.getImageData(0, 0, img.width, img.height).data };
-    } catch { info = null; }
+    const grids = await Promise.all(manifests.map(async (m) => {
+      try {
+        const img = new Image(); img.decoding = "async"; img.src = abs(m.info.url);
+        await img.decode();
+        const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+        const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0);
+        return { ...m.info, px: g.getImageData(0, 0, img.width, img.height).data };
+      } catch { return null; }
+    }));
+    info = grids.filter(Boolean);
+    if (!info.length) info = null;
   }
   function lookupInfo(lon, lat) {
     if (!info) return null;
     const [E, N] = Geo.toSweref(lon, lat);
-    const col = Math.floor((E - info.origin[0]) / info.cell), row = Math.floor((info.origin[1] - N) / info.cell);
-    if (col < 0 || row < 0 || col >= info.width || row >= info.height) return null;
-    const i = (row * info.width + col) * 4;
-    const code = info.codes[info.px[i] - 1];
-    return { code, tree: info.px[i + 1] / 8, twi: info.px[i + 2] / 20 };
+    for (const g of info) {
+      const col = Math.floor((E - g.origin[0]) / g.cell), row = Math.floor((g.origin[1] - N) / g.cell);
+      if (col < 0 || row < 0 || col >= g.width || row >= g.height) continue;
+      const i = (row * g.width + col) * 4;
+      return { code: g.codes[g.px[i] - 1], tree: g.px[i + 1] / 8, twi: g.px[i + 2] / 20 };
+    }
+    return null;
   }
   const demCache = new Map();
   async function demTile(z, x, y) {
@@ -1178,7 +1198,7 @@
       if (firstFix) {
         firstFix = false;
         if (nearArea(ll)) map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
-        else toast(`You're ${(Geo.distance(ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
+        else toast(`You're ${kmToNearestArea(ll).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
       followTick();
@@ -1293,7 +1313,7 @@
         cam.center = myFix.ll;
         if (!Follow.zoomed) { Follow.zoomed = true; if (map.getZoom() < 16.5) cam.zoom = 17; }
       }
-      else if (!Follow.warnedFar) { Follow.warnedFar = true; toast(`You're ${(Geo.distance(myFix.ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000); }
+      else if (!Follow.warnedFar) { Follow.warnedFar = true; toast(`You're ${kmToNearestArea(myFix.ll).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000); }
     }
     if (cam.bearing !== undefined || cam.center) map.jumpTo(cam);
   }

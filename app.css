@@ -395,3 +395,17 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
   .hud-btn { font-size: 13px; }
   .hud-btns { gap: 2px 9px; }
 }
+
+/* the compass keeps the same dark instrument look in light and dark mode */
+.hud { background: rgb(22 28 22 / .94); color: #e6eadf; }
+.hud .hud-face { fill: #1f281f; stroke: #3a463a; }
+.hud .hud-rose line { stroke: #b9c2b0; }
+.hud .hud-rose line.t30, .hud .hud-rose line.t90 { stroke: #f1f4ec; }
+.hud .hud-rose text { fill: #f1f4ec; }
+.hud .hud-rose text.hud-n, .hud .hud-north { fill: #ff4d4d; }
+.hud .hud-pivot { fill: #f1f4ec; }
+.hud .hud-wind path { stroke: #1f281f; }
+.hud .hud-wind-text { color: #f1f4ec; }
+.hud .hud-btn { color: #aab4a2; }
+.hud .hud-btn.on { color: #ff7a2e; border-bottom-color: #ff7a2e; }
+.hud .hud-facing { color: #4da3ff; }

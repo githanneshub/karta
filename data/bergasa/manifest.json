@@ -1,0 +1,690 @@
+{
+ "layers": {
+  "relief": [
+   {
+    "url": "data/bergasa/relief_0_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.5752108,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/relief_0_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/relief_1_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.16846
+     ],
+     [
+      15.5752108,
+      56.16846
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/relief_1_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.16846
+     ],
+     [
+      15.6083263,
+      56.16846
+     ]
+    ]
+   }
+  ],
+  "forest": [
+   {
+    "url": "data/bergasa/forest_0_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.5752108,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/forest_0_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/forest_1_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.16846
+     ],
+     [
+      15.5752108,
+      56.16846
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/forest_1_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.16846
+     ],
+     [
+      15.6083263,
+      56.16846
+     ]
+    ]
+   }
+  ],
+  "height": [
+   {
+    "url": "data/bergasa/height_0_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.5752108,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/height_0_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/height_1_0.webp",
+    "coordinates": [
+     [
+      15.5752108,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.16846
+     ],
+     [
+      15.5752108,
+      56.16846
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/height_1_1.webp",
+    "coordinates": [
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.16846
+     ],
+     [
+      15.6083263,
+      56.16846
+     ]
+    ]
+   }
+  ],
+  "wet": [
+   {
+    "url": "data/bergasa/wet_0_0.png",
+    "coordinates": [
+     [
+      15.5752108,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.5752108,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/wet_0_1.png",
+    "coordinates": [
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/wet_1_0.png",
+    "coordinates": [
+     [
+      15.5752108,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.16846
+     ],
+     [
+      15.5752108,
+      56.16846
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/wet_1_1.png",
+    "coordinates": [
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.16846
+     ],
+     [
+      15.6083263,
+      56.16846
+     ]
+    ]
+   }
+  ],
+  "steep": [
+   {
+    "url": "data/bergasa/steep_0_0.png",
+    "coordinates": [
+     [
+      15.5752108,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.5752108,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/steep_0_1.png",
+    "coordinates": [
+     [
+      15.6083263,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.195638
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/steep_1_0.png",
+    "coordinates": [
+     [
+      15.5752108,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6083263,
+      56.16846
+     ],
+     [
+      15.5752108,
+      56.16846
+     ]
+    ]
+   },
+   {
+    "url": "data/bergasa/steep_1_1.png",
+    "coordinates": [
+     [
+      15.6083263,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.1772095
+     ],
+     [
+      15.6239462,
+      56.16846
+     ],
+     [
+      15.6083263,
+      56.16846
+     ]
+    ]
+   }
+  ]
+ },
+ "bounds": [
+  15.575211,
+  56.168451,
+  15.623958,
+  56.195638
+ ],
+ "id": "bergasa",
+ "name": "Bergåsa",
+ "forestLegend": [
+  {
+   "code": 51,
+   "label": "Byggnad",
+   "color": "#8f8279"
+  },
+  {
+   "code": 52,
+   "label": "Anlagd mark, ej byggnad eller väg/järnväg",
+   "color": "#b4a79c"
+  },
+  {
+   "code": 53,
+   "label": "Väg/järnväg",
+   "color": "#9a9088"
+  },
+  {
+   "code": 61,
+   "label": "Inlandsvatten",
+   "color": "#76a7cc"
+  },
+  {
+   "code": 62,
+   "label": "Hav",
+   "color": "#76a7cc"
+  },
+  {
+   "code": 111,
+   "label": "Tallskog på fastmark",
+   "color": "#93a052"
+  },
+  {
+   "code": 112,
+   "label": "Granskog på fastmark",
+   "color": "#2f5a40"
+  },
+  {
+   "code": 113,
+   "label": "Barrblandskog på fastmark",
+   "color": "#4c6e45"
+  },
+  {
+   "code": 114,
+   "label": "Lövblandad barrskog på fastmark",
+   "color": "#6b9254"
+  },
+  {
+   "code": 115,
+   "label": "Triviallövskog på fastmark",
+   "color": "#a3c76c"
+  },
+  {
+   "code": 116,
+   "label": "Ädellövskog på fastmark",
+   "color": "#d1a443"
+  },
+  {
+   "code": 117,
+   "label": "Triviallövskog med ädellövinslag på fastmark",
+   "color": "#bdb35a"
+  },
+  {
+   "code": 118,
+   "label": "Temporärt ej skog på fastmark",
+   "color": "#e0b39c"
+  },
+  {
+   "code": 121,
+   "label": "Tallskog på våtmark",
+   "color": "#879862"
+  },
+  {
+   "code": 122,
+   "label": "Granskog på våtmark",
+   "color": "#396154"
+  },
+  {
+   "code": 124,
+   "label": "Lövblandad barrskog på våtmark",
+   "color": "#678d63"
+  },
+  {
+   "code": 125,
+   "label": "Triviallövskog på våtmark",
+   "color": "#93b676"
+  },
+  {
+   "code": 126,
+   "label": "Ädellövskog på våtmark",
+   "color": "#b79b56"
+  },
+  {
+   "code": 127,
+   "label": "Triviallövskog med ädellövinslag på våtmark",
+   "color": "#a7a668"
+  },
+  {
+   "code": 200,
+   "label": "Öppen våtmark (underindelning saknas)",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 211,
+   "label": "Buskmyr",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 213,
+   "label": "Fastmattemyr, mager",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 215,
+   "label": "Sumpkärr",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 217,
+   "label": "Våtmark utan växttäcke",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 221,
+   "label": "Våtmark med buskar",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 223,
+   "label": "Gräsdominerad  våtmark, mager",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 225,
+   "label": "Gräsdominerad våtmark, högvuxen",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 226,
+   "label": "Mossdominerad våtmark",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 227,
+   "label": "Lösbottnad våtmark",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 411,
+   "label": "Öppen fastmark utan vegetation (ej glaciär eller varaktigt snöfält)",
+   "color": "#d9d3c8"
+  },
+  {
+   "code": 4211,
+   "label": "211 Buskdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4212,
+   "label": "212 Buskdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4213,
+   "label": "213 Buskdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4221,
+   "label": "221 Risdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4222,
+   "label": "222 Risdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4223,
+   "label": "223 Risdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4231,
+   "label": "231 Gräsdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4232,
+   "label": "232 Gräsdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4233,
+   "label": "233 Gräsdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  }
+ ],
+ "info": {
+  "url": "data/bergasa/info.png",
+  "origin": [
+   535718,
+   6228003
+  ],
+  "cell": 5,
+  "width": 600,
+  "height": 600,
+  "codes": [
+   51,
+   52,
+   53,
+   61,
+   62,
+   111,
+   112,
+   113,
+   114,
+   115,
+   116,
+   117,
+   118,
+   121,
+   122,
+   124,
+   125,
+   126,
+   127,
+   200,
+   211,
+   213,
+   215,
+   217,
+   221,
+   223,
+   225,
+   226,
+   227,
+   411,
+   4211,
+   4212,
+   4213,
+   4221,
+   4222,
+   4223,
+   4231,
+   4232,
+   4233
+  ]
+ }
+}

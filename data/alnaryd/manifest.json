@@ -1,0 +1,363 @@
+{
+ "layers": {
+  "relief": [
+   {
+    "url": "data/alnaryd/relief_0_0.webp",
+    "coordinates": [
+     [
+      15.4182253,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3461994
+     ],
+     [
+      15.4182253,
+      56.3461994
+     ]
+    ]
+   }
+  ],
+  "forest": [
+   {
+    "url": "data/alnaryd/forest_0_0.webp",
+    "coordinates": [
+     [
+      15.4182253,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3461994
+     ],
+     [
+      15.4182253,
+      56.3461994
+     ]
+    ]
+   }
+  ],
+  "height": [
+   {
+    "url": "data/alnaryd/height_0_0.webp",
+    "coordinates": [
+     [
+      15.4182253,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3461994
+     ],
+     [
+      15.4182253,
+      56.3461994
+     ]
+    ]
+   }
+  ],
+  "wet": [
+   {
+    "url": "data/alnaryd/wet_0_0.png",
+    "coordinates": [
+     [
+      15.4182253,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3461994
+     ],
+     [
+      15.4182253,
+      56.3461994
+     ]
+    ]
+   }
+  ],
+  "steep": [
+   {
+    "url": "data/alnaryd/steep_0_0.png",
+    "coordinates": [
+     [
+      15.4182253,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3629076
+     ],
+     [
+      15.4459078,
+      56.3461994
+     ],
+     [
+      15.4182253,
+      56.3461994
+     ]
+    ]
+   }
+  ]
+ },
+ "bounds": [
+  15.418225,
+  56.346191,
+  15.445922,
+  56.362908
+ ],
+ "id": "alnaryd",
+ "name": "Alnaryd",
+ "forestLegend": [
+  {
+   "code": 3,
+   "label": "Åkermark",
+   "color": "#efe4a4"
+  },
+  {
+   "code": 51,
+   "label": "Byggnad",
+   "color": "#8f8279"
+  },
+  {
+   "code": 53,
+   "label": "Väg/järnväg",
+   "color": "#9a9088"
+  },
+  {
+   "code": 61,
+   "label": "Inlandsvatten",
+   "color": "#76a7cc"
+  },
+  {
+   "code": 111,
+   "label": "Tallskog på fastmark",
+   "color": "#93a052"
+  },
+  {
+   "code": 112,
+   "label": "Granskog på fastmark",
+   "color": "#2f5a40"
+  },
+  {
+   "code": 113,
+   "label": "Barrblandskog på fastmark",
+   "color": "#4c6e45"
+  },
+  {
+   "code": 114,
+   "label": "Lövblandad barrskog på fastmark",
+   "color": "#6b9254"
+  },
+  {
+   "code": 115,
+   "label": "Triviallövskog på fastmark",
+   "color": "#a3c76c"
+  },
+  {
+   "code": 116,
+   "label": "Ädellövskog på fastmark",
+   "color": "#d1a443"
+  },
+  {
+   "code": 117,
+   "label": "Triviallövskog med ädellövinslag på fastmark",
+   "color": "#bdb35a"
+  },
+  {
+   "code": 118,
+   "label": "Temporärt ej skog på fastmark",
+   "color": "#e0b39c"
+  },
+  {
+   "code": 121,
+   "label": "Tallskog på våtmark",
+   "color": "#879862"
+  },
+  {
+   "code": 122,
+   "label": "Granskog på våtmark",
+   "color": "#396154"
+  },
+  {
+   "code": 123,
+   "label": "Barrblandskog på våtmark",
+   "color": "#4f7158"
+  },
+  {
+   "code": 124,
+   "label": "Lövblandad barrskog på våtmark",
+   "color": "#678d63"
+  },
+  {
+   "code": 125,
+   "label": "Triviallövskog på våtmark",
+   "color": "#93b676"
+  },
+  {
+   "code": 126,
+   "label": "Ädellövskog på våtmark",
+   "color": "#b79b56"
+  },
+  {
+   "code": 127,
+   "label": "Triviallövskog med ädellövinslag på våtmark",
+   "color": "#a7a668"
+  },
+  {
+   "code": 128,
+   "label": "Temporärt ej skog på våtmark",
+   "color": "#c3a69b"
+  },
+  {
+   "code": 200,
+   "label": "Öppen våtmark (underindelning saknas)",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 211,
+   "label": "Buskmyr",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 215,
+   "label": "Sumpkärr",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 217,
+   "label": "Våtmark utan växttäcke",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 221,
+   "label": "Våtmark med buskar",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 223,
+   "label": "Gräsdominerad  våtmark, mager",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 225,
+   "label": "Gräsdominerad våtmark, högvuxen",
+   "color": "#bba7cc"
+  },
+  {
+   "code": 411,
+   "label": "Öppen fastmark utan vegetation (ej glaciär eller varaktigt snöfält)",
+   "color": "#d9d3c8"
+  },
+  {
+   "code": 4211,
+   "label": "211 Buskdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4212,
+   "label": "212 Buskdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4213,
+   "label": "213 Buskdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4221,
+   "label": "221 Risdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4222,
+   "label": "222 Risdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4223,
+   "label": "223 Risdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4231,
+   "label": "231 Gräsdominerad mark, torr",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4232,
+   "label": "232 Gräsdominerad mark, frisk",
+   "color": "#e3d6a6"
+  },
+  {
+   "code": 4233,
+   "label": "233 Gräsdominerad mark, frisk-fuktig",
+   "color": "#e3d6a6"
+  }
+ ],
+ "info": {
+  "url": "data/alnaryd/info.png",
+  "origin": [
+   525850,
+   6246550
+  ],
+  "cell": 5,
+  "width": 340,
+  "height": 370,
+  "codes": [
+   3,
+   51,
+   53,
+   61,
+   111,
+   112,
+   113,
+   114,
+   115,
+   116,
+   117,
+   118,
+   121,
+   122,
+   123,
+   124,
+   125,
+   126,
+   127,
+   128,
+   200,
+   211,
+   215,
+   217,
+   221,
+   223,
+   225,
+   411,
+   4211,
+   4212,
+   4213,
+   4221,
+   4222,
+   4223,
+   4231,
+   4232,
+   4233
+  ]
+ }
+}
