@@ -17,6 +17,10 @@
   const LIVE_DEM = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
   if (FAMILY) document.documentElement.classList.add("family");
+  // offline: the family site keeps the app and the hunting-ground map on the phone (see sw.js)
+  if (FAMILY && "serviceWorker" in navigator && !location.search.includes("shot=")) {
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
   const PLAN_KINDS = ["stands", "routes", "sightings"];  // things each person plans; tagged with who made them
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
@@ -2170,6 +2174,9 @@
   }
 
   renderPosBtn();
+
+  window.addEventListener("offline", () => toast("No coverage. The map still works; positions and messages are sent when you're back online.", 6000));
+  window.addEventListener("online", () => toast("Back online."));
 
   // ---------- boot ----------
   // ?shot=1 is a development switch for headless screenshots: in-memory sample data, no saving.
