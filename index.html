@@ -13,18 +13,22 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "e0b6e1dfa0";</script>
-<script src="firebase-config.js?v=e0b6e1dfa0"></script>
-<script type="module" src="fb.js?v=e0b6e1dfa0"></script>
+<script>window.APP_VERSION = "4421956d57";</script>
+<script src="firebase-config.js?v=4421956d57"></script>
+<script type="module" src="fb.js?v=4421956d57"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=e0b6e1dfa0">
-<link rel="stylesheet" href="app.css?v=e0b6e1dfa0">
+<link rel="stylesheet" href="maplibre-gl.css?v=4421956d57">
+<link rel="stylesheet" href="app.css?v=4421956d57">
 
+<script>
+  document.documentElement.dataset.theme = "dark";
+  try { if (JSON.parse(localStorage.getItem("alnaryd-prefs") || "{}").night) document.documentElement.classList.add("night"); } catch (e) { /* ignore */ }
+</script>
 <div id="app" data-sheet="peek">
   <aside id="panel" aria-label="Map controls">
     <button id="sheetHandle" class="sheet-handle" type="button" aria-label="Expand or collapse panel"><span></span></button>
@@ -43,7 +47,7 @@
       <button role="tab" id="tab-map" aria-controls="pane-map" aria-selected="true" data-tab="map">Map</button>
       <button role="tab" id="tab-wind" aria-controls="pane-wind" aria-selected="false" data-tab="wind">Wind</button>
       <button role="tab" id="tab-stands" aria-controls="pane-stands" aria-selected="false" data-tab="stands">Stands</button>
-      <button role="tab" id="tab-log" aria-controls="pane-log" aria-selected="false" data-tab="log">Sightings</button>
+      <button role="tab" id="tab-log" aria-controls="pane-log" aria-selected="false" data-tab="log">Log</button>
       <button role="tab" id="tab-family" aria-controls="pane-family" aria-selected="false" data-tab="family" hidden>Family</button>
     </nav>
 
@@ -69,15 +73,17 @@
           <li><label><input type="checkbox" id="ov-wet" data-ov="wet"><span class="sw sw-wet"></span>Wet ground <small>mires, wet hollows</small></label></li>
           <li><label><input type="checkbox" id="ov-drainage" data-ov="drainage"><span class="sw sw-drain"></span>Drainage &amp; cold-air flow</label></li>
           <li><label><input type="checkbox" id="ov-steep" data-ov="steep"><span class="sw sw-steep"></span>Steep ground <small>&gt; 18°</small></label></li>
+          <li><label><input type="checkbox" id="threeD"><span class="sw sw-3d"></span>3D terrain</label></li>
         </ul>
 
-        <h2 class="eyebrow">3D view</h2>
-        <div class="row">
-          <label class="switch"><input type="checkbox" id="threeD"><span>Tilt into 3D</span></label>
+        <div id="whoBox" hidden>
+          <h2 class="eyebrow">Whose plans to show</h2>
+          <p class="note small">Stands, stalk routes and sightings. Only changes what you see on this phone.</p>
+          <ul class="toggles" id="whoList"></ul>
         </div>
-        <label class="slider" for="exag">Height exaggeration <output id="exagOut">1.6×</output></label>
-        <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
 
+        <details class="sect" id="editSect">
+          <summary>Edit the map</summary>
         <h2 class="eyebrow">Boundary</h2>
         <p class="note" id="boundaryInfo">No hunting boundary drawn yet. Use the boundary tool to trace it on the map.</p>
         <div class="row gap">
@@ -118,16 +124,25 @@
             <button class="btn danger" type="button" id="ff-delete">Delete</button>
           </div>
         </form>
+        </details>
 
+        <details class="sect" id="settingsSect">
+          <summary>Settings</summary>
         <h2 class="eyebrow">Language</h2>
         <div class="seg seg2" role="radiogroup" aria-label="Language">
           <label><input type="radio" name="lang" id="lang-sv" value="sv"><span translate="no">Svenska</span></label>
           <label><input type="radio" name="lang" id="lang-en" value="en"><span translate="no">English</span></label>
         </div>
 
+        <h2 class="eyebrow">Screen</h2>
+        <label class="switch"><input type="checkbox" id="nightMode"><span>Night mode (dimmed screen)</span></label>
+        <label class="slider" for="exag">3D height exaggeration <output id="exagOut">1.6×</output></label>
+        <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
+
         <h2 class="eyebrow">Sources</h2>
         <p class="note small">Elevation: Lantmäteriet 1 m laser model (CC0) via Mapterhorn. Land cover: Naturvårdsverket NMD 2023 (CC0). Tree height: Meta &amp; WRI canopy model (CC BY 4.0), imagery about 2018–2020. Roads: © OpenStreetMap contributors. Reserve: Naturvårdsverket.</p>
         <p class="note small">App version: <span id="appVersion" translate="no"></span></p>
+        </details>
       </section>
 
       <!-- WIND -->
@@ -137,16 +152,19 @@
           <div class="fc-strip" id="fcStrip" role="listbox" aria-label="Hourly wind forecast" hidden></div>
           <p class="note small" id="fcNote"></p>
         </div>
-        <div class="wind-head">
-          <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
-          <div class="wind-read">
-            <div class="wind-big" id="windBig">SW</div>
-            <div class="wind-sub" id="windSub">Wind from 225°</div>
-            <div class="wind-sub" id="windScent">Scent drifts toward NE</div>
-          </div>
+        <div class="wind-read wind-now">
+          <div class="wind-big" id="windBig">SW</div>
+          <div><div class="wind-sub" id="windSub">Wind from 225°</div>
+          <div class="wind-sub" id="windScent">Scent drifts toward NE</div></div>
         </div>
-        <label class="slider" for="windSpeed">Wind speed <output id="windSpeedOut">4 m/s</output></label>
-        <input type="range" id="windSpeed" min="0" max="15" step="0.5" value="4">
+        <details class="sect" id="windManual">
+          <summary>Adjust by hand</summary>
+          <div class="wind-head">
+            <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
+          </div>
+          <label class="slider" for="windSpeed">Wind speed <output id="windSpeedOut">4 m/s</output></label>
+          <input type="range" id="windSpeed" min="0" max="15" step="0.5" value="4">
+        </details>
         <div class="row">
           <label class="switch"><input type="checkbox" id="showMyCone" checked><span>Scent cone from my position</span></label>
         </div>
@@ -204,10 +222,6 @@
                   <option value="1.7">moose</option>
                 </select>
               </label>
-              <span><i class="vl-ok"></i>No colour: you can see it, a miss hits the ground</span>
-              <span><i class="vl-open"></i>Yellow stripes: you can see it, but a miss flies on</span>
-              <span><i class="vl-dead"></i>Purple stripes: hidden behind a hill or in a hollow</span>
-              <span><i class="vl-veg"></i>Dark: hidden by thick forest</span>
             </div>
             <p class="note small" id="sf-viewStats">Working out the view…</p>
           </div>
@@ -316,23 +330,24 @@
     <div id="map" aria-label="Map of the hunting ground"></div>
 
     <div class="toolbar" role="toolbar" aria-label="Map tools">
-      <button type="button" class="tool" data-tool="stand" title="Place a stand" aria-label="Place a stand">
-        <svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg></button>
-      <button type="button" class="tool" data-tool="sighting" title="Log a sighting" aria-label="Log a sighting">
-        <svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg></button>
-      <button type="button" class="tool" data-tool="route" title="Plan a stalk route" aria-label="Plan a stalk route">
-        <svg viewBox="0 0 24 24"><path d="M5 19c3-1 3-5 6-6s5 1 8-3"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="10" r="1.8"/></svg></button>
-      <button type="button" class="tool" data-tool="measure" title="Measure distance" aria-label="Measure distance">
-        <svg viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg></button>
-      <button type="button" class="tool" data-tool="layout" title="Edit trails & places" aria-label="Edit trails & places">
-        <svg viewBox="0 0 24 24"><path d="M4 20c2-4 5-4 7-8s4-6 9-8" stroke-dasharray="3 2.2"/><circle cx="18" cy="17" r="2.2"/><path d="M18 19.2V22"/></svg></button>
+      <button type="button" class="tool tool-add" id="addBtn" title="Add or draw" aria-label="Add or draw" aria-haspopup="menu" aria-expanded="false">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
       <span class="tool-sep" aria-hidden="true"></span>
-      <button type="button" class="tool" id="locate" title="Show my position" aria-label="Show my position">
-        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
-      <button type="button" class="tool" id="tilt" title="Toggle 3D" aria-label="Toggle 3D">
+      <button type="button" class="tool" id="locate" data-state="off" title="Show my position" aria-label="Show my position">
+        <svg class="i-off" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        <svg class="i-on" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        <svg class="i-follow" viewBox="0 0 24 24"><path d="M12 3 19 20 12 16 5 20Z" fill="currentColor"/></svg></button>
+      <button type="button" class="tool" id="tilt" title="3D terrain" aria-label="3D terrain">
         <svg viewBox="0 0 24 24"><path d="M3 18 9 8l4 6 3-4 5 8z"/></svg></button>
       <button type="button" class="tool" id="home" title="Back to the hunting ground" aria-label="Back to the hunting ground">
         <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg></button>
+    </div>
+    <div class="addmenu" id="addMenu" role="menu" hidden>
+      <button type="button" role="menuitem" data-tool="stand"><svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg>Place a stand</button>
+      <button type="button" role="menuitem" data-tool="sighting"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z"/><circle cx="12" cy="12" r="2.8"/></svg>Log a sighting</button>
+      <button type="button" role="menuitem" data-tool="route"><svg viewBox="0 0 24 24"><path d="M5 19c3-1 3-5 6-6s5 1 8-3"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="10" r="1.8"/></svg>Plan stalk route</button>
+      <button type="button" role="menuitem" data-tool="measure"><svg viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>Measure distance</button>
+      <button type="button" role="menuitem" data-tool="layout"><svg viewBox="0 0 24 24"><path d="M4 20c2-4 5-4 7-8s4-6 9-8" stroke-dasharray="3 2.2"/><circle cx="18" cy="17" r="2.2"/></svg>Edit trails &amp; places</button>
     </div>
 
     <div id="toolbar-hint" class="hint" hidden>
@@ -361,8 +376,6 @@
         <button type="button" class="hud-wind-text" id="hudWindText" title="Open the wind tab">Wind</button>
         <span class="hud-facing" id="hudFacing"></span>
         <span class="hud-btns">
-          <button type="button" class="hud-btn" id="hudFollow" title="Centre on me and turn the map the way I face">Follow me</button>
-          <button type="button" class="hud-btn" id="hudCompass" title="Show which way I face">Facing</button>
           <button type="button" class="hud-btn" id="hudCone" title="Show my scent cone">My scent</button>
         </span>
       </div>
@@ -413,10 +426,10 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=e0b6e1dfa0"></script>
-<script src="geo.js?v=e0b6e1dfa0"></script>
-<script src="view.js?v=e0b6e1dfa0"></script>
-<script src="app.js?v=e0b6e1dfa0"></script>
+<script src="i18n.js?v=4421956d57"></script>
+<script src="geo.js?v=4421956d57"></script>
+<script src="view.js?v=4421956d57"></script>
+<script src="app.js?v=4421956d57"></script>
 
 </body>
 </html>

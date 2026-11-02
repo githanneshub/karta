@@ -16,6 +16,7 @@
   const BLEKINGE = [14.40, 55.95, 16.20, 56.65];
   const LIVE_DEM = "https://tiles.mapterhorn.com/{z}/{x}/{y}.webp";
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
+  const PLAN_KINDS = ["stands", "routes", "sightings"];  // things each person plans; tagged with who made them
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
   // Areas with map data (Alnaryd, Bergåsa…), loaded from data/areas.json. GPS jumps only go to places near one,
@@ -140,6 +141,7 @@
     },
     async put(kind, item) {
       const { id, ...body } = item;
+      if (FAMILY && PLAN_KINDS.includes(kind) && !body.by && Family.user && !this.data[kind].some((x) => x.id === id)) body.by = Family.user.email.toLowerCase();
       if (this.db && FAMILY) {
         this.db.collection(kind).doc(id).set(body).catch(() => toast("Couldn't save. Check your connection."));
         return;
@@ -353,8 +355,12 @@
     map.addLayer({ id: "sectors", type: "fill", source: "sectors", paint: { "fill-color": ["get", "color"], "fill-opacity": .2 } });
     map.addLayer({ id: "sectors-line", type: "line", source: "sectors", paint: { "line-color": ["get", "color"], "line-width": 1.6 } });
     // routes
-    map.addLayer({ id: "routes-case", type: "line", source: "routes", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 6.5 } });
-    map.addLayer({ id: "routes", type: "line", source: "routes", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "color"], "line-width": 4 } });
+    const notLabel = ["!", ["has", "label"]];
+    map.addLayer({ id: "routes-case", type: "line", source: "routes", filter: notLabel, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 6.5 } });
+    map.addLayer({ id: "routes", type: "line", source: "routes", filter: notLabel, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "color"], "line-width": 4 } });
+    map.addLayer({ id: "routes-label", type: "symbol", source: "routes", filter: ["has", "label"], minzoom: 14,
+      layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "symbol-spacing": 300, "text-max-angle": 35, "text-offset": [0, -1.1] },
+      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     // sightings
     map.addLayer({ id: "sightings", type: "circle", source: "sightings",
       paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 10], "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
@@ -464,8 +470,32 @@
     pass: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
   };
 
+  // Plans (stands, routes, sightings) belong to whoever made them; each person can hide others' plans on their own phone.
+  function planShown(x) { return !(prefs.hideBy || {})[x.by || "?"]; }
+  function plans(kind) { return Store.data[kind].filter(planShown); }
+  function whoName(by) {
+    if (!by) return "Unknown";
+    const m = FAMILY && Family.members.find((x) => x.email === by);
+    return (m && m.name) || by.split("@")[0];
+  }
+  function whoTag(x) { return FAMILY ? ` · ${esc(whoName(x.by))}` : ""; }
+  function renderWho() {
+    const box = $("#whoBox");
+    if (!FAMILY || !Family.user) { box.hidden = true; return; }
+    const people = Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => ({ key: m.email, name: m.name || m.email, color: Family.colorFor(m.email) }));
+    const known = new Set(people.map((p) => p.key));
+    const extra = new Set();
+    for (const k of PLAN_KINDS) for (const x of Store.data[k]) if (!known.has(x.by || "?")) extra.add(x.by || "?");
+    for (const k of extra) people.push({ key: k, name: k === "?" ? "Made before names were saved" : k.split("@")[0], color: "#8a9384" });
+    const me = Family.user.email.toLowerCase(), hide = prefs.hideBy || {};
+    const count = (key) => PLAN_KINDS.reduce((n, k) => n + Store.data[k].filter((x) => (x.by || "?") === key).length, 0);
+    box.hidden = people.length < 2;
+    $("#whoList").innerHTML = people.map((p) => `<li><label><input type="checkbox" data-who="${esc(p.key)}"${hide[p.key] ? "" : " checked"}>
+      <span class="sw" style="background:${p.color};border-radius:50%;width:12px;height:12px;margin:0 5px"></span>${esc(p.name)}${p.key === me ? " <span>(you)</span>" : ""} <small>${count(p.key)}</small></label></li>`).join("");
+  }
+
   function allStands() {
-    const list = Store.data.stands.filter((s) => !draftStand || s.id !== draftStand.id);
+    const list = plans("stands").filter((s) => !draftStand || s.id !== draftStand.id);
     return draftStand ? [...list, draftStand] : list;
   }
 
@@ -592,15 +622,16 @@
     renderStandGeometry();
     // routes
     const feats = [];
-    for (const r of Store.data.routes) {
+    for (const r of plans("routes")) {
       const pts = pairs(r.pts);
       for (let i = 1; i < pts.length; i++) feats.push({ type: "Feature", properties: { color: segColor(pts[i - 1], pts[i]), id: r.id }, geometry: { type: "LineString", coordinates: [pts[i - 1], pts[i]] } });
+      if (FAMILY && pts.length >= 2) feats.push({ type: "Feature", properties: { label: tr(`${r.name || "Stalk route"} · ${whoName(r.by)}`) }, geometry: { type: "LineString", coordinates: pts } });
     }
     map.getSource("routes").setData(FC(feats));
     renderLayout();
     // sightings
     const filter = $("#logFilter").value;
-    map.getSource("sightings").setData(FC(Store.data.sightings.filter((x) => !filter || x.species === filter).map((x) => ({
+    map.getSource("sightings").setData(FC(plans("sightings").filter((x) => !filter || x.species === filter).map((x) => ({
       type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, label: tr(`${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}`) },
       geometry: { type: "Point", coordinates: [x.lon, x.lat] },
     }))));
@@ -618,32 +649,34 @@
   }
 
   function renderLists() {
+    renderWho();
     const sl = $("#standList");
-    const stands = Store.data.stands.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
+    const stands = plans("stands").sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
     sl.innerHTML = stands.length ? stands.map((s) => {
       const st = standStatus(s);
       return `<li data-id="${esc(s.id)}"><span class="dot" style="background:${STATUS_COLORS[st.cls]}"></span>
         <span class="it-main"><div class="it-name">${esc(s.name || "Unnamed stand")}</div>
-        <div class="it-sub">${esc(STAND_TYPES[s.type] || "")} · faces ${Geo.compassName(s.facing)} · ${s.range} m</div></span>
+        <div class="it-sub">${esc(STAND_TYPES[s.type] || "")} · faces ${Geo.compassName(s.facing)} · ${s.range} m${whoTag(s)}</div></span>
         <span class="pill ${st.cls}">${st.text}</span></li>`;
     }).join("") : `<li class="empty">No stands yet. Tap <b>Place a stand</b>, then tap the map where it is.</li>`;
 
     const rl = $("#routeList");
-    rl.innerHTML = Store.data.routes.length ? Store.data.routes.map((r) => {
+    const routes = plans("routes");
+    rl.innerHTML = routes.length ? routes.map((r) => {
       const st = routeStats(pairs(r.pts));
       return `<li data-id="${esc(r.id)}"><span class="it-main"><div class="it-name">${esc(r.name || "Stalk route")}</div>
-        <div class="it-sub">${Math.round(st.len)} m · ${st.intoPct}% into the wind now</div></span>
+        <div class="it-sub">${Math.round(st.len)} m · ${st.intoPct}% into the wind now${whoTag(r)}</div></span>
         <button class="btn small ghost" data-del-route="${esc(r.id)}" type="button">Delete</button></li>`;
     }).join("") : `<li class="empty">Draw a stalking route to check each leg against the wind. Green legs head into the wind.</li>`;
 
     const filter = $("#logFilter").value;
-    const logs = Store.data.sightings.filter((x) => !filter || x.species === filter).sort((a, b) => (b.when || "").localeCompare(a.when || ""));
+    const logs = plans("sightings").filter((x) => !filter || x.species === filter).sort((a, b) => (b.when || "").localeCompare(a.when || ""));
     $("#logList").innerHTML = logs.length ? logs.map((x) => {
       const sp = speciesById[x.species] || speciesById.other;
       const when = x.when ? new Date(x.when).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" }) : "";
       return `<li data-id="${esc(x.id)}"><span class="dot" style="background:${sp.color}"></span>
         <span class="it-main"><div class="it-name">${esc(sp.name)}${x.count > 1 ? " ×" + x.count : ""} · ${esc(KINDS[x.kind] || "Seen")}</div>
-        <div class="it-sub">${esc(when)}${x.wind ? " · wind " + esc(x.wind) : ""}${x.notes ? " · " + esc(x.notes) : ""}</div></span></li>`;
+        <div class="it-sub">${esc(when)}${x.wind ? " · wind " + esc(x.wind) : ""}${whoTag(x)}${x.notes ? " · " + esc(x.notes) : ""}</div></span></li>`;
     }).join("") : `<li class="empty">${filter ? "No sightings of this species yet." : "No sightings yet. Log what you see, where and in which wind, and patterns show up over a season."}</li>`;
 
     const b = Store.data.boundary ? pairs(Store.data.boundary) : null;
@@ -769,7 +802,7 @@
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
     $("#windSpeed").value = w.speed;
     renderHud();
-    const stands = Store.data.stands.map((s) => ({ s, st: standStatus(s) }));
+    const stands = plans("stands").map((s) => ({ s, st: standStatus(s) }));
     const order = { good: 0, warn: 1, bad: 2 };
     stands.sort((a, b) => order[a.st.cls] - order[b.st.cls]);
     $("#windStands").innerHTML = stands.length ? stands.map(({ s, st }) =>
@@ -794,7 +827,7 @@
       if (!tr) tool = t = "layout";
       else edit = { kind: "trail", id: tr.id, closed: false, pts: pairs(tr.pts), sel: -1, history: [] };
     }
-    $$(".tool[data-tool]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.tool === t || (b.dataset.tool === "layout" && LAYOUT_TOOLS.includes(t)))));
+    $("#addBtn").setAttribute("aria-pressed", String(!!t));
     map.getCanvas().style.cursor = t && !["editBoundary", "editTrail", "layout"].includes(t) ? "crosshair" : "";
     if (map.getLayer("boundary-line")) map.setLayoutProperty("boundary-line", "visibility", t === "editBoundary" || !prefs.ov.boundary ? "none" : "visible");
     if (LAYOUT_TOOLS.includes(t) && !prefs.ov.trails) { prefs.ov.trails = true; $("#ov-trails").checked = true; applyLayers(); }
@@ -1001,6 +1034,7 @@
     const item = (type === "place" ? Store.data.places : Store.data.trails).find((x) => x.id === id);
     if (!item) return;
     featDraft = { type, id };
+    $("#editSect").open = true;
     showTab("map", type === "place");
     $("#featForm").hidden = false;
     $("#featTitle").textContent = type === "place" ? "Place name" : "Trail";
@@ -1191,13 +1225,12 @@
   map.on("mouseout", () => { $("#readout").textContent = ""; });
 
   // ---------- GPS ----------
-  let watchId = null, meMarker = null, firstFix = true, myFix = null;
+  let watchId = null, meMarker = null, firstFix = true, myFix = null, firstFixDone = null;
   function startGPS() {
     if (watchId !== null) return true;
     if (!("geolocation" in navigator)) { toast("This browser can't share your position."); return false; }
     firstFix = true;
     prefs.gpsOn = true; savePrefs();
-    $("#locate").setAttribute("aria-pressed", "true");
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
       myFix = { ll, acc: p.coords.accuracy, t: Date.now() };
@@ -1215,6 +1248,7 @@
         if (!nearArea(ll)) toast(`You're outside the detailed map areas (${kmToNearestArea(ll).toFixed(1)} km away), so only the terrain shows here.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
+      if (firstFixDone !== watchId) { firstFixDone = watchId; renderPosBtn(); }
       followTick();
       renderMyCone();
     }, (err) => {
@@ -1224,21 +1258,33 @@
       stopGPS();
       if (FAMILY) Family.setSharing(false);
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+    renderPosBtn();
     return true;
   }
   function stopGPS() {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null; myFix = null; $("#locate").setAttribute("aria-pressed", "false");
+    watchId = null; myFix = null;
     prefs.gpsOn = false; savePrefs();
     if (Follow.on) setFollow(false);
     if (typeof renderHud === "function" && map.getSource("me")) renderHud();
     renderMyCone();
     if (meMarker) { meMarker.remove(); meMarker = null; }
     if (map.getSource("me")) map.getSource("me").setData(FC());
+    renderPosBtn();
   }
-  function toggleLocate() {
-    if (FAMILY && Family.ready) { Family.setSharing(!Family.sharing); return; }
-    if (watchId !== null) stopGPS(); else startGPS();
+  const POS_TITLES = { off: "Show my position", on: "Follow me (the map turns with you)", follow: "Turn off my position" };
+  function posState() { return Follow.on ? "follow" : watchId !== null ? "on" : "off"; }
+  function renderPosBtn() {
+    const st = posState(), b = $("#locate");
+    b.dataset.state = st; b.setAttribute("aria-pressed", String(st !== "off"));
+    b.title = POS_TITLES[st]; b.setAttribute("aria-label", POS_TITLES[st]);
+  }
+  function cyclePosition() {
+    const st = posState();
+    if (st === "off") { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
+    else if (st === "on") setFollow(true);
+    else { setFollow(false); if (FAMILY && Family.ready) Family.setSharing(false); else stopGPS(); }
+    renderPosBtn();
   }
 
   // ---------- compass (top left): north, wind, and which way the phone faces ----------
@@ -1273,8 +1319,6 @@
     if (hasHead) $("#hudHead").removeAttribute("hidden"); else $("#hudHead").setAttribute("hidden", "");
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
     $("#hudFacing").textContent = hasHead ? `Facing ${Geo.compassName(Heading.deg)} ${Math.round(Heading.deg)}°` : "";
-    $("#hudCompass").classList.toggle("on", Heading.on);
-    $("#hudFollow").classList.toggle("on", Follow.on);
     $("#hudCone").classList.toggle("on", !!prefs.myCone && watchId !== null);
     if (meMarker) {
       meMarker.getElement().classList.toggle("has-heading", hasHead);
@@ -1339,9 +1383,10 @@
     } else {
       if (Follow.on) followGestures(false);
       Follow.on = false;
+      if (Heading.on) disableHeading(false);
       map.easeTo({ bearing: 0, duration: 500 });
     }
-    renderHud();
+    renderHud(); renderPosBtn();
   }
   function followTick() {
     if (!Follow.on || Follow.touches > 0 || map.isZooming()) return;
@@ -1430,8 +1475,6 @@
     buildHud();
     $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
-    $("#hudCompass").addEventListener("click", () => (Heading.on ? disableHeading() : enableHeading()));
-    $("#hudFollow").addEventListener("click", () => setFollow(!Follow.on));
     $("#hudCone").addEventListener("click", () => {
       const on = !(prefs.myCone && watchId !== null);
       prefs.myCone = on; savePrefs(); $("#showMyCone").checked = on;
@@ -1441,7 +1484,7 @@
     // moving the map by hand ends follow mode
     map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);
-    $("#locate").addEventListener("click", toggleLocate);
+    $("#locate").addEventListener("click", cyclePosition);
 
     // boundary
     $("#drawBoundary").addEventListener("click", () => { setTool("boundary", { draw: true }); });
@@ -1453,11 +1496,19 @@
     });
 
     // tools
-    $$(".tool[data-tool]").forEach((b) => b.addEventListener("click", () => {
-      const active = tool === b.dataset.tool || (b.dataset.tool === "layout" && LAYOUT_TOOLS.includes(tool));
-      if (active && LAYOUT_TOOLS.includes(tool)) closeFeatForm();
-      setTool(active ? null : b.dataset.tool);
-    }));
+    const menu = $("#addMenu");
+    const closeMenu = () => { menu.hidden = true; $("#addBtn").setAttribute("aria-expanded", "false"); };
+    $("#addBtn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (tool) { if (LAYOUT_TOOLS.includes(tool)) closeFeatForm(); setTool(null); closeMenu(); return; }   // + also cancels what you're doing
+      menu.hidden = !menu.hidden; $("#addBtn").setAttribute("aria-expanded", String(!menu.hidden));
+    });
+    menu.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-tool]"); if (!b) return;
+      closeMenu(); setTool(b.dataset.tool);
+    });
+    document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest("#addMenu")) closeMenu(); });
+    map.on("movestart", closeMenu);
     $("#hintCancel").addEventListener("click", () => {
       if (["editTrail", "newTrail", "newPlace"].includes(tool)) { closeFeatForm(); setTool("layout"); } else setTool(null);
     });
@@ -1555,6 +1606,18 @@
       const r = Store.data.routes.find((x) => x.id === li.dataset.id); if (!r) return;
       const p = pairs(r.pts); const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
       map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 17 });
+    });
+
+    $("#whoList").addEventListener("change", (e) => {
+      const k = e.target.dataset.who; if (!k) return;
+      prefs.hideBy = { ...(prefs.hideBy || {}) };
+      if (e.target.checked) delete prefs.hideBy[k]; else prefs.hideBy[k] = true;
+      savePrefs(); renderAll();
+    });
+    $("#nightMode").checked = !!prefs.night;
+    $("#nightMode").addEventListener("change", (e) => {
+      prefs.night = e.target.checked; savePrefs();
+      document.documentElement.classList.toggle("night", prefs.night);
     });
 
     // language (Swedish by default); switching reloads so every text is redrawn in the new language
@@ -1723,6 +1786,7 @@
       return `Last seen ${age === null ? "" : age < 1 ? "just now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"}${where}`;
     },
     render() {
+      renderWho();
       if (!FAMILY || !this.user) return;
       const owner = this.member && this.member.role === "owner";
       $("#syncState").textContent = (this.member && this.member.name) || "Signed in";
@@ -1845,6 +1909,8 @@
     $("#importFile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) Family.importFile(f); e.target.value = ""; });
     setMode("signin");
   }
+
+  renderPosBtn();
 
   // ---------- boot ----------
   // ?shot=1 is a development switch for headless screenshots: in-memory sample data, no saving.

@@ -148,7 +148,12 @@
     "Elevation": "Höjd", "Slope": "Lutning", "Trees": "Träd", "Moisture": "Fuktighet", "Nearest stand": "Närmaste pass", "Open, under 2 m": "Öppet, under 2 m",
     "Dry": "Torrt", "Fresh": "Friskt", "Moist": "Fuktigt", "Wet": "Blött", "Open at Lantmäteriet ↗": "Öppna hos Lantmäteriet ↗",
     "(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)": "(Flygbild i lagermenyn visar flygfoton, även från 1960 och 1975)",
-    "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Follow me": "Följ mig", "Stop following": "Sluta följa", "My scent": "Vittring", "Show my scent cone": "Visa min vittringskon",
+    "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Log": "Obs", "Edit the map": "Redigera kartan", "Settings": "Inställningar", "Screen": "Skärm",
+    "Night mode (dimmed screen)": "Nattläge (dämpad skärm)", "3D height exaggeration": "Höjdförstärkning i 3D", "3D terrain": "3D-terräng", "Adjust by hand": "Ställ in för hand",
+    "Add or draw": "Lägg till eller rita", "Whose plans to show": "Vems planer som visas",
+    "Stands, stalk routes and sightings. Only changes what you see on this phone.": "Pass, smygrutter och observationer. Ändrar bara vad du ser på din telefon.",
+    "Made before names were saved": "Gjort innan namn sparades", "(you)": "(du)", "Unknown": "Okänd", "Follow me (the map turns with you)": "Följ mig (kartan vrids med dig)",
+    "Turn off my position": "Stäng av min position", "Follow me": "Följ mig", "Stop following": "Sluta följa", "My scent": "Vittring", "Show my scent cone": "Visa min vittringskon",
     "Centre on me and turn the map the way I face": "Centrera på mig och vrid kartan åt det håll jag tittar", "Show which way I face": "Visa vilket håll jag tittar",
     "Follow mode paused. Tap Follow me to continue.": "Följ mig pausat. Tryck på Följ mig för att fortsätta.",
     // compass letters
