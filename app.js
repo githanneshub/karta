@@ -468,10 +468,9 @@
   let draftStand = null;   // stand being edited (new or existing copy)
   const markers = new Map();
 
-  function standStatus(s) {
-    const w = prefs.wind;
+  function standStatus(s, w = prefs.wind) {
     if (w.speed < 1) return { cls: "warn", text: "Calm, swirling" };
-    const down = (localFrom(s.lon, s.lat) + 180) % 360;
+    const down = (localFrom(s.lon, s.lat, w.from) + 180) % 360;
     const d = Geo.angleDiff(down, s.facing);
     if (d <= s.width / 2 + 15) return { cls: "bad", text: "Scent into sector" };
     if (d <= 100) return { cls: "warn", text: "Side wind" };
@@ -487,9 +486,51 @@
     return curved || Geo.wedge([s.lon, s.lat], (w.from + 180) % 360, half, len);
   }
   // The wind where you stand: turned by hills and valleys when the terrain model covers the spot.
-  function localFrom(lon, lat) {
-    const l = terrainWind && window.TerrainWind.local(lon, lat, prefs.wind.from);
-    return l ? l.from : prefs.wind.from;
+  function localFrom(lon, lat, from = prefs.wind.from) {
+    const l = terrainWind && window.TerrainWind.local(lon, lat, from);
+    return l ? l.from : from;
+  }
+
+  // ---------- best stands: forecast wind at each stand plus what you have seen there before ----------
+  // Score = wind (good 3, side 1, scent into the sector -3) + sightings within 300 m that were logged
+  // in a similar wind (same or neighbouring direction) and at a similar time of day (±2 h).
+  function bestStands(h) {
+    const w = { from: h.from, speed: h.speed }, hour = new Date(h.t).getHours(), d8 = dir8(h.from), i8 = WIND8.indexOf(d8);
+    const near8 = new Set([d8, WIND8[(i8 + 1) % 8], WIND8[(i8 + 7) % 8]]);
+    return plans("stands").map((st) => {
+      const ws = standStatus(st, w);
+      let seen = 0, similar = 0;
+      for (const x of Store.data.sightings) {
+        if (Geo.distance([st.lon, st.lat], [x.lon, x.lat]) > 300) continue;
+        seen++;
+        const xh = x.when ? new Date(x.when).getHours() : null, xw = (x.wind || "").split(" ")[0];
+        const timeOk = xh === null || Math.min(Math.abs(xh - hour), 24 - Math.abs(xh - hour)) <= 2;
+        if (timeOk && (!xw || near8.has(xw))) similar += x.count || 1;
+      }
+      const score = (ws.cls === "good" ? 3 : ws.cls === "warn" ? 1 : -3) + Math.min(similar, 10) * 0.6 + Math.min(seen, 10) * 0.1;
+      return { st, ws, seen, similar, score };
+    }).sort((a, b) => b.score - a.score);
+  }
+  function renderBest() {
+    const box = $("#bestStands");
+    if (!Forecast.hours.length || !plans("stands").length) { box.hidden = true; return; }
+    box.hidden = false;
+    const now = Date.now(), tm = new Date(); tm.setDate(tm.getDate() + 1); tm.setMinutes(0, 0, 0);
+    const at = (hr) => { const t = new Date(tm); t.setHours(hr); return Forecast.hours.find((x) => Math.abs(x.t - t.getTime()) < 3600e3); };
+    const slots = [
+      { name: "Now", h: Forecast.hours.find((x) => x.t > now - 3600e3) },
+      { name: "Tomorrow morning", h: at(7) },
+      { name: "Tomorrow evening", h: at(16) },
+    ].filter((x) => x.h);
+    $("#bestList").innerHTML = slots.map(({ name, h }) => {
+      const top = bestStands(h).filter((r) => r.ws.cls !== "bad").slice(0, 3);
+      return `<div class="best-slot"><div class="best-head"><b>${name}</b><span>${Geo.compassName(h.from)} ${Math.round(h.speed)} m/s</span></div>` +
+        (top.length ? top.map((r, i) => `<div class="best-row" data-id="${esc(r.st.id)}"><span class="best-n">${i + 1}</span>
+          <span class="best-name">${esc(r.st.name || "Stand")}</span>
+          <span class="best-why">${r.similar ? `<span>${r.similar} seen in similar wind</span>` : r.seen ? `<span>${r.seen} seen here</span>` : ""}</span>
+          <span class="pill ${r.ws.cls}">${r.ws.text}</span></div>`).join("")
+          : `<div class="note small">No stand has good wind then.</div>`) + `</div>`;
+    }).join("");
   }
   function renderFlow() {
     if (flow) flow.set({ on: prefs.windFlow, from: prefs.wind.from, speed: prefs.wind.speed });
@@ -889,6 +930,7 @@
   }
 
   function renderWind() {
+    renderBest();
     const w = prefs.wind;
     $("#dialG").setAttribute("transform", `rotate(${w.from})`);
     $("#dial").setAttribute("aria-valuenow", String(w.from));
@@ -1609,13 +1651,30 @@
       if (tool) { if (LAYOUT_TOOLS.includes(tool)) closeFeatForm(); setTool(null); closeMenu(); return; }   // + also cancels what you're doing
       menu.hidden = !menu.hidden; $("#addBtn").setAttribute("aria-expanded", String(!menu.hidden));
     });
+    $("#sf-3d").addEventListener("click", () => {
+      if (!draftStand) return;
+      readStandForm();
+      const s = draftStand;
+      open3D({ id: s.id, lon: s.lon, lat: s.lat, facing: s.facing, width: s.width, range: s.range, name: s.name || "", eye: (s.height || 0) + (s.height > 0 ? 1.0 : 1.6) });
+    });
     menu.addEventListener("click", (e) => {
+      if (e.target.closest("[data-v3d]")) {
+        closeMenu();
+        const c = myFix ? myFix.ll : map.getCenter().toArray();
+        open3D({ lon: c[0], lat: c[1], facing: Heading.deg !== null ? Heading.deg : map.getBearing(), eye: 1.6, name: tr(myFix ? "Where you are" : "Map centre") });
+        return;
+      }
       const r = e.target.closest("[data-rec]");
       if (r) { closeMenu(); Rec.start(r.dataset.rec); return; }
       const b = e.target.closest("[data-tool]"); if (!b) return;
       closeMenu(); setTool(b.dataset.tool);
     });
     $("#recStop").addEventListener("click", () => Rec.stop());
+    $("#bestList").addEventListener("click", (e) => {
+      const r = e.target.closest("[data-id]"); if (!r) return;
+      const st = Store.data.stands.find((x) => x.id === r.dataset.id);
+      if (st) { map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 15.5) }); if (isPhone()) setSheet("peek"); }
+    });
     $("#recMarks").addEventListener("click", (e) => { const b = e.target.closest("[data-mark]"); if (b) Rec.mark(b.dataset.mark); });
     $("#trackList").addEventListener("click", async (e) => {
       const del = e.target.closest("[data-del-track]");
@@ -1787,6 +1846,19 @@
       map.easeTo({ center: [x.lon, x.lat], zoom: Math.max(map.getZoom(), 16) });
       draftSighting = { ...x, isNew: false }; openSightForm();
     });
+  }
+
+  // ---------- 3D view from a stand or from where you are ----------
+  async function open3D(o) {
+    const m = manifests.find((x) => inBox([o.lon, o.lat], x.bounds, 0));
+    if (!m) { toast("3D view works inside the map areas."); return; }
+    toast("Building the 3D view…", 2500);
+    try {
+      await window.View3D.open({
+        ...o, abs, trees: m.trees, ground: groundSampler, info: lookupInfo, stands: plans("stands").filter((s) => s.id !== o.id),
+        heading: () => Heading.deg, enableHeading: () => enableHeading(true), compassName: Geo.compassName,
+      });
+    } catch (e) { toast("The 3D view couldn't load. Check your connection."); }
   }
 
   // ---------- recorded tracks and eftersök (blood tracking) ----------
