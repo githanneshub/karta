@@ -123,6 +123,11 @@
 
       <!-- WIND -->
       <section class="pane" id="pane-wind" role="tabpanel" aria-labelledby="tab-wind" hidden>
+        <div class="fc">
+          <div class="fc-head"><span id="fcSource">Loading SMHI forecast…</span><button class="link" id="fcUse" type="button" hidden>Use SMHI forecast</button></div>
+          <div class="fc-strip" id="fcStrip" role="listbox" aria-label="Hourly wind forecast" hidden></div>
+          <p class="note small" id="fcNote"></p>
+        </div>
         <div class="wind-head">
           <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
           <div class="wind-read">

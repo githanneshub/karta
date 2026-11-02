@@ -636,16 +636,91 @@
       if (e.key === "ArrowLeft" || e.key === "ArrowDown") { setWind((prefs.wind.from - step + 360) % 360); e.preventDefault(); }
     });
   }
-  function setWind(from) { prefs.wind.from = Math.round(from) % 360; savePrefs(); renderAll(); }
+  function setWind(from) { prefs.wind.from = Math.round(from) % 360; prefs.windMode = "manual"; savePrefs(); renderAll(); renderForecast(); }
+
+  // ---------- SMHI wind forecast (snow1g point forecast, free, no key) ----------
+  // On claude.ai the page may not fetch outside data; the map then falls back to the last saved forecast or the dial.
+  const SMHI_URL = "https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/"
+    + HOME[0].toFixed(4) + "/lat/" + HOME[1].toFixed(4) + "/data.json";
+  const Forecast = { hours: [], fetched: 0, selT: null, failed: false };
+  async function loadForecast() {
+    try {
+      const r = await fetch(SMHI_URL, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      const d = await r.json();
+      Forecast.hours = d.timeSeries
+        .filter((t) => t.data && typeof t.data.wind_speed === "number" && typeof t.data.wind_from_direction === "number")
+        .map((t) => ({ t: Date.parse(t.time), from: Math.round(t.data.wind_from_direction) % 360, speed: t.data.wind_speed, gust: t.data.wind_speed_of_gust }));
+      Forecast.fetched = Date.now(); Forecast.failed = false;
+      try { localStorage.setItem("alnaryd-forecast", JSON.stringify({ hours: Forecast.hours, fetched: Forecast.fetched })); } catch { /* ignore */ }
+    } catch {
+      Forecast.failed = true;
+      try {
+        const c = JSON.parse(localStorage.getItem("alnaryd-forecast") || "null");
+        if (c && c.hours) { Forecast.hours = c.hours; Forecast.fetched = c.fetched; }
+      } catch { /* ignore */ }
+    }
+    const now = Date.now();
+    Forecast.hours = Forecast.hours.filter((h) => h.t > now - 3600e3).slice(0, 72);
+    if (!Forecast.selT || Forecast.selT < now - 3600e3) Forecast.selT = Forecast.hours.length ? Forecast.hours[0].t : null;
+    if (prefs.windMode !== "manual" && Forecast.selT) applyForecastHour(Forecast.selT, false);
+    renderForecast();
+  }
+  function applyForecastHour(t, scroll = true) {
+    const h = Forecast.hours.find((x) => x.t === t);
+    if (!h) return;
+    Forecast.selT = t;
+    prefs.wind.from = h.from; prefs.wind.speed = Math.round(h.speed * 2) / 2; prefs.windMode = "forecast";
+    savePrefs(); renderAll(); renderForecast(scroll);
+  }
+  const fcDay = (t) => new Date(t).toLocaleDateString("en-GB", { weekday: "short" });
+  const fcClock = (t) => new Date(t).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+  function fcLabel(t) {
+    const d = new Date(t), today = new Date(), tomorrow = new Date(Date.now() + 864e5);
+    const day = d.toDateString() === today.toDateString() ? "Today" : d.toDateString() === tomorrow.toDateString() ? "Tomorrow" : fcDay(t);
+    return `${day} ${fcClock(t)}`;
+  }
+  function renderForecast(scroll = false) {
+    const has = Forecast.hours.length > 0, manual = prefs.windMode === "manual";
+    $("#fcStrip").hidden = !has;
+    $("#fcUse").hidden = !(has && manual);
+    if (!has) {
+      $("#fcSource").textContent = "Set by hand";
+      $("#fcNote").textContent = "The SMHI forecast can't be loaded here. Set the wind with the dial.";
+      return;
+    }
+    const age = Math.round((Date.now() - Forecast.fetched) / 60000);
+    $("#fcSource").textContent = manual ? "Set by hand" : `SMHI forecast · ${fcLabel(Forecast.selT)}`;
+    $("#fcNote").textContent = (Forecast.failed ? `Offline: showing the forecast from ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago. ` : "")
+      + "Big number: wind in m/s, small: gusts. Tap an hour to plan for it. Wind in the forest is weaker and less steady than the forecast.";
+    let lastDay = "";
+    $("#fcStrip").innerHTML = Forecast.hours.map((h) => {
+      const day = fcDay(h.t), newDay = day !== lastDay; lastDay = day;
+      const sel = !manual && h.t === Forecast.selT;
+      const calm = h.speed < 1;
+      return `<button type="button" class="fc-h${sel ? " sel" : ""}${newDay ? " day" : ""}" data-t="${h.t}" role="option" aria-selected="${sel}"
+        aria-label="${fcLabel(h.t)}, wind from ${Geo.compassName(h.from)} ${h.speed.toFixed(1)} metres per second">
+        <span class="fc-day">${newDay ? day : ""}</span><span class="fc-time">${fcClock(h.t).slice(0, 2)}</span>
+        <svg viewBox="-10 -10 20 20" style="transform:rotate(${h.from}deg)"${calm ? ' class="calm"' : ""}><path d="M0 7 L-5 -3 L0 -1 L5 -3 Z"/></svg>
+        <span class="fc-ms">${Math.round(h.speed)}</span><span class="fc-gust">${h.gust ? Math.round(h.gust) : ""}</span></button>`;
+    }).join("");
+    if (scroll || !renderForecast.done) {
+      const el = $("#fcStrip .fc-h.sel");
+      if (el) el.scrollIntoView({ block: "nearest", inline: "center" });
+      renderForecast.done = true;
+    }
+  }
 
   function renderWind() {
     const w = prefs.wind;
     $("#dialG").setAttribute("transform", `rotate(${w.from})`);
     $("#dial").setAttribute("aria-valuenow", String(w.from));
     $("#windBig").textContent = Geo.compassName(w.from);
-    $("#windSub").textContent = `From ${w.from}° at ${w.speed} m/s`;
+    const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
+    $("#windSub").textContent = `From ${w.from}° at ${w.speed} m/s` + (fh && fh.gust ? `, gusts ${Math.round(fh.gust)}` : "");
     $("#windScent").textContent = w.speed < 1 ? "Calm: scent pools and swirls" : `Scent drifts toward ${Geo.compassName((w.from + 180) % 360)}`;
     $("#windSpeedOut").textContent = `${w.speed} m/s`;
+    $("#windSpeed").value = w.speed;
     const stands = Store.data.stands.map((s) => ({ s, st: standStatus(s) }));
     const order = { good: 0, warn: 1, bad: 2 };
     stands.sort((a, b) => order[a.st.cls] - order[b.st.cls]);
@@ -1300,7 +1375,15 @@
     // wind
     buildDial();
     $("#windSpeed").value = prefs.wind.speed;
-    $("#windSpeed").addEventListener("input", (e) => { prefs.wind.speed = +e.target.value; savePrefs(); renderAll(); });
+    $("#windSpeed").addEventListener("input", (e) => { prefs.wind.speed = +e.target.value; prefs.windMode = "manual"; savePrefs(); renderAll(); renderForecast(); });
+    $("#fcStrip").addEventListener("click", (e) => { const b = e.target.closest(".fc-h"); if (b) applyForecastHour(+b.dataset.t); });
+    $("#fcUse").addEventListener("click", () => {
+      const now = Date.now(), first = Forecast.hours.find((h) => h.t > now - 3600e3);
+      applyForecastHour(Forecast.selT && Forecast.selT > now - 3600e3 ? Forecast.selT : first && first.t);
+    });
+    loadForecast();
+    setInterval(loadForecast, 30 * 60e3);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
     $("#showCones").checked = prefs.cones;
     $("#showCones").addEventListener("change", (e) => { prefs.cones = e.target.checked; savePrefs(); applyLayers(); });
 
