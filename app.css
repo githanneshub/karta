@@ -409,3 +409,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud .hud-btn { color: #aab4a2; }
 .hud .hud-btn.on { color: #ff7a2e; border-bottom-color: #ff7a2e; }
 .hud .hud-facing { color: #4da3ff; }
+
+/* iPhone: buttons get a native light look unless told otherwise; the compass is always the dark instrument */
+.hud { background: #161c16 !important; color: #e6eadf !important; color-scheme: dark; forced-color-adjust: none; }
+.hud button { -webkit-appearance: none; appearance: none; background: transparent !important; -webkit-tap-highlight-color: transparent; }
+.hud-rose svg { color: #f1f4ec; }

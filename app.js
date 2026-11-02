@@ -1243,13 +1243,15 @@
     for (let d = 0; d < 360; d += 5) {
       if (d % 90 === 0) continue;
       const len = d % 30 === 0 ? 7 : d % 10 === 0 ? 4.5 : 3, cls = d % 30 === 0 ? "t30" : d % 10 === 0 ? "t10" : "t5";
-      h += `<line class="${cls}" x1="0" y1="${-47 + len}" x2="0" y2="-47" transform="rotate(${d})"/>`;
+      const col = d % 30 === 0 ? "#f1f4ec" : "#b9c2b0", sw = d % 30 === 0 ? 1.6 : d % 10 === 0 ? 1.1 : .8;
+      h += `<line class="${cls}" x1="0" y1="${-47 + len}" x2="0" y2="-47" stroke="${col}" stroke-width="${sw}" stroke-linecap="round" style="stroke:${col}" transform="rotate(${d})"/>`;
     }
-    h += `<path class="hud-north" d="M0 -48 L4.5 -38 L-4.5 -38 Z"/>`;
-    for (const d of [90, 180, 270]) h += `<line class="t90" x1="0" y1="-38" x2="0" y2="-47" transform="rotate(${d})"/>`;
+    h += `<path class="hud-north" fill="#ff4d4d" style="fill:#ff4d4d" d="M0 -48 L4.5 -38 L-4.5 -38 Z"/>`;
+    for (const d of [90, 180, 270]) h += `<line class="t90" x1="0" y1="-38" x2="0" y2="-47" stroke="#f1f4ec" stroke-width="2.2" style="stroke:#f1f4ec" transform="rotate(${d})"/>`;
     for (const [t, d] of HUD_LETTERS) {
       const x = Math.sin(d * Math.PI / 180) * 29, y = -Math.cos(d * Math.PI / 180) * 29;
-      h += `<text class="${t === "N" ? "hud-n" : ""}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-x="${x}" data-y="${y}">${t}</text>`;
+      const fc = t === "N" ? "#ff4d4d" : "#f1f4ec";
+      h += `<text class="${t === "N" ? "hud-n" : ""}" fill="${fc}" style="fill:${fc}" x="${x.toFixed(1)}" y="${y.toFixed(1)}" data-x="${x}" data-y="${y}">${t}</text>`;
     }
     $("#hudRing").innerHTML = h;
   }
