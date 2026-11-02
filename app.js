@@ -1052,7 +1052,7 @@
     $("#hintDone").hidden = !multi || pts.length < (tool === "boundary" ? 3 : 2);
     $("#hintDone").textContent = tool === "measure" ? "Clear" : "Finish";
     let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
-      newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go" }[tool];
+      newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go", v3d: "Tap where you want to stand in 3D" }[tool];
     if (pts.length >= 2 && tool !== "boundary") {
       let d = 0; for (let i = 1; i < pts.length; i++) d += Geo.distance(pts[i - 1], pts[i]);
       text = `${d < 1000 ? Math.round(d) + " m" : (d / 1000).toFixed(2) + " km"}` + (tool === "measure" ? ` · bearing ${Math.round(Geo.bearing(pts[pts.length - 2], pts[pts.length - 1]))}°` : "");
@@ -1099,6 +1099,12 @@
   }
 
   map.on("click", (e) => {
+    if (tool === "v3d") {
+      setTool(null);
+      // look away from the map's bottom edge, i.e. the way the map is turned
+      open3D({ lon: e.lngLat.lng, lat: e.lngLat.lat, facing: map.getBearing(), eye: 1.6, name: tr("Chosen spot") });
+      return;
+    }
     if (tool === "layout") {
       const id = trailAt(e.point);
       if (id) { setTool("editTrail", { trailId: id }); openFeatForm("trail", id); }
@@ -1658,12 +1664,6 @@
       open3D({ id: s.id, lon: s.lon, lat: s.lat, facing: s.facing, width: s.width, range: s.range, name: s.name || "", eye: (s.height || 0) + (s.height > 0 ? 1.0 : 1.6) });
     });
     menu.addEventListener("click", (e) => {
-      if (e.target.closest("[data-v3d]")) {
-        closeMenu();
-        const c = myFix ? myFix.ll : map.getCenter().toArray();
-        open3D({ lon: c[0], lat: c[1], facing: Heading.deg !== null ? Heading.deg : map.getBearing(), eye: 1.6, name: tr(myFix ? "Where you are" : "Map centre") });
-        return;
-      }
       const r = e.target.closest("[data-rec]");
       if (r) { closeMenu(); Rec.start(r.dataset.rec); return; }
       const b = e.target.closest("[data-tool]"); if (!b) return;
@@ -1850,9 +1850,8 @@
 
   // ---------- 3D view from a stand or from where you are ----------
   async function open3D(o) {
-    const m = manifests.find((x) => inBox([o.lon, o.lat], x.bounds, 0));
-    if (!m) { toast("3D view works inside the map areas."); return; }
-    toast("Building the 3D view…", 2500);
+    const m = manifests.find((x) => inBox([o.lon, o.lat], x.bounds, 0)) || {};   // outside the map areas: terrain only, no trees
+    toast(m.trees ? "Building the 3D view…" : "Building the 3D view… No tree data here, only the terrain.", 3500);
     try {
       await window.View3D.open({
         ...o, abs, trees: m.trees, ground: groundSampler, info: lookupInfo, stands: plans("stands").filter((s) => s.id !== o.id),
