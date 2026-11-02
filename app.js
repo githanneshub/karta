@@ -60,7 +60,7 @@
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
     const defaults = { base: "forest", ov: { trails: true, contours: true, roads: true, reserve: true, boundary: true, wet: false, drainage: false, steep: false },
-      wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false };
+      wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try { const p = JSON.parse(localStorage.getItem("alnaryd-prefs") || "null"); return p ? { ...defaults, ...p, ov: { ...defaults.ov, ...p.ov }, wind: { ...defaults.wind, ...p.wind } } : defaults; }
     catch { return defaults; }
@@ -253,7 +253,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "routes", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -324,6 +324,8 @@
     // stands: sectors and scent cones
     map.addLayer({ id: "cones", type: "fill", source: "cones", paint: { "fill-color": "#df5a12", "fill-opacity": .13 } });
     map.addLayer({ id: "cones-line", type: "line", source: "cones", paint: { "line-color": "#df5a12", "line-opacity": .55, "line-width": 1.2, "line-dasharray": [2, 2] } });
+    map.addLayer({ id: "mycone", type: "fill", source: "mycone", paint: { "fill-color": "#ff7a2e", "fill-opacity": .22 } });
+    map.addLayer({ id: "mycone-line", type: "line", source: "mycone", paint: { "line-color": "#ff7a2e", "line-width": 2, "line-dasharray": [1.5, 1.5] } });
     map.addLayer({ id: "sectors", type: "fill", source: "sectors", paint: { "fill-color": ["get", "color"], "fill-opacity": .2 } });
     map.addLayer({ id: "sectors-line", type: "line", source: "sectors", paint: { "line-color": ["get", "color"], "line-width": 1.6 } });
     // routes
@@ -487,6 +489,19 @@
       type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [coneGeom(s)] },
     })) : []));
     if (draftStand && prefs.view) scheduleView(); else hideView();
+    renderMyCone();
+  }
+  // Scent from your own GPS position, shaped by the wind you have set (SMHI or by hand). Calm air: a circle of swirl.
+  function renderMyCone() {
+    const src = map.getSource("mycone");
+    if (!src) return;
+    if (!prefs.myCone || !myFix) { src.setData(FC()); $("#myConeNote").textContent = prefs.myCone ? "Turn on your position to see it." : ""; return; }
+    const w = prefs.wind;
+    const ring = w.speed < 1 ? Geo.circle(myFix.ll, 60) : coneGeom({ lon: myFix.ll[0], lat: myFix.ll[1] });
+    src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }]));
+    $("#myConeNote").textContent = w.speed < 1
+      ? "Calm: your scent spreads about 60 m around you and drifts with the slope."
+      : `Your scent carries about ${Math.round(clamp(120 + w.speed * 70, 120, 700))} m toward ${Geo.compassName((w.from + 180) % 360)}.`;
   }
 
   function editStand(id) {
@@ -710,8 +725,9 @@
         <span class="fc-ms">${Math.round(h.speed)}</span><span class="fc-gust">${h.gust ? Math.round(h.gust) : ""}</span></button>`;
     }).join("");
     if (scroll || !renderForecast.done) {
-      const el = $("#fcStrip .fc-h.sel");
-      if (el) el.scrollIntoView({ block: "nearest", inline: "center" });
+      const el = $("#fcStrip .fc-h.sel"), strip = $("#fcStrip");
+      // scroll only the strip itself; scrollIntoView would also shift the whole page on phones
+      if (el) strip.scrollLeft = el.offsetLeft - strip.offsetLeft - (strip.clientWidth - el.offsetWidth) / 2;
       renderForecast.done = true;
     }
   }
@@ -967,7 +983,8 @@
     $("#ff-kindRow").hidden = type !== "place";
     if (type === "place") $("#ff-kind").value = item.kind || "other";
     $("#ff-help").textContent = type === "place" ? "Drag the name on the map to move it." : "Drag the points on the map to reshape it, then Save.";
-    $("#featForm").scrollIntoView({ block: "nearest" });
+    const panes = $(".panes"), form = $("#featForm");
+    panes.scrollTop = Math.max(0, form.offsetTop - panes.offsetTop - 12);
     renderLayout();
   }
   function closeFeatForm() { featDraft = null; $("#featForm").hidden = true; renderLayout(); }
@@ -1182,6 +1199,7 @@
         else toast(`You're ${(Geo.distance(ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
       }
       if (FAMILY) Family.onFix(p);
+      renderMyCone();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       toast(FAMILY ? "Location is blocked. On iPhone: Settings → Privacy → Location Services → Safari Websites → While Using."
@@ -1194,6 +1212,7 @@
   function stopGPS() {
     if (watchId !== null) navigator.geolocation.clearWatch(watchId);
     watchId = null; myFix = null; $("#locate").setAttribute("aria-pressed", "false");
+    renderMyCone();
     if (meMarker) { meMarker.remove(); meMarker = null; }
     if (map.getSource("me")) map.getSource("me").setData(FC());
   }
@@ -1398,6 +1417,8 @@
     loadForecast();
     setInterval(loadForecast, 30 * 60e3);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
+    $("#showMyCone").checked = prefs.myCone;
+    $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); renderMyCone(); });
     $("#showCones").checked = prefs.cones;
     $("#showCones").addEventListener("change", (e) => { prefs.cones = e.target.checked; savePrefs(); applyLayers(); });
 
@@ -1698,5 +1719,19 @@
   renderAll();
   if (QS.get("sheet")) setSheet(QS.get("sheet"));
   if (QS.has("3d")) map.once("load", () => setTimeout(() => set3D(true, false) || map.jumpTo({ pitch: 62, bearing: -20 }), 200));
+  // Hosted site: if a newer release is out, reload into it (versioned URL so no stale cache is used).
+  async function checkForUpdate() {
+    if (!window.APP_VERSION) return;
+    try {
+      const r = await fetch("version.json?t=" + Date.now(), { cache: "no-store" });
+      const { v } = await r.json();
+      if (!v || v === window.APP_VERSION) return;
+      const key = "alnaryd-update-" + v;
+      try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch { /* ignore */ }
+      location.replace(location.pathname + "?v=" + v);
+    } catch { /* offline: keep running this version */ }
+  }
+  checkForUpdate();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();
 })();
