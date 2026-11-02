@@ -15,6 +15,10 @@
   const HOME = [15.43379, 56.35514]; // the point you gave
   const FAMILY = !!window.FIREBASE_CONFIG;  // hosted family site with Firebase login
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
+  // The map data covers about 4 x 4.5 km. Keep the view (and GPS jumps) near it so nobody ends up over an empty map.
+  const AREA = [15.401146, 56.328076, 15.466322, 56.368731];
+  const nearArea = ([lon, lat], pad = 0.02) =>
+    lon > AREA[0] - pad * 1.8 && lon < AREA[2] + pad * 1.8 && lat > AREA[1] - pad && lat < AREA[3] + pad;
 
   // ---------- reference data ----------
   const LAND = {
@@ -196,6 +200,7 @@
     maxPitch: 75,
     attributionControl: { compact: true, customAttribution: "Lantmäteriet (CC0) via Mapterhorn · Naturvårdsverket NMD · Meta/WRI canopy height · © OpenStreetMap" },
   });
+  map.setMaxBounds([[AREA[0] - 0.09, AREA[1] - 0.05], [AREA[2] + 0.09, AREA[3] + 0.05]]);
   if (location.search.includes("shot=")) window.__map = map;  // test hook for screenshot mode
   map.addControl(new maplibregl.ScaleControl({ unit: "metric", maxWidth: 110 }), "bottom-left");
 
@@ -1171,7 +1176,11 @@
       if (!meMarker) { const el = document.createElement("div"); el.className = "me-dot"; meMarker = new maplibregl.Marker({ element: el }).setLngLat(ll).addTo(map); }
       meMarker.setLngLat(ll);
       map.getSource("me").setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [Geo.circle(ll, p.coords.accuracy)] } }]));
-      if (firstFix) { firstFix = false; map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) }); }
+      if (firstFix) {
+        firstFix = false;
+        if (nearArea(ll)) map.easeTo({ center: ll, zoom: Math.max(map.getZoom(), 16) });
+        else toast(`You're ${(Geo.distance(ll, HOME) / 1000).toFixed(1)} km from the hunting ground. Your dot shows on the map once you're near it.`, 6000);
+      }
       if (FAMILY) Family.onFix(p);
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
@@ -1227,6 +1236,10 @@
     document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
 
+  function goHome() {
+    if (Store.data.boundary && pairs(Store.data.boundary).length >= 3) fitBoundary(true);
+    else map.easeTo({ center: START.center, zoom: START.zoom, bearing: 0 });
+  }
   function fitBoundary(animate = true) {
     const b = Store.data.boundary ? pairs(Store.data.boundary) : null; if (!b || b.length < 3) return;
     const xs = b.map((p) => p[0]), ys = b.map((p) => p[1]);
@@ -1257,6 +1270,7 @@
       if ($("#threeD").checked) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
     });
     $("#north").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
+    $("#home").addEventListener("click", goHome);
     $("#locate").addEventListener("click", toggleLocate);
 
     // boundary
