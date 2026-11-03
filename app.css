@@ -586,6 +586,7 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .game-legend span { display: flex; align-items: center; gap: 8px; }
 .game-legend i { width: 18px; height: 6px; border-radius: 3px; flex: none; }
+.game-legend i.zone { height: 12px; border: 2px solid; box-sizing: border-box; }
 
 
 /* OwnTracks setup */
