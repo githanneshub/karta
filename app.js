@@ -430,7 +430,7 @@
     addImageSet(prefs.base, "anchor-base");
     // vector layers: one file per area, merged into one map source each
     for (const k of ["osm", "reserves", "drainage", "contours", "gamezones"]) {
-      Promise.all(manifests.map((m) => getJSON(`data/${m.id}/${k}.geojson`).catch(() => FC())))
+      Promise.all(manifests.map((m) => getFresh(`data/${m.id}/${k}.geojson`).catch(() => FC())))
         .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
     }
     loadInfoGrid();
