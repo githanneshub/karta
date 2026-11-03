@@ -130,12 +130,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .winds { border: 0; padding: 0; margin: 4px 0 0; }
 .winds legend { font-weight: 500; font-size: 14px; padding: 0; margin-bottom: 6px; }
 .winds small { color: var(--muted); font-weight: 400; }
-.wind-chips { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
-.wind-chips label { position: relative; }
-.wind-chips input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-.wind-chips span { display: block; text-align: center; font: 500 12px var(--f-mono); padding: 6px 0; border: 1px solid var(--line); border-radius: 5px; }
-.wind-chips input:checked + span { background: var(--forest); color: var(--panel); border-color: var(--forest); }
-.wind-chips input:focus-visible + span { outline: 2px solid var(--accent); }
 
 .viewbox { display: flex; flex-direction: column; gap: 6px; padding: 8px 0 2px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); margin: 4px 0; }
 .vl-target { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; color: var(--fg); font-size: 14px; }
@@ -176,9 +170,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .dial .scent { fill: var(--accent); opacity: .18; }
 .wind-big { font: 700 44px/1 var(--f-display); letter-spacing: .02em; }
 .wind-sub { color: var(--muted); font: 13px var(--f-mono); margin-top: 3px; }
-.stand-status { list-style: none; margin: 0; padding: 0; }
-.stand-status li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
-.stand-status li span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 
 /* Map chrome */
 .toolbar {
@@ -333,8 +324,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud-head path { fill: #1d7cf2; }
 .hud-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
 .hud-wind-text { appearance: none; border: 0; background: none; padding: 0; color: var(--fg); font: 700 17px var(--f-display); letter-spacing: .02em; cursor: pointer; white-space: nowrap; }
-.hud-facing { font: 12px var(--f-mono); color: #1d7cf2; white-space: nowrap; }
-.hud-facing:empty { display: none; }
 .hud-btn { appearance: none; border: 0; background: none; padding: 0; color: var(--accent); font: 600 12px var(--f-ui); cursor: pointer; white-space: nowrap; }
 .hint { top: calc(84px + env(safe-area-inset-top, 0px)); }
 /* my position with optional facing beam */
@@ -384,7 +373,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud-north { fill: #e03131; }
 .hud-pivot { fill: var(--fg); }
 @media (max-width: 860px) { .hud-rose { width: 60px; height: 60px; } }
-.hud-facing { font: 600 13px var(--f-ui); }
 .hud-head path { fill: #1d7cf2; stroke: var(--panel); stroke-width: 1.2; }
 /* keep the compass buttons inside the pill on narrow phones */
 .hud { max-width: calc(100% - 76px - env(safe-area-inset-right, 0px)); }
@@ -408,7 +396,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud .hud-wind-text { color: #f1f4ec; }
 .hud .hud-btn { color: #aab4a2; }
 .hud .hud-btn.on { color: #ff7a2e; border-bottom-color: #ff7a2e; }
-.hud .hud-facing { color: #4da3ff; }
 
 /* iPhone: buttons get a native light look unless told otherwise; the compass is always the dark instrument */
 .hud { background: #161c16 !important; color: #e6eadf !important; color-scheme: dark; forced-color-adjust: none; }
@@ -438,7 +425,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 #locate[data-state="off"] .i-off, #locate[data-state="on"] .i-on, #locate[data-state="follow"] .i-follow { display: block; }
 #locate[data-state="on"] { background: var(--raise); color: var(--accent); }
 #locate[data-state="follow"] { background: var(--accent); color: var(--accent-fg); }
-.sw-3d { background: linear-gradient(135deg, #6b7a5a 0 45%, #2f3a2a 45%); }
 
 details.sect { margin: 14px 0 4px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--raise); }
 details.sect > summary {
@@ -450,8 +436,6 @@ details.sect[open] > summary::after { transform: rotate(-135deg); margin-top: 4p
 details.sect[open] { padding-bottom: 12px; }
 details.sect > .eyebrow:first-of-type { margin-top: 2px; }
 
-.wind-now { display: flex; align-items: center; gap: 14px; margin-top: 10px; }
-.wind-now .wind-big { min-width: 64px; }
 
 
 @media (max-width: 860px) {
@@ -573,19 +557,6 @@ html.recording .toast { bottom: calc(220px + env(safe-area-inset-bottom, 0px)); 
 .best-name { font-weight: 600; flex: none; }
 .best-why { flex: 1; color: var(--muted); font-size: 12.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* 3D view */
-.v3d { position: fixed; inset: 0; z-index: 40; background: #b9c8d4; }
-.v3d canvas { width: 100%; height: 100%; display: block; touch-action: none; }
-.v3d-top { position: absolute; top: calc(10px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-.v3d-name { font: 700 18px var(--f-ui); color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .6); }
-.v3d-bottom { position: absolute; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); background: rgb(23 30 23 / .86); color: #e6eadf;
-  border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; max-width: 560px; margin: 0 auto; }
-.v3d-h { display: grid; grid-template-columns: auto auto 1fr; gap: 8px; align-items: center; font-weight: 600; }
-.v3d-h output { font: 500 13px var(--f-mono); min-width: 48px; }
-.v3d-btns { display: flex; align-items: center; gap: 10px; }
-.v3d-btns .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
-.v3d-dir { font: 600 14px var(--f-mono); }
-.v3d-note { margin: 0; font-size: 11.5px; color: #aab4a3; }
 
 /* hunt day */
 .day-card { margin: 10px 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
@@ -604,7 +575,6 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .game-legend[hidden] { display: none; }
 .game-legend span { display: flex; align-items: center; gap: 8px; }
 .game-legend i { width: 18px; height: 6px; border-radius: 3px; flex: none; }
-.game-legend i.dot-pass { width: 10px; height: 10px; border-radius: 50%; background: #ff1fb4; box-shadow: 0 0 0 2px #fff; margin: 0 4px; }
 
 
 /* OwnTracks setup */

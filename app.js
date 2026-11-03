@@ -462,8 +462,9 @@
   }
 
   // ---------- 3D ----------
+  let is3D = false;
   function set3D(on, animate = true) {
-    $("#threeD").checked = on;
+    is3D = on;
     $("#tilt").setAttribute("aria-pressed", String(on));
     if (on) { map.setTerrain({ source: "dem", exaggeration: prefs.exag }); if (animate) map.easeTo({ pitch: 62, duration: 900 }); }
     else { map.setTerrain(null); if (animate) map.easeTo({ pitch: 0, duration: 600 }); }
@@ -949,7 +950,7 @@
     $("#dial").setAttribute("aria-valuenow", String(w.from));
     $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
-    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "");
+    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` · gusts ${Math.round(fh.gust)}` : "");
     const wx = wxHour();
     $("#wxIcon").innerHTML = wx ? wxSvg(wx) : "";
     $("#wxTemp").textContent = wx && typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : "";
@@ -1609,15 +1610,14 @@
       c.checked = !!prefs.ov[c.dataset.ov];
       c.addEventListener("change", () => { prefs.ov[c.dataset.ov] = c.checked; savePrefs(); applyLayers(); });
     });
-    $("#threeD").addEventListener("change", (e) => set3D(e.target.checked));
-    $("#tilt").addEventListener("click", () => set3D(!$("#threeD").checked));
+    $("#tilt").addEventListener("click", () => set3D(!is3D));
     $("#exag").value = prefs.exag; $("#exagOut").textContent = prefs.exag + "×";
     $("#exag").addEventListener("input", (e) => {
       prefs.exag = +e.target.value; $("#exagOut").textContent = prefs.exag.toFixed(1) + "×"; savePrefs();
-      if ($("#threeD").checked) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
+      if (is3D) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
     });
     buildHud();
-    $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: $("#threeD").checked ? map.getPitch() : 0 }));
+    $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: is3D ? map.getPitch() : 0 }));
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
     $("#hudCone").addEventListener("click", () => {
       const on = !(prefs.myCone && watchId !== null);
@@ -1984,7 +1984,7 @@
     tl.innerHTML = saved.length ? saved.map((t) => {
       const d = new Date(t.start || 0).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" });
       return `<li data-id="${esc(t.id)}"><span class="dot" style="background:${t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e"}"></span>
-        <span class="it-main"><div class="it-name"><span>${t.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(d)}${t.live ? " <span>· live</span>" : ""}</div>
+        <span class="it-main"><div class="it-name"><span>${t.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(d)}${t.live && Date.now() - (t.end || 0) < 10 * 60e3 ? " <span>· live</span>" : ""}</div>
         <div class="it-sub">${trackLen(t.pts || [])}${(t.marks || []).length ? ` · ${(t.marks || []).length} marks` : ""}${whoTag(t)}</div></span>
         <button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button></li>`;
     }).join("") : `<li class="empty">No recorded tracks yet. Start one with +.</li>`;
@@ -2043,9 +2043,11 @@
   const Hunt = {
     events: [], stand: null, checkins: {}, seen: null, markers: new Map(), last: new Map(), blocked: false,
     start(db) {
-      this.stand = prefs.onStand || null;
       db.doc("map/onstand").onSnapshot((snap) => {
         this.checkins = snap.exists ? snap.data() : {};
+        const me = Family.user.email.toLowerCase(), c = this.checkins[me];
+        this.stand = c && c.stand && Date.now() - (c.t || 0) < 14 * 3600e3 ? c.stand : null;
+        this.render();
         syncMarkers(); this.checkSafety();
       }, () => {});
       db.collection("events").onSnapshot((snap) => {
@@ -2093,7 +2095,6 @@
         this.stand = best.id; e.standId = best.id; e.standName = best.name || "";
       }
       if (type === "offstand") { if (!this.stand) return; this.stand = null; }
-      prefs.onStand = this.stand; savePrefs();
       if (type === "onstand" || type === "offstand")
         window.FB.db.doc("map/onstand").update({ [e.email]: { stand: this.stand || "", t: Date.now() } }).catch(() => {});
       try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); }
@@ -2263,7 +2264,7 @@
         this.render();
       }, () => {});
     },
-    active() { return !!(this.doc && this.doc.active); },
+    active() { return !!(this.doc && this.doc.active && Date.now() - (this.doc.started || 0) < 14 * 3600e3); },
     me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
     myStand() { return this.active() ? (this.doc.assign || {})[this.me()] || null : null; },
     whoOn(standId) {
