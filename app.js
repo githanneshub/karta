@@ -2165,17 +2165,25 @@
   // OwnTracks posts to the family's Apps Script receiver (tools/owntracks), which writes positions/ot_<email>.
   // The receiver's address lives in map/config, each person's code in map/ot_tokens (made here on first use).
   const OT = {
-    url: "", tokens: {},
+    url: "", tokens: {}, tokensLoaded: false,
     start(db) {
       db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
-      db.doc("map/ot_tokens").onSnapshot((snap) => { this.tokens = snap.exists ? snap.data() : {}; this.render(); }, () => {});
+      db.doc("map/ot_tokens").onSnapshot((snap) => {
+        if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;   // wait for the server before deciding there's no code
+        this.tokens = snap.exists ? snap.data() : {}; this.tokensLoaded = true; this.render();
+      }, () => {});
     },
     me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
+    // A person's code is made once and never replaced: OwnTracks keeps using the address it was given.
     async ensureToken() {
-      if (!this.url || !this.me() || this.tokens[this.me()]) return;
+      if (!this.url || !this.me() || !this.tokensLoaded || this.tokens[this.me()] || this.making) return;
+      this.making = true;
       const a = new Uint8Array(15); crypto.getRandomValues(a);
       const tok = btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
-      await window.FB.db.doc("map/ot_tokens").update({ [this.me()]: tok }).catch(() => {});
+      // re-read first: another of my devices may have made one a moment ago
+      const cur = await window.FB.db.doc("map/ot_tokens").get().catch(() => null);
+      if (!(cur && cur.exists && cur.data()[this.me()])) await window.FB.db.doc("map/ot_tokens").update({ [this.me()]: tok }).catch(() => {});
+      this.making = false;
     },
     personalUrl() {
       const t = this.tokens[this.me()]; if (!this.url || !t) return "";
