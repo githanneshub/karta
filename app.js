@@ -1685,7 +1685,19 @@
       document.querySelectorAll(".maplibregl-popup").forEach((p) => p.remove());
       Rec.start("search", { lon: ev.lon, lat: ev.lat, label: tr(EVENT_TEXT.shot(ev)) });
     });
+    // delete a message: tap Delete, then again within 3 s to confirm (in the list or on its map pin)
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-del-ev]"); if (!b) return;
+      e.stopPropagation();
+      if (b.dataset.confirm !== "1") {
+        b.dataset.confirm = "1"; b.textContent = tr("Confirm");
+        setTimeout(() => { if (b.isConnected) { b.dataset.confirm = ""; b.textContent = tr("Delete"); } }, 3000);
+        return;
+      }
+      Hunt.remove(b.dataset.delEv);
+    }, true);
     $("#eventList").addEventListener("click", (e) => {
+      if (e.target.closest("[data-del-ev]")) return;
       const li = e.target.closest("li[data-lon]"); if (!li) return;
       map.easeTo({ center: [+li.dataset.lon, +li.dataset.lat], zoom: Math.max(map.getZoom(), 16) });
     });
@@ -2038,8 +2050,10 @@
     shot: (e) => `${e.name}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
     down: (e) => `${e.name}: animal down`,
     help: (e) => `${e.name} needs help`,
+    animal: (e) => `${e.name}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
   };
-  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!" };
+  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎" };
+  const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2 };   // how long each kind stays on the map
   const Hunt = {
     events: [], stand: null, checkins: {}, seen: null, markers: new Map(), last: new Map(), blocked: false,
     start(db) {
@@ -2109,7 +2123,7 @@
       if (!map.getSource("me")) return;
       const keep = new Set();
       for (const e of this.events) {
-        if (!["shot", "down", "help"].includes(e.type)) continue;
+        if (!PIN_HOURS[e.type] || Date.now() - e.tc > PIN_HOURS[e.type] * 3600e3) continue;
         keep.add(e.id);
         let m = this.markers.get(e.id);
         if (!m) {
@@ -2120,7 +2134,8 @@
             const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
             new maplibregl.Popup({ closeButton: false, offset: 14 }).setLngLat([e.lon, e.lat])
               .setHTML(`<div class="pop"><b>${esc(tr(EVENT_TEXT[e.type](e)))}</b><br>${t}` +
-                (e.type === "shot" ? `<br><button class="btn small primary" type="button" data-search-from="${esc(e.id)}">${esc(tr("Start blood tracking here"))}</button>` : "") + `</div>`).addTo(map);
+                (e.type === "shot" ? `<br><button class="btn small primary" type="button" data-search-from="${esc(e.id)}">${esc(tr("Start blood tracking here"))}</button>` : "") +
+                (Hunt.canDelete(e) ? `<br><button class="btn small ghost" type="button" data-del-ev="${esc(e.id)}">${esc(tr("Delete"))}</button>` : "") + `</div>`).addTo(map);
           });
           m = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat([e.lon, e.lat]).addTo(map);
           this.markers.set(e.id, m);
@@ -2136,8 +2151,16 @@
       $("#eventList").innerHTML = this.events.length ? this.events.slice(0, 30).map((e) => `<li${typeof e.lon === "number" ? ` data-lon="${e.lon}" data-lat="${e.lat}"` : ""}>
           <span class="fam-dot" style="background:${Family.colorFor(e.email)}" translate="no">${esc(Family.letterFor(e.email, e.name))}</span>
           <span class="it-main"><div class="it-name">${esc(EVENT_TEXT[e.type] ? EVENT_TEXT[e.type](e) : e.type)}</div>
-          <div class="it-sub">${new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</div></span></li>`).join("")
+          <div class="it-sub">${new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</div></span>
+          ${this.canDelete(e) ? `<button class="btn small ghost" type="button" data-del-ev="${esc(e.id)}">Delete</button>` : ""}</li>`).join("")
         : `<li class="empty">No messages today.</li>`;
+    },
+    canDelete(e) {
+      return !!Family.user && (e.email === Family.user.email.toLowerCase() || (Family.member && Family.member.role === "owner"));
+    },
+    async remove(id) {
+      document.querySelectorAll(".maplibregl-popup").forEach((p) => p.remove());
+      await window.FB.db.doc(`events/${id}`).delete().catch(() => toast("Couldn't delete. Try again."));
     },
     // A person inside a shooting sector (stand facing ± half the width, out to SAFETY_RANGE): warn both sides.
     inSector(stand, ll) {
@@ -2533,6 +2556,7 @@
           <span class="fam-dot" style="background:${this.colorFor(m.email)}" translate="no">${esc(this.letterFor(m.email, m.name))}</span>
           <span class="it-main"><div class="it-name">${esc(m.name || m.email)}${m.role === "owner" ? " · owner" : ""}</div>
           <div class="it-sub">${esc(this.statusFor(m.email))}</div></span>
+          ${this.whereIs(m.email) ? `<button class="btn small ghost" type="button" data-coords="${esc(m.email)}">Coordinates</button>` : ""}
           <button class="btn small ghost" type="button" data-look="${esc(m.email)}">Edit</button>
           ${owner && m.role !== "owner" ? `<button class="btn small ghost" type="button" data-remove="${esc(m.email)}">Remove</button>` : ""}</li>`).join("")
         : `<li class="empty">Nobody added yet.</li>`;
@@ -2547,7 +2571,14 @@
         if (!m) {
           const el = document.createElement("div"); el.className = "fam-marker";
           el.innerHTML = `<b translate="no"></b><span></span>`;
-          el.addEventListener("click", (e) => { e.stopPropagation(); map.easeTo({ center: m.getLngLat(), zoom: Math.max(map.getZoom(), 16) }); });
+          el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const cur = this.positions.get(uid) || v;
+            map.easeTo({ center: m.getLngLat(), zoom: Math.max(map.getZoom(), 16) });
+            new maplibregl.Popup({ closeButton: false, offset: 18 }).setLngLat(m.getLngLat())
+              .setHTML(`<div class="pop"><b>${esc(cur.name || cur.email)}</b><br>${cur.lat.toFixed(5)}, ${cur.lon.toFixed(5)}<br>` +
+                `<button class="btn small primary" type="button" data-coords="${esc(cur.email)}">${esc(tr("Copy coordinates"))}</button></div>`).addTo(map);
+          });
           m = new maplibregl.Marker({ element: el }).setLngLat([v.lon, v.lat]).addTo(map);
           this.markers.set(uid, m);
         }
@@ -2579,6 +2610,25 @@
         el.querySelector("b").textContent = this.letterFor(me, this.member && this.member.name);
         el.querySelector("span").textContent = tr("You (OwnTracks)");
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
+    },
+    // where someone is: their latest position (my own: the map's GPS or my OwnTracks)
+    whereIs(email) {
+      const me = this.user && email === this.user.email.toLowerCase();
+      if (me) { const p = myPos(); return p ? { ll: p.ll, acc: p.acc, age: myFix ? 0 : this.ageMin(this.otMine) } : null; }
+      const v = [...this.positions.values()].find((x) => x.email === email);
+      return v && typeof v.lon === "number" ? { ll: [v.lon, v.lat], acc: v.acc, age: this.ageMin(v) } : null;
+    },
+    async copyCoords(email) {
+      const w = this.whereIs(email);
+      if (!w) { toast("No position for them yet."); return; }
+      const m = this.members.find((x) => x.email === email), name = (m && m.name) || email.split("@")[0];
+      const [lon, lat] = w.ll, [E, N] = Geo.toSweref(lon, lat);
+      const age = w.age ? (w.age < 60 ? `${w.age} min` : `${Math.round(w.age / 60)} h`) : "";
+      const text = `${name}: ${lat.toFixed(5)}, ${lon.toFixed(5)} (WGS84)\n` +
+        `SWEREF 99 TM: N ${Math.round(N)} E ${Math.round(E)}${w.acc ? ` (±${Math.round(w.acc)} m)` : ""}\n` +
+        `https://maps.google.com/?q=${lat.toFixed(5)},${lon.toFixed(5)}` + (age ? `\n${tr(`Position from ${age} ago`)}` : "");
+      try { await navigator.clipboard.writeText(text); toast(tr(`Copied ${name}'s coordinates`)); }
+      catch { prompt(tr("Coordinates:"), text.replace(/\n/g, " · ")); }
     },
     async addMember(name, email) {
       email = email.trim().toLowerCase();
@@ -2648,7 +2698,12 @@
       e.preventDefault();
       if (await Family.addMember($("#mf-name").value, $("#mf-email").value)) { $("#mf-name").value = ""; $("#mf-email").value = ""; }
     });
+    document.addEventListener("click", (e) => {
+      const c = e.target.closest("[data-coords]"); if (!c) return;
+      e.stopPropagation(); Family.copyCoords(c.dataset.coords);
+    }, true);
     $("#familyList").addEventListener("click", async (e) => {
+      if (e.target.closest("[data-coords]")) return;
       const lk = e.target.closest("[data-look]");
       if (lk) { Family.openLook(lk.dataset.look); return; }
       const rm = e.target.closest("[data-remove]");
