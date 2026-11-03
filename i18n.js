@@ -237,6 +237,7 @@
     [/^Your stand today: (.+)$/, (m, a) => `Ditt pass i dag: ${a}`],
     [/^Your stand: (.+)$/, (m, a) => `Ditt pass: ${a}`],
     [/^Last position (\d+) min ago$/, (m, a) => `Senaste position för ${a} min sedan`],
+    [/^You · OwnTracks · (.+)$/, (m, a) => `Du · OwnTracks · ${tr(a)}`],
     [/^Scent drifts toward ([A-Z]{1,3})$/, (m, a) => `Vittringen driver mot ${C(a)}`],
     [/^([A-Z]{1,3}) ([\d.]+) m\/s\.?$/, (m, a, b) => `${C(a)} ${b} m/s`],
     [/^Facing ([A-Z]{1,3}) (\d+)°$/, (m, a, b) => `Du tittar mot ${C(a)} ${b}°`],

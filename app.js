@@ -2431,7 +2431,11 @@
     statusFor(email) {
       const pos = [...this.positions.entries()].find(([, v]) => v.email === email);
       const mine = this.user && email === this.user.email.toLowerCase();
-      if (mine) return this.sharing ? (myFix ? "You · sharing now" : "You · waiting for GPS…") : "You · not sharing";
+      if (mine) {
+        if (this.sharing) return myFix ? "You · sharing now" : "You · waiting for GPS…";
+        const ot = this.positions.get(this.user.uid), oa = ot && ot.src === "owntracks" ? this.ageMin(ot) : null;
+        return oa === null ? "You · not sharing" : `You · OwnTracks · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}`;
+      }
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
       const where = myFix ? ` · ${Math.round(Geo.distance(myFix.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(myFix.ll, [v.lon, v.lat]))}` : "";
