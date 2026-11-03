@@ -75,7 +75,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false },
+    const defaults = { windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false },
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -242,12 +242,12 @@
     return area > 0 ? ring : ring.slice().reverse();
   }
 
-  const imageIds = (name) => manifests.flatMap((m) => m.layers[name].map((_, i) => `${name}-${m.id}-${i}`));
+  const imageIds = (name) => manifests.flatMap((m) => (m.layers[name] || []).map((_, i) => `${name}-${m.id}-${i}`));
   function addImageSet(name, beforeId) {
     if (loadedImageSets.has(name) || !manifests.length) return;
     loadedImageSets.add(name);
     for (const m of manifests) {
-      m.layers[name].forEach((chunk, i) => {
+      (m.layers[name] || []).forEach((chunk, i) => {
         const sid = `${name}-${m.id}-${i}`;
         map.addSource(sid, { type: "image", url: abs(chunk.url), coordinates: chunk.coordinates });
         map.addLayer({ id: sid, type: "raster", source: sid, paint: { "raster-fade-duration": 0, "raster-resampling": "linear" } }, beforeId);
@@ -255,7 +255,7 @@
     }
   }
   function setImageSetVisible(name, on) {
-    if (on) addImageSet(name, name === "wet" || name === "steep" ? "anchor-overlays" : "anchor-base");
+    if (on) addImageSet(name, ["wet", "steep", "game"].includes(name) ? "anchor-overlays" : "anchor-base");
     for (const id of imageIds(name)) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
   }
 
@@ -296,7 +296,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "game", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -376,6 +376,12 @@
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
       paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
+    map.addLayer({ id: "game-pts", type: "circle", source: "game", minzoom: 13,
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 9], "circle-color": "#ff1fb4", "circle-stroke-color": "#fff", "circle-stroke-width": 2,
+        "circle-opacity": ["interpolate", ["linear"], ["get", "strength"], 0, .55, 1, 1] } });
+    map.addLayer({ id: "game-pts-label", type: "symbol", source: "game", minzoom: 15,
+      layout: { "text-field": tr("Passage"), "text-font": ["Open Sans Semibold"], "text-size": 11, "text-offset": [0, 1.2], "text-anchor": "top" },
+      paint: { "text-color": "#7a0d12", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
     // recorded tracks and blood-tracking marks
     map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
@@ -413,6 +419,9 @@
       Promise.all(manifests.map((m) => getJSON(`data/${m.id}/${k}.geojson`).catch(() => FC())))
         .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
     }
+    // game-trail model: passages where trails funnel together (areas that have the model)
+    Promise.all(manifests.filter((m) => m.gamePoints).map((m) => getJSON(m.gamePoints).catch(() => FC())))
+      .then((parts) => map.getSource("game").setData(FC(parts.flatMap((d) => d.features))));
     loadInfoGrid();
 
     applyLayers();
@@ -431,6 +440,7 @@
     roads: ["road-case", "road", "track", "path", "power", "buildings", "road-label"],
     reserve: ["reserve-fill", "reserve-line-halo", "reserve-line"],
     sightings: ["sightings", "sightings-label"],
+    game: ["game-pts", "game-pts-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
@@ -441,6 +451,8 @@
     for (const [k, ids] of Object.entries(OV_LAYERS)) ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", prefs.ov[k] ? "visible" : "none"));
     setImageSetVisible("wet", prefs.ov.wet);
     setImageSetVisible("steep", prefs.ov.steep);
+    setImageSetVisible("game", prefs.ov.game);
+    $("#gameLegend").hidden = !prefs.ov.game;
     for (const id of ["cones", "cones-line"]) map.setLayoutProperty(id, "visibility", prefs.cones ? "visible" : "none");
   }
 
@@ -862,13 +874,19 @@
   }
   function sunTimes(t) {
     const d = new Date(t); d.setHours(0, 0, 0, 0);
-    let up = null, down = null, prev = sunAlt(d.getTime(), HOME[0], HOME[1]);
-    for (let m = 5; m <= 1440; m += 5) {
-      const tt = d.getTime() + m * 6e4, a = sunAlt(tt, HOME[0], HOME[1]);
-      if (prev < -0.833 && a >= -0.833) up = tt; if (prev >= -0.833 && a < -0.833) down = tt;
-      prev = a;
+    // sunrise/sunset = sun's upper edge on the horizon (-0.833° with refraction); find the 10-minute step
+    // where it crosses, then narrow it down to the second
+    const h = (t) => sunAlt(t, HOME[0], HOME[1]) + 0.833;
+    const exact = (a, b) => { for (let i = 0; i < 20; i++) { const m = (a + b) / 2; if ((h(a) < 0) === (h(m) < 0)) a = m; else b = m; } return (a + b) / 2; };
+    let up = null, down = null, t0 = d.getTime();
+    for (let m = 10; m <= 1440; m += 10) {
+      const t1 = d.getTime() + m * 6e4;
+      if (h(t0) < 0 && h(t1) >= 0) up = exact(t0, t1);
+      if (h(t0) >= 0 && h(t1) < 0) down = exact(t0, t1);
+      t0 = t1;
     }
-    return { up, down };
+    const min = (t) => (t === null ? null : Math.round(t / 6e4) * 6e4);   // nearest minute, like almanacs show it
+    return { up: min(up), down: min(down) };
   }
   const SUN = '<circle cx="16" cy="16" r="6" fill="#f5b82e"/><g stroke="#f5b82e" stroke-width="2" stroke-linecap="round"><path d="M16 3v3M16 26v3M3 16h3M26 16h3M6.8 6.8l2.1 2.1M23.1 23.1l2.1 2.1M6.8 25.2l2.1-2.1M23.1 8.9l2.1-2.1"/></g>';
   const MOON = '<path d="M20 5a11 11 0 1 0 7 19A9 9 0 0 1 20 5z" fill="#e6dfb8"/>';
