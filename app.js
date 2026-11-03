@@ -296,7 +296,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -374,6 +374,8 @@
     map.addLayer({ id: "routes-label", type: "symbol", source: "routes", filter: ["has", "label"], minzoom: 14,
       layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "symbol-spacing": 300, "text-max-angle": 35, "text-offset": [0, -1.1] },
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
+    map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
+      paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
     // recorded tracks and blood-tracking marks
     map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
@@ -581,7 +583,7 @@
       if (!m) {
         const el = document.createElement("div");
         el.className = "stand-marker";
-        el.innerHTML = `<div class="disc"></div><div class="stand-label"></div><b class="stand-who" hidden></b>`;
+        el.innerHTML = `<div class="disc"></div><div class="stand-label"></div><b class="stand-who" hidden translate="no"></b>`;
         el.addEventListener("click", (e) => { e.stopPropagation(); if (!tool) editStand(s.id); });
         m = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([s.lon, s.lat]).addTo(map);
         m.on("drag", () => {
@@ -1400,6 +1402,7 @@
       followTick();
       renderMyCone();
       Rec.onFix(ll, p.coords.accuracy);
+      if (FAMILY) renderGoto();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       clearTimeout(startGPS.slow);
@@ -1635,7 +1638,22 @@
     $("#huntBtn").addEventListener("click", (e) => {
       e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
     });
+    $("#dayCard").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-day]"); if (!b) return;
+      if (b.dataset.day === "start") Day.begin();
+      if (b.dataset.day === "end") {
+        if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Tap again to end"); setTimeout(() => { if (b.isConnected) { b.dataset.confirm = ""; b.textContent = tr("End the hunt day"); } }, 3000); return; }
+        Day.end();
+      }
+    });
+    $("#dayCard").addEventListener("change", (e) => { const s = e.target.closest("[data-assign]"); if (s) Day.assign(s.dataset.assign, s.value); });
+    $("#myStandChip").addEventListener("click", () => {
+      const st = Store.data.stands.find((x) => x.id === $("#myStandChip").dataset.id); if (!st) return;
+      if (myFix) map.fitBounds([[Math.min(myFix.ll[0], st.lon), Math.min(myFix.ll[1], st.lat)], [Math.max(myFix.ll[0], st.lon), Math.max(myFix.ll[1], st.lat)]], { padding: 90, maxZoom: 17 });
+      else map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 16) });
+    });
     hmenu.addEventListener("click", (e) => {
+      if (e.target.closest("[data-day]")) { closeHunt(); if (Day.active()) showTab("family", true); else Day.begin(); return; }
       const b = e.target.closest("[data-ev]"); if (!b) return;
       closeHunt(); Hunt.send(b.dataset.ev);
     });
@@ -1980,6 +1998,8 @@
   const SAFETY_RANGE = 600;   // m: a bullet carries far past the stand's own range, so warn well beyond it
   const EVENT_TEXT = {
     onstand: (e) => `${e.name} is on stand ${e.standName || ""}`.trim(),
+    daystart: (e) => `${e.name} started the hunt day`,
+    dayend: (e) => `${e.name}: the hunt is over`,
     offstand: (e) => `${e.name} left the stand`,
     shot: (e) => `${e.name}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
     down: (e) => `${e.name}: animal down`,
@@ -2005,7 +2025,15 @@
     onStand(standId) {
       for (const [, v] of Family.positions) if (v.stand === standId && v.sharing && Family.ageMin(v) !== null && Family.ageMin(v) < 30) return v;
       if (this.stand === standId && Family.user) return { email: Family.user.email.toLowerCase(), name: Family.member && Family.member.name };
+      const who = Day.whoOn(standId);
+      if (who) { const m = Family.members.find((x) => x.email === who); return { email: who, name: m ? m.name : who.split("@")[0], planned: true }; }
       return null;
+    },
+    // post a message that needs no position (hunt day start and end)
+    async post(type, extra = {}) {
+      const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0], tc: Date.now(), ...extra };
+      if (myFix) { e.lon = myFix.ll[0]; e.lat = myFix.ll[1]; }
+      try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); } catch { /* rules not published yet */ }
     },
     async send(type) {
       if (!myFix) {
@@ -2061,7 +2089,7 @@
       for (const [id, m] of this.markers) if (!keep.has(id)) { m.remove(); this.markers.delete(id); }
       $("#huntOff").hidden = !this.stand;
       $("#huntOn").hidden = !!this.stand;
-      $("#eventList").innerHTML = this.events.length ? this.events.slice(0, 30).map((e) => `<li data-lon="${e.lon}" data-lat="${e.lat}">
+      $("#eventList").innerHTML = this.events.length ? this.events.slice(0, 30).map((e) => `<li${typeof e.lon === "number" ? ` data-lon="${e.lon}" data-lat="${e.lat}"` : ""}>
           <span class="fam-dot" style="background:${Family.colorFor(e.email)}" translate="no">${esc(Family.letterFor(e.email, e.name))}</span>
           <span class="it-main"><div class="it-name">${esc(EVENT_TEXT[e.type] ? EVENT_TEXT[e.type](e) : e.type)}</div>
           <div class="it-sub">${new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}</div></span></li>`).join("")
@@ -2076,11 +2104,22 @@
       if (!FAMILY || !Family.user) return;
       const msgs = [], uid = Family.user.uid;
       const live = [...Family.positions].filter(([id, v]) => id !== uid && v.sharing && typeof v.lon === "number" && Family.ageMin(v) !== null && Family.ageMin(v) < 5);
-      const mine = this.stand && Store.data.stands.find((x) => x.id === this.stand);
+      const me = Family.user.email.toLowerCase();
+      // my stand counts once I've checked in, or once I'm at the stand I was given today
+      const plannedId = Day.myStand(), planned = plannedId && Store.data.stands.find((x) => x.id === plannedId);
+      const mine = (this.stand && Store.data.stands.find((x) => x.id === this.stand)) || (planned && myFix && Geo.distance(myFix.ll, [planned.lon, planned.lat]) < 50 ? planned : null);
       if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${v.name || v.email} is in your shooting sector` });
-      if (myFix) for (const [, v] of live) {
-        const st = v.stand && Store.data.stands.find((x) => x.id === v.stand);
-        if (st && this.inSector(st, myFix.ll)) msgs.push({ key: "me:" + v.email, text: `You're in ${v.name || v.email}'s shooting sector` });
+      if (myFix) {
+        const others = new Map();   // stand id -> who sits there (checked in now, or given the stand today)
+        for (const [, v] of live) if (v.stand) others.set(v.stand, v.name || v.email);
+        if (Day.active()) for (const [email, sid] of Object.entries(Day.doc.assign || {})) {
+          if (!sid || email === me || others.has(sid)) continue;
+          const m = Family.members.find((x) => x.email === email); others.set(sid, (m && m.name) || email.split("@")[0]);
+        }
+        for (const [sid, name] of others) {
+          const st = Store.data.stands.find((x) => x.id === sid);
+          if (st && st.id !== (mine && mine.id) && this.inSector(st, myFix.ll)) msgs.push({ key: "me:" + sid, text: `You're in ${name}'s shooting sector` });
+        }
       }
       const banner = $("#safety");
       banner.hidden = !msgs.length;
@@ -2091,6 +2130,110 @@
       }
     },
   };
+
+  // ---------- hunt day: leader, who sits where, start and end, summary ----------
+  // Stored in map/huntday (the map collection is open to every member, so no new rules are needed);
+  // finished days are kept as map/day_<id> summaries.
+  const Day = {
+    doc: null, past: [],
+    start(db) {
+      db.doc("map/huntday").onSnapshot((snap) => {
+        const was = this.active();
+        this.doc = snap.exists ? snap.data() : null;
+        this.render(); syncMarkers(); Hunt.checkSafety(); renderGoto();
+        if (!was && this.active() && this.myStand() && this.doc.leader !== Family.user.email.toLowerCase()) {
+          const st = Store.data.stands.find((x) => x.id === this.myStand());
+          if (st) toast(tr(`Your stand today: ${st.name || "Stand"}`), 7000);
+        }
+      }, () => {});
+      db.collection("map").onSnapshot((snap) => {
+        this.past = snap.docs.filter((d) => d.id.startsWith("day_")).map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => b.started - a.started);
+        this.render();
+      }, () => {});
+    },
+    active() { return !!(this.doc && this.doc.active); },
+    me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
+    myStand() { return this.active() ? (this.doc.assign || {})[this.me()] || null : null; },
+    whoOn(standId) {
+      if (!this.active()) return null;
+      for (const [email, sid] of Object.entries(this.doc.assign || {})) if (sid === standId) return email;
+      return null;
+    },
+    canLead() { return this.active() && (this.doc.leader === this.me() || (Family.member && Family.member.role === "owner")); },
+    async begin() {
+      const assign = {};
+      for (const [, v] of Family.positions) if (v.stand && v.email) assign[v.email] = v.stand;   // already sitting
+      await window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
+        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` });
+      Hunt.post("daystart");
+      showTab("family", true);
+    },
+    async assign(email, standId) {
+      await window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" } }).catch(() => toast("Couldn't save. Check your connection."));
+    },
+    async end() {
+      const d = this.doc; if (!d) return;
+      const since = d.started || 0, name = (e) => { const m = Family.members.find((x) => x.email === e); return (m && m.name) || e.split("@")[0]; };
+      const ev = Hunt.events.filter((e) => e.tc >= since);
+      const summary = {
+        started: since, ended: Date.now(), leaderName: d.leaderName || "", wind: d.wind || "",
+        sat: Object.entries(d.assign || {}).filter(([, sid]) => sid).map(([e, sid]) => ({ name: name(e), stand: (Store.data.stands.find((x) => x.id === sid) || {}).name || "?" })),
+        shots: ev.filter((e) => e.type === "shot").map((e) => ({ name: e.name, t: e.tc, dir: typeof e.heading === "number" ? Geo.compassName(e.heading) : "" })),
+        downs: ev.filter((e) => e.type === "down").map((e) => ({ name: e.name, t: e.tc })),
+        tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
+      };
+      await window.FB.db.doc(`map/day_${since}`).set(summary).catch(() => {});
+      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now() }).catch(() => toast("Couldn't save. Check your connection."));
+      Hunt.post("dayend");
+    },
+    render() {
+      const card = $("#dayCard"); if (!card) return;
+      const hm = (t) => new Date(t).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+      const stands = Store.data.stands.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
+      let h = "";
+      if (this.active()) {
+        const d = this.doc, lead = this.canLead();
+        h += `<h2 class="eyebrow">Hunt day in progress</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
+        h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
+          const cur = (d.assign || {})[m.email] || "";
+          const opts = `<option value="">–</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
+          return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
+            <span class="it-main"><div class="it-name">${esc(m.name || m.email)}</div></span>
+            <select data-assign="${esc(m.email)}"${lead ? "" : " disabled"} aria-label="Stand">${opts}</select></li>`;
+        }).join("") + `</ul>`;
+        if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
+      } else {
+        h += `<h2 class="eyebrow">Hunt day</h2><p class="note small">Start a hunt day to give everyone a stand. Given stands count for the shooting-sector warning right away.</p>
+          <button class="btn primary" type="button" data-day="start">Start hunt day</button>`;
+      }
+      if (this.past.length) {
+        h += `<h2 class="eyebrow">Earlier hunt days</h2><ul class="items day-past">` + this.past.slice(0, 10).map((p) => {
+          const day = new Date(p.started).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+          const lines = [
+            p.sat && p.sat.length ? p.sat.map((x) => `${esc(x.name)}: ${esc(x.stand)}`).join(", ") : "",
+            (p.shots || []).map((x) => `<span>Shot</span> ${hm(x.t)} ${esc(x.name)}${x.dir ? " → " + x.dir : ""}`).join("<br>"),
+            (p.downs || []).map((x) => `<span>Animal down</span> ${hm(x.t)} ${esc(x.name)}`).join("<br>"),
+            (p.tracks || []).map((x) => `<span>${x.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(x.name)} ${esc(x.len)}`).join("<br>"),
+          ].filter(Boolean).join("<br>");
+          return `<li><details><summary><b>${esc(day)}</b> ${hm(p.started)}–${hm(p.ended)} · ${(p.shots || []).length} <span>shots</span> · ${(p.downs || []).length} <span>down</span></summary>
+            <div class="it-sub">${p.wind ? `<span>Wind</span> ${esc(p.wind)}<br>` : ""}${lines || ""}</div></details></li>`;
+        }).join("") + `</ul>`;
+      }
+      card.innerHTML = h;
+      $("#dayStartBtn").hidden = this.active();
+    },
+  };
+  // the stand you were given today: a chip on the map and a line from you to it
+  function renderGoto() {
+    const src = map.getSource("goto"), chip = $("#myStandChip");
+    const sid = FAMILY ? Day.myStand() : null, st = sid && Store.data.stands.find((x) => x.id === sid);
+    if (!st) { chip.hidden = true; if (src) src.setData(FC()); return; }
+    chip.hidden = false;
+    const near = myFix && Geo.distance(myFix.ll, [st.lon, st.lat]);
+    chip.textContent = tr(`Your stand: ${st.name || "Stand"}`) + (myFix ? ` · ${Math.round(near)} m ${Geo.compassName(Geo.bearing(myFix.ll, [st.lon, st.lat]))}` : "");
+    chip.dataset.id = st.id;
+    if (src) src.setData(FC(myFix && near > 30 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [myFix.ll, [st.lon, st.lat]] } }] : []));
+  }
 
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
   const LOOK_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d", "#e03131", "#495057", "#f5c518", "#ffffff"];
@@ -2175,7 +2318,7 @@
         this.render();
         syncMarkers(); Hunt.checkSafety();
       }, () => {});
-      Hunt.start(db);
+      Hunt.start(db); Day.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();
@@ -2261,7 +2404,7 @@
         let m = this.markers.get(uid);
         if (!m) {
           const el = document.createElement("div"); el.className = "fam-marker";
-          el.innerHTML = `<b></b><span></span>`;
+          el.innerHTML = `<b translate="no"></b><span></span>`;
           el.addEventListener("click", (e) => { e.stopPropagation(); map.easeTo({ center: m.getLngLat(), zoom: Math.max(map.getZoom(), 16) }); });
           m = new maplibregl.Marker({ element: el }).setLngLat([v.lon, v.lat]).addTo(map);
           this.markers.set(uid, m);
