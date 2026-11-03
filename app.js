@@ -67,7 +67,7 @@
     { id: "other", name: "Other", sv: "annat", color: "#6c757d" },
   ];
   const speciesById = Object.fromEntries(SPECIES.map((s) => [s.id, s]));
-  const KINDS = { seen: "Seen", shot: "Shot", tracks: "Tracks / sign", bed: "Bed / daybed", rub: "Rub / wallow" };
+  const KINDS = { seen: "Seen", heard: "Heard", shot: "Shot", tracks: "Tracks / sign", bed: "Bed / daybed", rub: "Rub / wallow" };
   const STAND_TYPES = { tower: "Tower / high seat", ladder: "Ladder stand", ground: "Ground blind", pass: "Drive post" };
   const WIND8 = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   const dir8 = (deg) => WIND8[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
@@ -405,7 +405,10 @@
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
     // sightings
     map.addLayer({ id: "sightings", type: "circle", source: "sightings",
-      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 10], "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
+      // heard (not seen): a hollow ring in the species colour
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 10],
+        "circle-color": ["case", ["get", "heard"], "rgba(255,255,255,.85)", ["get", "color"]],
+        "circle-stroke-color": ["case", ["get", "heard"], ["get", "color"], "#fff"], "circle-stroke-width": ["case", ["get", "heard"], 3.5, 2.5] } });
     map.addLayer({ id: "sightings-label", type: "symbol", source: "sightings", minzoom: 15.5,
       layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 11, "text-offset": [0, 1.3], "text-anchor": "top" },
       paint: { "text-color": "#1c231b", "text-halo-color": "rgba(255,255,255,.9)", "text-halo-width": 1.5 } });
@@ -733,7 +736,8 @@
     // sightings
     const filter = $("#logFilter").value;
     map.getSource("sightings").setData(FC(plans("sightings").filter((x) => !filter || x.species === filter).map((x) => ({
-      type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, label: tr(`${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}`) },
+      type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, heard: x.kind === "heard",
+        label: tr(`${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}${x.kind === "heard" ? " · Heard" : ""}`) },
       geometry: { type: "Point", coordinates: [x.lon, x.lat] },
     }))));
     // boundary

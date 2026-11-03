@@ -79,7 +79,7 @@
     "Confirm": "Bekräfta",
     // sightings
     "Log a sighting": "Logga observation", "Filter sightings by species": "Filtrera observationer per art", "Sighting": "Observation", "Species": "Art", "Count": "Antal",
-    "When": "När", "What": "Vad", "Seen": "Sett", "Shot": "Skjuten", "Tracks / sign": "Spår / tecken", "Bed / daybed": "Liga / dagliga", "Rub / wallow": "Fejning / gyttjebad",
+    "When": "När", "What": "Vad", "Seen": "Sett", "Heard": "Hört (ljud)", "Shot": "Skjuten", "Tracks / sign": "Spår / tecken", "Bed / daybed": "Liga / dagliga", "Rub / wallow": "Fejning / gyttjebad",
     "Cow with calf heading north along the ditch": "Ko med kalv på väg norrut längs diket", "Save sighting": "Spara observation", "Sighting saved": "Observationen sparad",
     "All species": "Alla arter", "Moose": "Älg", "Roe deer": "Rådjur", "Fallow deer": "Dovhjort", "Red deer": "Kronhjort", "Wild boar": "Vildsvin", "Fox": "Räv", "Bird": "Fågel",
     "Other": "Annat", 
