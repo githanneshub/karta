@@ -1,6 +1,9 @@
 /* Alnaryd hunting map: layers, stands, wind, stalk routes, sightings. */
 (function () {
   "use strict";
+  // iPhone: pinching anywhere but the map would zoom the whole page and leave the menus too big (the map
+  // handles its own pinch through touch events, which this doesn't touch)
+  for (const ev of ["gesturestart", "gesturechange", "gestureend"]) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
 
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.from(document.querySelectorAll(s));

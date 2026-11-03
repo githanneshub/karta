@@ -609,3 +609,11 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .huntmenu .ev-animal { color: #fcc419; }
 .ev-marker.ev-animal b { background: #f08c00; }
 .note.bad { color: var(--bad); }
+
+/* No page zoom: only the map zooms. Pinch and double-tap on menus and buttons do nothing, and text fields are
+   16 px on phones so the iPhone doesn't zoom in when you tap one. */
+html, body { touch-action: manipulation; }
+#panel, .hud, .toolbar, .addmenu, .gate { touch-action: pan-x pan-y; }
+@media (pointer: coarse), (max-width: 860px) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
+}
