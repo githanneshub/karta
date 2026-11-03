@@ -2053,7 +2053,7 @@
       }, () => { this.blocked = true; });
     },
     onStand(standId) {
-      for (const [, v] of Family.positions) if (v.stand === standId && v.sharing && Family.ageMin(v) !== null && Family.ageMin(v) < 30) return v;
+      for (const [, v] of Family.positions) if (v.stand === standId && Family.isCurrent(v, 30)) return v;
       if (this.stand === standId && Family.user) return { email: Family.user.email.toLowerCase(), name: Family.member && Family.member.name };
       const who = Day.whoOn(standId);
       if (who) { const m = Family.members.find((x) => x.email === who); return { email: who, name: m ? m.name : who.split("@")[0], planned: true }; }
@@ -2133,7 +2133,7 @@
     checkSafety() {
       if (!FAMILY || !Family.user) return;
       const msgs = [], uid = Family.user.uid;
-      const live = [...Family.positions].filter(([id, v]) => id !== uid && v.sharing && typeof v.lon === "number" && Family.ageMin(v) !== null && Family.ageMin(v) < 5);
+      const live = [...Family.positions].filter(([id, v]) => id !== uid && typeof v.lon === "number" && Family.isCurrent(v, 5) && Family.goodFix(v));
       const me = Family.user.email.toLowerCase();
       // my stand counts once I've checked in, or once I'm at the stand I was given today
       const plannedId = Day.myStand(), planned = plannedId && Store.data.stands.find((x) => x.id === plannedId);
@@ -2463,6 +2463,17 @@
       Hunt.checkSafety();
     },
     posTime(v) { return (v.t && v.t.toMillis ? v.t.toMillis() : 0) || v.tc || 0; },
+    // Is this person's position current? The map sends every few seconds while open, so a few minutes of silence
+    // means it's closed. OwnTracks only sends after 15 m of movement, so silence means "sitting still": its
+    // positions count as current for 2 hours (unless the battery is about to die).
+    isCurrent(v, mapMinutes) {
+      const age = this.ageMin(v);
+      if (!v || !v.sharing || age === null) return false;
+      if (v.src === "owntracks") return age < 120 && !(typeof v.batt === "number" && v.batt <= 3);
+      return age < mapMinutes;
+    },
+    // a bad fix (inside a car, under thick canopy) can be 100 m off: don't let it raise safety alarms
+    goodFix(v) { return !(typeof v.acc === "number" && v.acc > 50); },
     ageMin(pos) {
       const t = pos.t && pos.t.toMillis ? pos.t.toMillis() : pos.tc;
       return t ? Math.max(0, Math.round((Date.now() - t) / 60000)) : null;
@@ -2479,7 +2490,11 @@
       const [, v] = pos, age = this.ageMin(v);
       const where = myFix ? ` · ${Math.round(Geo.distance(myFix.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(myFix.ll, [v.lon, v.lat]))}` : "";
       const via = v.src === "owntracks" ? " · OwnTracks" : "";
-      if (v.sharing && age !== null && age < 10) return `Sharing · ${age ? age + " min ago" : "now"}${where}${via}`;
+      const batt = typeof v.batt === "number" ? ` · 🔋${v.batt}%` : "";
+      if (this.isCurrent(v, 10)) {
+        const still = v.src === "owntracks" && age >= 3 ? `Still for ${age} min` : `Sharing · ${age ? age + " min ago" : "now"}`;
+        return `${still}${where}${via}${batt}`;
+      }
       return `Last seen ${age === null ? "" : age < 1 ? "just now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"}${where}`;
     },
     render() {
@@ -2517,11 +2532,18 @@
           this.markers.set(uid, m);
         }
         m.setLngLat([v.lon, v.lat]);
-        const el = m.getElement(), live = v.sharing && age < 10;
+        const el = m.getElement(), live = this.isCurrent(v, 10);
+        const low = typeof v.batt === "number" && v.batt <= 15;
         el.style.setProperty("--c", this.colorFor(v.email));
         el.classList.toggle("stale", !live);
         el.querySelector("b").textContent = this.letterFor(v.email, v.name);
-        el.querySelector("span").textContent = `${v.name || ""}${live ? (age ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}`;
+        el.querySelector("span").textContent = `${v.name || ""}${live ? (age && v.src !== "owntracks" ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}${low ? ` · 🔋${v.batt}%` : ""}`;
+        // warn once per person and day when their phone is about to die in the forest
+        if (low && live) {
+          const key = `${v.email}|${new Date().toDateString()}`;
+          if (!this.battWarned) this.battWarned = new Set();
+          if (!this.battWarned.has(key)) { this.battWarned.add(key); toast(tr(`${v.name || v.email}'s phone battery is low (${v.batt}%)`), 8000); }
+        }
       }
       for (const [uid, m] of this.markers) if (!keep.has(uid)) { m.remove(); this.markers.delete(uid); }
     },
