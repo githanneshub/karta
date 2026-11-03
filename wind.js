@@ -69,15 +69,17 @@
       if (!w) return null;
       return { from: (Math.atan2(-w[0], -w[1]) / rad + 360) % 360, ratio: Math.hypot(w[0], w[1]) };
     },
-    // Scent plume: follow the airflow downwind from a point for `len` metres and widen it by `half` degrees.
+    // Scent plume: follow the airflow downwind from a point and widen it by `half` degrees. `len` is how far scent
+    // carries in average wind; where the model has slower air (hollows, lee of hills) it spreads wider and
+    // reaches less far, where air is faster (ridges, gaps) it carries further in a narrower band.
     // Returns a closed lon/lat ring, or null when the point is outside the model.
     plume(lon, lat, from, len, half) {
       const [E0, N0] = Geo.toSweref(lon, lat), a = this.areaAt(E0, N0);
       if (!a) return null;
-      const F = this.field(a, from), STEP = 6;
-      const path = [[E0, N0]];
-      let E = E0, N = N0, d = 0, dir = null;
-      while (d < len) {
+      const F = this.field(a, from), STEP = 6, med = a.meta.median || 0.72;
+      const path = [[E0, N0]], spread = [0];
+      let E = E0, N = N0, d = 0, dir = null, wide = 0;
+      while (d < len && path.length < 400) {
         let w = F.at(E, N);
         if (!w) break;
         let m = Math.hypot(w[0], w[1]) || 1e-6;
@@ -85,15 +87,16 @@
         const w2 = F.at(E + (w[0] / m) * STEP / 2, N + (w[1] / m) * STEP / 2) || w;
         m = Math.hypot(w2[0], w2[1]) || 1e-6;
         dir = [w2[0] / m, w2[1] / m];
-        E += dir[0] * STEP; N += dir[1] * STEP; d += STEP;
-        path.push([E, N]);
+        const slow = Math.min(1.8, Math.max(0.6, med / m));   // >1 where the air is slower than usual here
+        E += dir[0] * STEP; N += dir[1] * STEP; d += STEP * slow; wide += STEP * slow;
+        path.push([E, N]); spread.push(wide);
       }
       if (path.length < 3) return null;
       const tan = Math.tan(half * rad), left = [], right = [];
       for (let i = 0; i < path.length; i++) {
         const p = path[i], q = path[Math.min(i + 1, path.length - 1)], o = path[Math.max(i - 1, 0)];
         let tx = q[0] - o[0], ty = q[1] - o[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
-        const wdt = Math.max(4, i * STEP * tan);
+        const wdt = Math.max(4, spread[i] * tan);
         left.push([p[0] - ty * wdt, p[1] + tx * wdt]); right.push([p[0] + ty * wdt, p[1] - tx * wdt]);
       }
       // rounded far end
