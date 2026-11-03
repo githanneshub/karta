@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "fb296a67f2";</script>
-<script src="firebase-config.js?v=fb296a67f2"></script>
-<script type="module" src="fb.js?v=fb296a67f2"></script>
+<script>window.APP_VERSION = "e188c55aae";</script>
+<script src="firebase-config.js?v=e188c55aae"></script>
+<script type="module" src="fb.js?v=e188c55aae"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=fb296a67f2">
-<link rel="stylesheet" href="app.css?v=fb296a67f2">
+<link rel="stylesheet" href="maplibre-gl.css?v=e188c55aae">
+<link rel="stylesheet" href="app.css?v=e188c55aae">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -296,7 +296,7 @@
         <div class="share-card">
           <label class="switch big" for="shareMe"><input type="checkbox" id="shareMe"><span>Share my position</span></label>
           <p class="note small" id="shareState">Off. Your family can't see you.</p>
-          <p class="note small">Positions only update while the map is open. On iPhone, set Auto-Lock to Never during the hunt.</p>
+          <p class="note small">iPhones only share the position while the map is on screen. In the pocket, use pocket mode (the phone button on the right): the screen goes black, which uses almost no battery on newer iPhones, and the position keeps updating. Don't press the side button, it locks the phone.</p>
         </div>
         <details class="sect" id="gpsHelp">
           <summary>Position not working?</summary>
@@ -358,6 +358,8 @@
         <svg class="i-follow" viewBox="0 0 24 24"><path d="M12 3 19 20 12 16 5 20Z" fill="currentColor"/></svg></button>
       <button type="button" class="tool" id="tilt" title="3D terrain" aria-label="3D terrain">
         <svg viewBox="0 0 24 24"><path d="M3 18 9 8l4 6 3-4 5 8z"/></svg></button>
+      <button type="button" class="tool family-only" id="pocketBtn" title="Pocket mode: black screen, keeps sharing" aria-label="Pocket mode: black screen, keeps sharing">
+        <svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M10 18.5h4"/><path d="M9 9.5a3 3 0 0 0 6 0" /></svg></button>
       <button type="button" class="tool" id="home" title="Back to the hunting ground" aria-label="Back to the hunting ground">
         <svg viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></svg></button>
     </div>
@@ -370,6 +372,7 @@
       <button type="button" role="menuitem" data-ev="help"><span class="ev-ico ev-help">!</span>Need help</button>
     </div>
     <div class="safety" id="safety" role="alert" hidden></div>
+    <div class="pocket" id="pocket" hidden><div class="pocket-info"><span id="pocketInfo"></span><small>Double-tap to open the map</small></div></div>
     <button type="button" class="mystand" id="myStandChip" hidden></button>
     <div class="recbar" id="recBar" hidden>
       <div class="rec-top"><span class="rec-dot"></span><span id="recInfo"></span><button class="btn small" id="recStop" type="button">Stop</button></div>
@@ -466,12 +469,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=fb296a67f2"></script>
-<script src="geo.js?v=fb296a67f2"></script>
-<script src="view.js?v=fb296a67f2"></script>
-<script src="wind.js?v=fb296a67f2"></script>
-<script src="jakt.js?v=fb296a67f2"></script>
-<script src="app.js?v=fb296a67f2"></script>
+<script src="i18n.js?v=e188c55aae"></script>
+<script src="geo.js?v=e188c55aae"></script>
+<script src="view.js?v=e188c55aae"></script>
+<script src="wind.js?v=e188c55aae"></script>
+<script src="jakt.js?v=e188c55aae"></script>
+<script src="app.js?v=e188c55aae"></script>
 
 </body>
 </html>

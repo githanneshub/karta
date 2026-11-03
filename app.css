@@ -605,3 +605,11 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .game-legend span { display: flex; align-items: center; gap: 8px; }
 .game-legend i { width: 18px; height: 6px; border-radius: 3px; flex: none; }
 .game-legend i.dot-pass { width: 10px; height: 10px; border-radius: 50%; background: #ff1fb4; box-shadow: 0 0 0 2px #fff; margin: 0 4px; }
+
+/* pocket mode: pure black (OLED pixels off), dim text, touches swallowed */
+.pocket { position: fixed; inset: 0; z-index: 2000; background: #000; display: flex; align-items: flex-end; justify-content: center;
+  touch-action: none; user-select: none; -webkit-user-select: none; padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+.pocket[hidden] { display: none; }
+.pocket-info { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #3a3a3a; font: 600 15px var(--f-ui); }
+.pocket-info small { color: #2a2a2a; font-size: 12px; }
+html.pocket #map { visibility: hidden; }
