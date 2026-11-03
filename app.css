@@ -611,3 +611,6 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .ot-steps { margin: 6px 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .ot-steps .btn { display: inline-block; text-decoration: none; margin: 2px 0; }
 #otUrlIn { flex: 1; min-width: 0; }
+
+.ot-last { margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--bad) 18%, var(--raise)); font-size: 13.5px; }
+.ot-last.ok { background: color-mix(in srgb, var(--good) 18%, var(--raise)); }

@@ -150,7 +150,7 @@
     "(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)": "(Flygbild i lagermenyn visar flygfoton, även från 1960 och 1975)",
     "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Log": "Obs", "Edit the map": "Redigera kartan", "Settings": "Inställningar", "Screen": "Skärm",
     "Night mode (dimmed screen)": "Nattläge (dämpad skärm)", "3D height exaggeration": "Höjdförstärkning i 3D", "3D terrain": "3D-terräng", "Adjust by hand": "Ställ in för hand",
-    "Add or draw": "Lägg till eller rita", "Background tracking (phone locked)": "Bakgrundsspårning (låst telefon)",
+    "Add or draw": "Lägg till eller rita", "Last position from your OwnTracks:": "Senast mottaget från din OwnTracks:", "Nothing has arrived from your OwnTracks yet.": "Inget har kommit från din OwnTracks än.", "Background tracking (phone locked)": "Bakgrundsspårning (låst telefon)",
     "The map can only send your position while it's open. OwnTracks keeps sending it with the phone locked in your pocket, and your dot shows on everyone's map.":
       "Kartan kan bara skicka din position medan den är öppen. OwnTracks fortsätter skicka den med telefonen låst i fickan, och din prick syns på allas karta.",
     "Set up the receiver and the forwarder once (see tools/owntracks/SETUP.md), then paste the forwarder address here.": "Sätt upp mottagaren och vidarebefordraren en gång (se tools/owntracks/SETUP.md) och klistra sedan in vidarebefordrarens adress här.",
@@ -238,6 +238,7 @@
     [/^Your stand: (.+)$/, (m, a) => `Ditt pass: ${a}`],
     [/^Last position (\d+) min ago$/, (m, a) => `Senaste position för ${a} min sedan`],
     [/^You · OwnTracks · (.+)$/, (m, a) => `Du · OwnTracks · ${tr(a)}`],
+    [/^\((.+)\)$/, (m, a) => `(${tr(a)})`],
     [/^Scent drifts toward ([A-Z]{1,3})$/, (m, a) => `Vittringen driver mot ${C(a)}`],
     [/^([A-Z]{1,3}) ([\d.]+) m\/s\.?$/, (m, a, b) => `${C(a)} ${b} m/s`],
     [/^Facing ([A-Z]{1,3}) (\d+)°$/, (m, a, b) => `Du tittar mot ${C(a)} ${b}°`],

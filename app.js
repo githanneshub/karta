@@ -2200,7 +2200,12 @@
       }
       this.ensureToken();
       const link = this.configLink(), url = this.personalUrl();
-      box.innerHTML = url ? `<ol class="ot-steps">
+      // what has actually arrived from my phone's OwnTracks (shown whether or not the map itself is sharing)
+      const v = Family.otMine, age = v ? Family.ageMin(v) : null;
+      const last = v && age !== null
+        ? `<p class="ot-last ok"><span>Last position from your OwnTracks:</span> ${new Date(Family.posTime(v)).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} <span>(${age < 1 ? "now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"})</span></p>`
+        : `<p class="ot-last"><span>Nothing has arrived from your OwnTracks yet.</span></p>`;
+      box.innerHTML = url ? last + `<ol class="ot-steps">
           <li><span>Install</span> <b translate="no">OwnTracks</b> <span>from the App Store (free).</span></li>
           <li><a class="btn primary" href="${esc(link)}">Set up OwnTracks</a> <span>Tap this on your iPhone; OwnTracks opens with everything filled in.</span></li>
           <li><span>Allow location "Always" for OwnTracks when it asks, and keep its mode on "Move" during the hunt.</span></li>
@@ -2404,7 +2409,7 @@
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
-        syncMarkers(); Hunt.checkSafety(); Rec.backfill();
+        syncMarkers(); Hunt.checkSafety(); Rec.backfill(); OT.render();
       }, () => {});
       Hunt.start(db); Day.start(db); OT.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
