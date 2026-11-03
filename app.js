@@ -1998,7 +1998,8 @@
       return `<li data-id="${esc(t.id)}"><span class="dot" style="background:${t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e"}"></span>
         <span class="it-main"><div class="it-name"><span>${t.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(d)}${t.live && Date.now() - (t.end || 0) < 10 * 60e3 ? " <span>· live</span>" : ""}</div>
         <div class="it-sub">${trackLen(t.pts || [])}${(t.marks || []).length ? ` · ${(t.marks || []).length} marks` : ""}${whoTag(t)}</div></span>
-        <button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button></li>`;
+        ${!FAMILY || !t.by || (Family.user && t.by === Family.user.email.toLowerCase()) || (Family.member && Family.member.role === "owner")
+          ? `<button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button>` : ""}</li>`;
     }).join("") : `<li class="empty">No recorded tracks yet. Start one with +.</li>`;
   }
 
@@ -2203,30 +2204,35 @@
 
   // ---------- background tracking with OwnTracks (positions while the phone is locked) ----------
   // OwnTracks posts to the family's Apps Script receiver (tools/owntracks), which writes positions/ot_<email>.
-  // The receiver's address lives in map/config, each person's code in map/ot_tokens (made here on first use).
+  // The receiver's address lives in map/config (the owner sets it); each person's code in ottokens/<email>,
+  // which only they can read (made here on first use, never replaced: OwnTracks keeps the address it was given).
   const OT = {
-    url: "", tokens: {}, tokensLoaded: false,
+    url: "", code: "", codeLoaded: false,
     start(db) {
       db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
-      db.doc("map/ot_tokens").onSnapshot((snap) => {
+      db.doc(`ottokens/${this.me()}`).onSnapshot((snap) => {
         if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;   // wait for the server before deciding there's no code
-        this.tokens = snap.exists ? snap.data() : {}; this.tokensLoaded = true; this.render();
+        this.code = (snap.exists && snap.data().code) || ""; this.codeLoaded = true; this.render();
       }, () => {});
     },
     me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
-    // A person's code is made once and never replaced: OwnTracks keeps using the address it was given.
     async ensureToken() {
-      if (!this.url || !this.me() || !this.tokensLoaded || this.tokens[this.me()] || this.making) return;
+      if (!this.url || !this.me() || !this.codeLoaded || this.code || this.making) return;
       this.making = true;
-      const a = new Uint8Array(15); crypto.getRandomValues(a);
-      const tok = btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
+      // an older version kept everyone's codes in one shared record: carry mine over so OwnTracks keeps working
+      const old = await window.FB.db.doc("map/ot_tokens").get().catch(() => null);
+      let tok = old && old.exists ? old.data()[this.me()] || "" : "";
+      if (!tok) {
+        const a = new Uint8Array(15); crypto.getRandomValues(a);
+        tok = btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
+      }
       // re-read first: another of my devices may have made one a moment ago
-      const cur = await window.FB.db.doc("map/ot_tokens").get().catch(() => null);
-      if (!(cur && cur.exists && cur.data()[this.me()])) await window.FB.db.doc("map/ot_tokens").update({ [this.me()]: tok }).catch(() => {});
+      const cur = await window.FB.db.doc(`ottokens/${this.me()}`).get().catch(() => null);
+      if (!(cur && cur.exists && cur.data().code)) await window.FB.db.doc(`ottokens/${this.me()}`).set({ code: tok }).catch(() => {});
       this.making = false;
     },
     personalUrl() {
-      const t = this.tokens[this.me()]; if (!this.url || !t) return "";
+      const t = this.code; if (!this.url || !t) return "";
       return `${this.url}${this.url.includes("?") ? "&" : "?"}u=${encodeURIComponent(this.me())}&k=${t}`;
     },
     render() {
@@ -2271,7 +2277,7 @@
 
   // ---------- hunt day: leader, who sits where, start and end, summary ----------
   // Stored in map/huntday (the map collection is open to every member, so no new rules are needed);
-  // finished days are kept as map/day_<id> summaries.
+  // finished days are kept as summaries in days/<start time>.
   const Day = {
     doc: null, past: [],
     start(db) {
@@ -2284,8 +2290,8 @@
           if (st) toast(tr(`Your stand today: ${st.name || "Stand"}`), 7000);
         }
       }, () => {});
-      db.collection("map").onSnapshot((snap) => {
-        this.past = snap.docs.filter((d) => d.id.startsWith("day_")).map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => b.started - a.started);
+      db.collection("days").onSnapshot((snap) => {
+        this.past = snap.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => b.started - a.started);
         this.render();
       }, () => {});
     },
@@ -2320,7 +2326,7 @@
         downs: ev.filter((e) => e.type === "down").map((e) => ({ name: e.name, t: e.tc })),
         tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
       };
-      await window.FB.db.doc(`map/day_${since}`).set(summary).catch(() => {});
+      await window.FB.db.doc(`days/${since}`).set(summary).catch(() => {});
       await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now() }).catch(() => toast("Couldn't save. Check your connection."));
       Hunt.post("dayend");
     },
@@ -2550,7 +2556,7 @@
       $("#syncState").textContent = (this.member && this.member.name) || "Signed in";
       $("#syncState").dataset.state = "shared";
       $("#meInfo").textContent = `Signed in as ${this.user.email}.`;
-      $("#memberForm").hidden = !owner; $("#ownerTools").hidden = !owner;
+      $("#memberForm").hidden = !owner; $("#ownerTools").hidden = !owner; $("#boundaryTools").hidden = !owner;
       $("#shareState").textContent = this.sharing
         ? (myFix ? "On. Your family sees you while this map is open. Keep the screen on." : "On. Waiting for GPS…")
         : "Off. Your family can't see you.";
