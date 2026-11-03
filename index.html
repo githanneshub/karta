@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "3534ef9f07";</script>
-<script src="firebase-config.js?v=3534ef9f07"></script>
-<script type="module" src="fb.js?v=3534ef9f07"></script>
+<script>window.APP_VERSION = "c3696c9545";</script>
+<script src="firebase-config.js?v=c3696c9545"></script>
+<script type="module" src="fb.js?v=c3696c9545"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=3534ef9f07">
-<link rel="stylesheet" href="app.css?v=3534ef9f07">
+<link rel="stylesheet" href="maplibre-gl.css?v=c3696c9545">
+<link rel="stylesheet" href="app.css?v=c3696c9545">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -301,6 +301,11 @@
       <!-- FAMILY (hosted site only) -->
       <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
         <div class="day-card" id="dayCard"></div>
+        <details class="sect" id="pushSect" open>
+          <summary>Notifications</summary>
+          <p class="note small">Shots, "need help", "animal near me" and the hunt day buzz on your phone even when the map is closed. Turn it on once on each phone.</p>
+          <div id="pushBox"></div>
+        </details>
         <details class="sect" id="otSect" open>
           <summary>Your position (OwnTracks)</summary>
           <p class="note small">We share positions with the OwnTracks app. It keeps sending with the phone locked in your pocket, and your dot shows on everyone's map. Set it up once:</p>
@@ -484,12 +489,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=3534ef9f07"></script>
-<script src="geo.js?v=3534ef9f07"></script>
-<script src="view.js?v=3534ef9f07"></script>
-<script src="wind.js?v=3534ef9f07"></script>
-<script src="jakt.js?v=3534ef9f07"></script>
-<script src="app.js?v=3534ef9f07"></script>
+<script src="i18n.js?v=c3696c9545"></script>
+<script src="geo.js?v=c3696c9545"></script>
+<script src="view.js?v=c3696c9545"></script>
+<script src="wind.js?v=c3696c9545"></script>
+<script src="jakt.js?v=c3696c9545"></script>
+<script src="app.js?v=c3696c9545"></script>
 
 </body>
 </html>

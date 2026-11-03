@@ -1704,6 +1704,13 @@
     $("#huntBtn").addEventListener("click", (e) => {
       e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
     });
+    $("#pushBox").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-push]"); if (!b) return;
+      ({ on: () => Push.enable(), off: () => Push.disable(), test: () => Push.test() })[b.dataset.push]();
+    });
+    if ("serviceWorker" in navigator) navigator.serviceWorker.addEventListener("message", (e) => {
+      if (e.data && e.data.type === "show-event") Hunt.show(e.data.id);
+    });
     $("#otBox").addEventListener("click", async (e) => {
       const b = e.target.closest("[data-ot]"); if (!b) return;
       if (b.dataset.ot === "save") {
@@ -2128,6 +2135,7 @@
       }, () => {});
       db.collection("events").onSnapshot((snap) => {
         const all = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+        if (this.showId && all.some((e) => e.id === this.showId)) setTimeout(() => this.show(this.showId), 0);
         const fresh = this.seen ? all.filter((e) => !this.seen.has(e.id)) : [];
         this.seen = new Set(all.map((e) => e.id));
         this.events = all.filter((e) => Date.now() - (e.tc || 0) < 12 * 3600e3).sort((a, b) => b.tc - a.tc);
@@ -2156,7 +2164,8 @@
     async post(type, extra = {}) {
       const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0], tc: Date.now(), ...extra };
       const pos = myPos(); if (pos) { e.lon = pos.ll[0]; e.lat = pos.ll[1]; }
-      try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); } catch { /* rules not published yet */ }
+      const id = newId("ev");
+      try { await window.FB.db.doc(`events/${id}`).set(e); Push.announce(id, e); } catch { /* rules not published yet */ }
     },
     async send(type) {
       const pos = myPos();
@@ -2173,9 +2182,19 @@
       if (type === "offstand") { if (!this.stand) return; this.stand = null; }
       if (type === "onstand" || type === "offstand")
         window.FB.db.doc("map/onstand").update({ [e.email]: { stand: this.stand || "", t: Date.now() } }).catch(() => {});
-      try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); }
+      const st = Store.data.stands.find((x) => x.id === (this.stand || Day.myStand()));
+      if (st && !e.standName) e.standName = st.name || "";
+      const id = newId("ev");
+      try { await window.FB.db.doc(`events/${id}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); Push.announce(id, e); }
       catch { toast("Couldn't send. The owner needs to publish the new Firebase rules.", 7000); }
       syncMarkers(); this.render();
+    },
+    show(id) {
+      const e = this.events.find((x) => x.id === id);
+      if (!e) { this.showId = id; return; }   // not loaded yet: shown when it arrives
+      this.showId = null;
+      if (typeof e.lon === "number") map.flyTo({ center: [e.lon, e.lat], zoom: Math.max(map.getZoom(), 16) });
+      if (isPhone()) setSheet("peek");
     },
     notify(e) {
       toast(tr(EVENT_TEXT[e.type](e)), e.type === "help" ? 15000 : 7000);
@@ -2269,7 +2288,7 @@
   const OT = {
     url: "", code: "", codeLoaded: false,
     start(db) {
-      db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
+      db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); Push.render(); }, () => {});
       db.doc(`ottokens/${this.me()}`).onSnapshot((snap) => {
         if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;   // wait for the server before deciding there's no code
         this.code = (snap.exists && snap.data().code) || ""; this.codeLoaded = true; this.render();
@@ -2332,6 +2351,99 @@
           <span>Don't swipe OwnTracks away, and avoid Low Power Mode during the hunt.</span></p>
         ${owner ? `<p class="note small"><button class="btn small ghost" type="button" data-ot="reset">Change receiver address</button></p>` : ""}`
         : `<p class="note small">Making your personal code…</p>`;
+    },
+  };
+
+  // ---------- phone notifications ----------
+  // Hunt messages reach everyone's phone even with the map closed and the screen locked. Each phone subscribes
+  // here (Firebase Cloud Messaging; on iPhone only from the home-screen map) and keeps its address in
+  // push/<email>; after posting a message the map asks the OwnTracks receiver, through the same personal address,
+  // to send it to everyone else.
+  const PUSH_TYPES = ["shot", "down", "help", "animal", "daystart", "dayend"];
+  const Push = {
+    state: "", err: "",
+    dev() {
+      try {
+        let d = localStorage.getItem("alnaryd-dev");
+        if (!d) { d = "d" + Math.random().toString(36).slice(2, 12); localStorage.setItem("alnaryd-dev", d); }
+        return d;
+      } catch { return "d0"; }
+    },
+    wanted() { try { return localStorage.getItem("alnaryd-push") === "on"; } catch { return false; } },
+    iosBrowser() { return /iPhone|iPad/.test(navigator.userAgent) && !navigator.standalone && !matchMedia("(display-mode: standalone)").matches; },
+    possible() { return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window; },
+    async subscribe() {
+      const reg = await navigator.serviceWorker.ready;
+      const token = await window.FB.push.token(reg);
+      if (!token) throw new Error("no token");
+      const me = Family.user.email.toLowerCase();
+      await window.FB.db.doc(`push/${me}`).update({ devices: { [this.dev()]: { token, at: Date.now(), ua: navigator.userAgent.slice(0, 120) } } });
+    },
+    async enable() {
+      this.err = "";
+      if (!this.possible()) { this.render(); return; }
+      this.state = "busy"; this.render();
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted") { this.state = ""; this.err = "blocked"; this.render(); return; }
+        OT.ensureToken();
+        await this.subscribe();
+        try { localStorage.setItem("alnaryd-push", "on"); } catch { /* ignore */ }
+        this.state = "on";
+      } catch (e) { this.state = ""; this.err = String((e && e.message) || e).slice(0, 160); }
+      this.render();
+    },
+    async disable() {
+      try { localStorage.removeItem("alnaryd-push"); } catch { /* ignore */ }
+      const me = Family.user.email.toLowerCase();
+      await window.FB.db.doc(`push/${me}`).update({ devices: { [this.dev()]: window.FB.deleteField() } }).catch(() => {});
+      await window.FB.push.remove().catch(() => {});
+      this.state = ""; this.render();
+    },
+    // on start: keep this phone's address fresh (it can change)
+    async refresh() {
+      if (!this.wanted() || !this.possible() || Notification.permission !== "granted") return;
+      try { await this.subscribe(); this.state = "on"; } catch (e) { this.err = String((e && e.message) || e).slice(0, 160); }
+      this.render();
+    },
+    async call(body) {
+      if (!OT.url) return false;
+      if (!OT.code) { OT.ensureToken(); for (let i = 0; i < 10 && !OT.code; i++) await new Promise((r) => setTimeout(r, 500)); }
+      const url = OT.personalUrl(); if (!url) return false;
+      for (let i = 0; i < 4; i++) {   // weak signal in the forest: try again a few times
+        try { await fetch(url, { method: "POST", mode: "no-cors", body: JSON.stringify(body) }); return true; }
+        catch { await new Promise((r) => setTimeout(r, 20000)); }
+      }
+      return false;
+    },
+    announce(id, e) {
+      if (!PUSH_TYPES.includes(e.type)) return;
+      const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+      const body = [t, e.standName, tr("Tap to see it on the map")].filter(Boolean).join(" · ");
+      this.call({ _type: "notify", id, title: tr(EVENT_TEXT[e.type](e)), body });
+    },
+    async test() {
+      const ok = await this.call({ _type: "notify", test: true, title: tr("Test from the hunting map"), body: tr("Notifications work on this phone.") });
+      toast(ok ? "Test sent. It should arrive in a few seconds." : "Couldn't reach the receiver.");
+    },
+    render() {
+      const box = $("#pushBox"); if (!box || !Family.user) return;
+      let html;
+      if (!this.possible()) {
+        html = this.iosBrowser()
+          ? `<p class="note small">On iPhone, notifications only work in the map opened from the home screen: in Safari tap Share → Add to Home Screen, open the map from there and turn them on.</p>`
+          : `<p class="note small">This browser can't receive notifications.</p>`;
+      } else if (!OT.url) {
+        html = `<p class="note small">The map owner needs to set up the OwnTracks receiver first; it also sends the notifications.</p>`;
+      } else if (this.state === "on" && Notification.permission === "granted") {
+        html = `<p class="ot-last good">On for this phone</p>
+          <div class="row gap"><button class="btn small" type="button" data-push="test">Send a test</button><button class="btn small ghost" type="button" data-push="off">Turn off</button></div>`;
+      } else {
+        html = `<button class="btn primary" type="button" data-push="on" ${this.state === "busy" ? "disabled" : ""}>Turn on notifications</button>`;
+      }
+      if (this.err === "blocked") html += `<p class="note small bad">Notifications are blocked. iPhone: Settings → Notifications → Alnaryd (or the map's name) → Allow.</p>`;
+      else if (this.err) html += `<p class="note small bad">${esc(tr("Couldn't turn on:"))} ${esc(this.err)}</p>`;
+      box.innerHTML = html;
     },
   };
 
@@ -2531,6 +2643,8 @@
         syncMarkers(); Hunt.checkSafety(); Rec.backfill(); OT.render(); renderMyCone(); renderGoto();
       }, () => {});
       Hunt.start(db); Day.start(db); OT.start(db);
+      Hunt.showId = QS.get("ev") || null;   // opened from a notification
+      Push.render(); Push.refresh();
       db.doc("map/looks").onSnapshot((snap) => {
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();

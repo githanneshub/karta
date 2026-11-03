@@ -604,3 +604,4 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 
 .huntmenu .ev-animal { color: #fcc419; }
 .ev-marker.ev-animal b { background: #f08c00; }
+.note.bad { color: var(--bad); }
