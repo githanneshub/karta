@@ -299,9 +299,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 /* SMHI forecast strip */
 .fc { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
 .fc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-weight: 600; }
-.fc-strip { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 4px; scroll-snap-type: x proximity; overscroll-behavior-x: contain; }
+.fc-strip { display: flex; gap: 2px; overflow-x: auto; padding-bottom: 4px; overscroll-behavior-x: contain; }
 .fc-h { flex: none; width: 40px; display: grid; grid-template-rows: 14px 16px 22px 16px 12px; justify-items: center; align-items: center;
-  border: 1px solid transparent; border-radius: 8px; background: var(--raise); color: var(--fg); padding: 3px 0; cursor: pointer; scroll-snap-align: center; }
+  border: 1px solid transparent; border-radius: 8px; background: var(--raise); color: var(--fg); padding: 3px 0; cursor: pointer; }
 .fc-h.day { margin-left: 6px; border-left-color: var(--line); }
 .fc-h:first-child { margin-left: 0; }
 .fc-h.sel { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--raise)); }
@@ -622,3 +622,11 @@ html, body { touch-action: manipulation; }
 @media (pointer: coarse), (max-width: 860px) {
   input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select, textarea { font-size: 16px !important; }
 }
+
+/* Map overlays never cover each other: the warning, your-stand chip and drawing hint stack down the middle,
+   clear of the buttons on the right; while recording, the legend moves up above the recording bar. */
+.safety { max-width: calc(100% - 132px - env(safe-area-inset-right, 0px)); }
+.mystand:not([hidden]) ~ .hint, .safety:not([hidden]) ~ .hint { top: calc(140px + env(safe-area-inset-top, 0px)); }
+.safety:not([hidden]) ~ .mystand:not([hidden]) ~ .hint { top: calc(196px + env(safe-area-inset-top, 0px)); }
+html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
+@media (min-width: 861px) { html.recording .map-legend { bottom: calc(98px + env(safe-area-inset-bottom, 0px)); } }

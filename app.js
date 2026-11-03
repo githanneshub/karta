@@ -198,7 +198,17 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, ms);
   }
   const isPhone = () => window.matchMedia("(max-width: 860px)").matches;
-  function setSheet(state) { $("#app").dataset.sheet = state; }
+  function setSheet(state) {
+    $("#app").dataset.sheet = state;
+    if (state === "open" && isPhone()) closePopups();   // the panel and a menu would cover each other
+  }
+  // the + and 📢 menus: only one open at a time
+  function closePopups() {
+    for (const [m, b] of [["#addMenu", "#addBtn"], ["#huntMenu", "#huntBtn"]]) {
+      const el = $(m); if (el) el.hidden = true;
+      const btn = $(b); if (btn) btn.setAttribute("aria-expanded", "false");
+    }
+  }
   // Phone: a tab bar at the bottom; the content above it follows your finger. Drag the tab bar or the handle up or
   // down, or pull the content down when it is scrolled to the top; let go and it settles open or closed depending
   // on how far and how fast.
@@ -213,15 +223,17 @@
       if (!isPhone() || e.touches.length !== 1) return;
       const top = e.target.closest(".sheet-handle, .tabs"), pane = e.target.closest(".panes");
       if (!top && !(pane && app.dataset.sheet === "open")) return;
-      d = { y: e.touches[0].clientY, t: Date.now(), base: panes.offsetHeight, full: probe.offsetHeight, fromPane: !top, on: false, dy: 0, hist: [] };
+      d = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now(), base: panes.offsetHeight, full: probe.offsetHeight, fromPane: !top, on: false, dy: 0, hist: [] };
     }, { passive: true });
     $("#panel").addEventListener("touchmove", (e) => {
       if (!d) return;
-      const dy = e.touches[0].clientY - d.y;
+      const dy = e.touches[0].clientY - d.y, dx = e.touches[0].clientX - d.x;
       if (!d.on) {
+        // sideways (the forecast strip, tabs): always a normal scroll
+        if (Math.abs(dx) > 4 && Math.abs(dx) >= Math.abs(dy)) { d = null; return; }
         // in the content only a pull-down from the very top moves the panel; anything else scrolls as usual
         if (d.fromPane && (dy < 0 || panes.scrollTop > 0)) { d = null; return; }
-        if (d.fromPane) e.preventDefault();   // claim it before the iPhone starts its own rubber-band scroll
+        if (d.fromPane && dy > 2) e.preventDefault();   // a clear pull-down: claim it before the iPhone's rubber-band
         if (Math.abs(dy) < 8) return;
         d.on = true; panes.style.transition = "none";
       }
@@ -1756,7 +1768,9 @@
     const hmenu = $("#huntMenu");
     const closeHunt = () => { hmenu.hidden = true; $("#huntBtn").setAttribute("aria-expanded", "false"); };
     $("#huntBtn").addEventListener("click", (e) => {
-      e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
+      e.stopPropagation(); const open = hmenu.hidden;
+      closePopups(); hmenu.hidden = !open; $("#huntBtn").setAttribute("aria-expanded", String(open));
+      if (open && isPhone()) setSheet("peek");   // one thing at a time on a small screen
     });
     $("#pushBox").addEventListener("click", (e) => {
       const b = e.target.closest("[data-push]"); if (!b) return;
@@ -1823,7 +1837,9 @@
     $("#addBtn").addEventListener("click", (e) => {
       e.stopPropagation();
       if (tool) { if (LAYOUT_TOOLS.includes(tool)) closeFeatForm(); setTool(null); closeMenu(); return; }   // + also cancels what you're doing
-      menu.hidden = !menu.hidden; $("#addBtn").setAttribute("aria-expanded", String(!menu.hidden));
+      const open = menu.hidden;
+      closePopups(); menu.hidden = !open; $("#addBtn").setAttribute("aria-expanded", String(open));
+      if (open && isPhone()) setSheet("peek");
     });
     menu.addEventListener("click", (e) => {
       const r = e.target.closest("[data-rec]");
