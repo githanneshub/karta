@@ -150,7 +150,8 @@
     "(Flygbild in its layer menu shows aerial photos, 1960 and 1975 too)": "(Flygbild i lagermenyn visar flygfoton, även från 1960 och 1975)",
     "just now": "nyss", "Map marker": "Kartmarkör", "App version:": "Appversion:", "Log": "Obs", "Edit the map": "Redigera kartan", "Settings": "Inställningar", "Screen": "Skärm",
     "Night mode (dimmed screen)": "Nattläge (dämpad skärm)", "3D height exaggeration": "Höjdförstärkning i 3D", "3D terrain": "3D-terräng", "Adjust by hand": "Ställ in för hand",
-    "Add or draw": "Lägg till eller rita", "Your position (OwnTracks)": "Din position (OwnTracks)", "Share from the map instead": "Dela från kartan i stället",
+    "Add or draw": "Lägg till eller rita", "You (OwnTracks)": "Du (OwnTracks)", "The map's own GPS not working?": "Fungerar inte kartans egen GPS?",
+    "Only needed for the blue dot, follow-me and the compass while the map is open. OwnTracks works without it.": "Behövs bara för den blå pricken, följ mig och kompassen medan kartan är öppen. OwnTracks fungerar utan den.", "Your position (OwnTracks)": "Din position (OwnTracks)", "Share from the map instead": "Dela från kartan i stället",
     "We share positions with the OwnTracks app. It keeps sending with the phone locked in your pocket, and your dot shows on everyone's map. Set it up once:":
       "Vi delar positioner med appen OwnTracks. Den fortsätter skicka med telefonen låst i fickan, och din prick syns på allas karta. Ställ in den en gång:",
     "Only for a phone without OwnTracks: it sends only while the map is open on screen. Don't turn it on on a computer.":

@@ -75,7 +75,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false },
+    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false },
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -83,6 +83,8 @@
       if (!p) return defaults;
       const merged = { ...defaults, ...p, ov: { ...defaults.ov, ...p.ov }, wind: { ...defaults.wind, ...p.wind } };
       if (!(p.v >= 2)) { merged.ov.reserve = false; merged.v = 2; }   // one-time: the reserve layer is now off by default
+      // one-time: the position button used to switch on sharing as well; sharing is now a separate choice (OwnTracks does it)
+      if (!(p.v >= 3)) { merged.share = false; merged.v = 3; }
       return merged;
     }
     catch { return defaults; }
@@ -640,9 +642,10 @@
   function renderMyCone() {
     const src = map.getSource("mycone");
     if (!src) return;
-    if (!prefs.myCone || !myFix) { src.setData(FC()); return; }
+    const pos = myPos();
+    if (!prefs.myCone || !pos) { src.setData(FC()); return; }
     const w = prefs.wind;
-    const ring = w.speed < 1 ? Geo.circle(myFix.ll, 60) : coneGeom({ lon: myFix.ll[0], lat: myFix.ll[1] });
+    const ring = w.speed < 1 ? Geo.circle(pos.ll, 60) : coneGeom({ lon: pos.ll[0], lat: pos.ll[1] });
     src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }]));
   }
 
@@ -1447,9 +1450,9 @@
   }
   function cyclePosition() {
     const st = posState();
-    if (st === "off") { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
+    if (st === "off") startGPS();
     else if (st === "on") setFollow(true);
-    else { setFollow(false); if (FAMILY && Family.ready) Family.setSharing(false); else stopGPS(); }
+    else { setFollow(false); stopGPS(); if (FAMILY && Family.sharing) Family.setSharing(false); }
     renderPosBtn();
   }
 
@@ -1674,7 +1677,8 @@
     $("#dayCard").addEventListener("change", (e) => { const s = e.target.closest("[data-assign]"); if (s) Day.assign(s.dataset.assign, s.value); });
     $("#myStandChip").addEventListener("click", () => {
       const st = Store.data.stands.find((x) => x.id === $("#myStandChip").dataset.id); if (!st) return;
-      if (myFix) map.fitBounds([[Math.min(myFix.ll[0], st.lon), Math.min(myFix.ll[1], st.lat)], [Math.max(myFix.ll[0], st.lon), Math.max(myFix.ll[1], st.lat)]], { padding: 90, maxZoom: 17 });
+      const pos = myPos();
+      if (pos) map.fitBounds([[Math.min(pos.ll[0], st.lon), Math.min(pos.ll[1], st.lat)], [Math.max(pos.ll[0], st.lon), Math.max(pos.ll[1], st.lat)]], { padding: 90, maxZoom: 17 });
       else map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 16) });
     });
     hmenu.addEventListener("click", (e) => {
@@ -1892,8 +1896,8 @@
     on: null, lastSave: 0, wake: null, timer: 0,
     start(kind, from) {
       if (this.on) { toast("Already recording."); return; }
-      if (watchId === null) { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
-      const pts = from ? [from.lon, from.lat] : myFix ? [...myFix.ll] : [];
+      if (watchId === null) startGPS();
+      const here = myPos(), pts = from ? [from.lon, from.lat] : here ? [...here.ll] : [];
       this.on = { id: newId("tk"), kind, pts, ts: pts.length ? [Date.now()] : [], marks: [], start: Date.now(), from: from ? from.label || "" : "" };
       try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => { this.wake = w; }).catch(() => {}); } catch { /* no wake lock */ }
       this.timer = setInterval(() => this.renderBar(), 15000);
@@ -1933,8 +1937,9 @@
     },
     mark(kind) {
       if (!this.on) return;
-      if (!myFix) { toast("Waiting for your position. Try again in a moment."); return; }
-      this.on.marks.push({ kind, lon: myFix.ll[0], lat: myFix.ll[1], t: Date.now() });
+      const pos = myPos();
+      if (!pos) { toast("Waiting for your position. Try again in a moment."); return; }
+      this.on.marks.push({ kind, lon: pos.ll[0], lat: pos.ll[1], t: Date.now() });
       renderTracks(); this.save();
       toast(`${MARKS[kind].n} ✓`);
       try { navigator.vibrate && navigator.vibrate(60); } catch { /* none */ }
@@ -1993,6 +1998,13 @@
     }).join("") : `<li class="empty">No recorded tracks yet. Start one with +.</li>`;
   }
 
+  function myPos() {
+    if (myFix) return { ll: myFix.ll, acc: myFix.acc };
+    const v = FAMILY && Family.otMine;
+    if (v && typeof v.lon === "number" && Family.isCurrent(v, 0) && Family.goodFix(v)) return { ll: [v.lon, v.lat], acc: v.acc || 20 };
+    return null;
+  }
+
   // ---------- hunting seasons and shooting light (Blekinge län) ----------
   function renderSeasons() {
     const J = window.Jakttider; if (!J) return;
@@ -2037,9 +2049,13 @@
   };
   const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!" };
   const Hunt = {
-    events: [], stand: null, seen: null, markers: new Map(), last: new Map(), blocked: false,
+    events: [], stand: null, checkins: {}, seen: null, markers: new Map(), last: new Map(), blocked: false,
     start(db) {
       this.stand = prefs.onStand || null;
+      db.doc("map/onstand").onSnapshot((snap) => {
+        this.checkins = snap.exists ? snap.data() : {};
+        syncMarkers(); this.checkSafety();
+      }, () => {});
       db.collection("events").onSnapshot((snap) => {
         const all = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
         const fresh = this.seen ? all.filter((e) => !this.seen.has(e.id)) : [];
@@ -2052,37 +2068,42 @@
         for (const e of all) if (e.email === me && Date.now() - (e.tc || 0) > 48 * 3600e3) db.doc(`events/${e.id}`).delete().catch(() => {});
       }, () => { this.blocked = true; });
     },
+    // who has checked in where (a check-in lasts until they leave the stand, at most 14 hours)
+    sitting() {
+      const out = new Map();
+      for (const [email, c] of Object.entries(this.checkins || {})) if (c && c.stand && Date.now() - (c.t || 0) < 14 * 3600e3) out.set(c.stand, email);
+      return out;
+    },
     onStand(standId) {
-      for (const [, v] of Family.positions) if (v.stand === standId && Family.isCurrent(v, 30)) return v;
+      const who = this.sitting().get(standId);
+      if (who) { const m = Family.members.find((x) => x.email === who); return { email: who, name: m ? m.name : who.split("@")[0] }; }
       if (this.stand === standId && Family.user) return { email: Family.user.email.toLowerCase(), name: Family.member && Family.member.name };
-      const who = Day.whoOn(standId);
-      if (who) { const m = Family.members.find((x) => x.email === who); return { email: who, name: m ? m.name : who.split("@")[0], planned: true }; }
+      const planned = Day.whoOn(standId);
+      if (planned) { const m = Family.members.find((x) => x.email === planned); return { email: planned, name: m ? m.name : planned.split("@")[0], planned: true }; }
       return null;
     },
     // post a message that needs no position (hunt day start and end)
     async post(type, extra = {}) {
       const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0], tc: Date.now(), ...extra };
-      if (myFix) { e.lon = myFix.ll[0]; e.lat = myFix.ll[1]; }
+      const pos = myPos(); if (pos) { e.lon = pos.ll[0]; e.lat = pos.ll[1]; }
       try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); } catch { /* rules not published yet */ }
     },
     async send(type) {
-      if (!myFix) {
-        if (FAMILY && !Family.sharing) Family.setSharing(true); else startGPS();
-        toast("Waiting for your position. Try again in a moment."); return;
-      }
-      if (FAMILY && !Family.sharing) Family.setSharing(true);
+      const pos = myPos();
+      if (!pos) { startGPS(); toast("Waiting for your position. Try again in a moment."); return; }
       const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0],
-        lon: myFix.ll[0], lat: myFix.ll[1], tc: Date.now() };
+        lon: pos.ll[0], lat: pos.ll[1], tc: Date.now() };
       if (Heading.on && Heading.deg !== null) e.heading = Math.round(Heading.deg);
       if (type === "onstand") {
         let best = null, bd = 150;
-        for (const st of Store.data.stands) { const d = Geo.distance(myFix.ll, [st.lon, st.lat]); if (d < bd) { bd = d; best = st; } }
+        for (const st of Store.data.stands) { const d = Geo.distance(pos.ll, [st.lon, st.lat]); if (d < bd) { bd = d; best = st; } }
         if (!best) { toast("No stand within 150 m of you."); return; }
         this.stand = best.id; e.standId = best.id; e.standName = best.name || "";
       }
       if (type === "offstand") { if (!this.stand) return; this.stand = null; }
       prefs.onStand = this.stand; savePrefs();
-      Family.lastWrite = null; Family.onFix({ coords: { longitude: myFix.ll[0], latitude: myFix.ll[1], accuracy: myFix.acc } });
+      if (type === "onstand" || type === "offstand")
+        window.FB.db.doc("map/onstand").update({ [e.email]: { stand: this.stand || "", t: Date.now() } }).catch(() => {});
       try { await window.FB.db.doc(`events/${newId("ev")}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); }
       catch { toast("Couldn't send. The owner needs to publish the new Firebase rules.", 7000); }
       syncMarkers(); this.render();
@@ -2137,18 +2158,19 @@
       const me = Family.user.email.toLowerCase();
       // my stand counts once I've checked in, or once I'm at the stand I was given today
       const plannedId = Day.myStand(), planned = plannedId && Store.data.stands.find((x) => x.id === plannedId);
-      const mine = (this.stand && Store.data.stands.find((x) => x.id === this.stand)) || (planned && myFix && Geo.distance(myFix.ll, [planned.lon, planned.lat]) < 50 ? planned : null);
+      const pos = myPos();
+      const mine = (this.stand && Store.data.stands.find((x) => x.id === this.stand)) || (planned && pos && Geo.distance(pos.ll, [planned.lon, planned.lat]) < 50 ? planned : null);
       if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${v.name || v.email} is in your shooting sector` });
-      if (myFix) {
-        const others = new Map();   // stand id -> who sits there (checked in now, or given the stand today)
-        for (const [, v] of live) if (v.stand) others.set(v.stand, v.name || v.email);
+      if (pos) {
+        const others = new Map(), nameOf = (e) => { const m = Family.members.find((x) => x.email === e); return (m && m.name) || e.split("@")[0]; };
+        for (const [sid, email] of this.sitting()) if (email !== me) others.set(sid, nameOf(email));   // checked in now
         if (Day.active()) for (const [email, sid] of Object.entries(Day.doc.assign || {})) {
           if (!sid || email === me || others.has(sid)) continue;
           const m = Family.members.find((x) => x.email === email); others.set(sid, (m && m.name) || email.split("@")[0]);
         }
         for (const [sid, name] of others) {
           const st = Store.data.stands.find((x) => x.id === sid);
-          if (st && st.id !== (mine && mine.id) && this.inSector(st, myFix.ll)) msgs.push({ key: "me:" + sid, text: `You're in ${name}'s shooting sector` });
+          if (st && st.id !== (mine && mine.id) && this.inSector(st, pos.ll)) msgs.push({ key: "me:" + sid, text: `You're in ${name}'s shooting sector` });
         }
       }
       const banner = $("#safety");
@@ -2260,7 +2282,7 @@
     canLead() { return this.active() && (this.doc.leader === this.me() || (Family.member && Family.member.role === "owner")); },
     async begin() {
       const assign = {};
-      for (const [, v] of Family.positions) if (v.stand && v.email) assign[v.email] = v.stand;   // already sitting
+      for (const [sid, email] of Hunt.sitting()) assign[email] = sid;   // already sitting
       await window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
         leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` });
       Hunt.post("daystart");
@@ -2327,10 +2349,10 @@
     const sid = FAMILY ? Day.myStand() : null, st = sid && Store.data.stands.find((x) => x.id === sid);
     if (!st) { chip.hidden = true; if (src) src.setData(FC()); return; }
     chip.hidden = false;
-    const near = myFix && Geo.distance(myFix.ll, [st.lon, st.lat]);
-    chip.textContent = tr(`Your stand: ${st.name || "Stand"}`) + (myFix ? ` · ${Math.round(near)} m ${Geo.compassName(Geo.bearing(myFix.ll, [st.lon, st.lat]))}` : "");
+    const pos = myPos(), near = pos && Geo.distance(pos.ll, [st.lon, st.lat]);
+    chip.textContent = tr(`Your stand: ${st.name || "Stand"}`) + (pos ? ` · ${Math.round(near)} m ${Geo.compassName(Geo.bearing(pos.ll, [st.lon, st.lat]))}` : "");
     chip.dataset.id = st.id;
-    if (src) src.setData(FC(myFix && near > 30 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [myFix.ll, [st.lon, st.lat]] } }] : []));
+    if (src) src.setData(FC(pos && near > 30 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [pos.ll, [st.lon, st.lat]] } }] : []));
   }
 
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
@@ -2422,7 +2444,7 @@
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
-        syncMarkers(); Hunt.checkSafety(); Rec.backfill(); OT.render();
+        syncMarkers(); Hunt.checkSafety(); Rec.backfill(); OT.render(); renderMyCone(); renderGoto();
       }, () => {});
       Hunt.start(db); Day.start(db); OT.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
@@ -2462,7 +2484,6 @@
       window.FB.db.doc(`positions/${this.user.uid}`).set({
         name: (this.member && this.member.name) || this.user.displayName || this.user.email, email: this.user.email.toLowerCase(),
         lon: ll[0], lat: ll[1], acc: Math.round(p.coords.accuracy), t: window.FB.serverTimestamp(), tc: now, sharing: true,
-        stand: Hunt.stand || null,
       }).catch(() => {});
       this.render();
       Hunt.checkSafety();
@@ -2493,7 +2514,8 @@
       }
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
-      const where = myFix ? ` · ${Math.round(Geo.distance(myFix.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(myFix.ll, [v.lon, v.lat]))}` : "";
+      const here = myPos();
+      const where = here ? ` · ${Math.round(Geo.distance(here.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(here.ll, [v.lon, v.lat]))}` : "";
       const via = v.src === "owntracks" ? " · OwnTracks" : "";
       const batt = typeof v.batt === "number" ? ` · 🔋${v.batt}%` : "";
       if (this.isCurrent(v, 10)) {
@@ -2551,6 +2573,19 @@
         }
       }
       for (const [uid, m] of this.markers) if (!keep.has(uid)) { m.remove(); this.markers.delete(uid); }
+      const ot = !myFix && this.otMine && this.isCurrent(this.otMine, 0) ? this.otMine : null;
+      if (ot) {
+        if (!this.meOt) {
+          const el = document.createElement("div"); el.className = "fam-marker me-ot";
+          el.innerHTML = `<b translate="no"></b><span></span>`;
+          this.meOt = new maplibregl.Marker({ element: el }).setLngLat([ot.lon, ot.lat]).addTo(map);
+        }
+        this.meOt.setLngLat([ot.lon, ot.lat]);
+        const el = this.meOt.getElement(), me = this.user.email.toLowerCase();
+        el.style.setProperty("--c", this.colorFor(me));
+        el.querySelector("b").textContent = this.letterFor(me, this.member && this.member.name);
+        el.querySelector("span").textContent = tr("You (OwnTracks)");
+      } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
     },
     async addMember(name, email) {
       email = email.trim().toLowerCase();
