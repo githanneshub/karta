@@ -304,7 +304,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -323,6 +323,15 @@
       paint: { "line-color": "#1f6fb5", "line-opacity": .8, "line-width": ["interpolate", ["linear"], ["get", "ha"], 1.5, .8, 20, 2.2, 200, 3.4] } });
     map.addLayer({ id: "drainage-arrows", type: "symbol", source: "drainage", minzoom: 14.5,
       layout: { "symbol-placement": "line", "symbol-spacing": 70, "icon-image": "arrow-blue", "icon-size": .55, "icon-allow-overlap": true, "icon-ignore-placement": true } });
+    // game model: bedding (solid blue) and feeding (dashed yellow) outlines with a faint tint
+    const ZONE = ["match", ["get", "k"], "bed", "#5ec8ff", "#ffe14d"];
+    map.addLayer({ id: "gamezones-fill", type: "fill", source: "gamezones", paint: { "fill-color": ZONE, "fill-opacity": .1 } });
+    map.addLayer({ id: "gamezones-case", type: "line", source: "gamezones", layout: { "line-join": "round" },
+      paint: { "line-color": "#0d1b26", "line-opacity": .45, "line-width": ["interpolate", ["linear"], ["zoom"], 13, 2.6, 17, 4.6] } });
+    map.addLayer({ id: "gamezones-bed", type: "line", source: "gamezones", filter: ["==", ["get", "k"], "bed"], layout: { "line-join": "round" },
+      paint: { "line-color": ZONE, "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.4, 17, 2.6] } });
+    map.addLayer({ id: "gamezones-food", type: "line", source: "gamezones", filter: ["==", ["get", "k"], "food"], layout: { "line-join": "round" },
+      paint: { "line-color": ZONE, "line-width": ["interpolate", ["linear"], ["zoom"], 13, 1.4, 17, 2.6], "line-dasharray": [2.5, 1.5] } });
     // streams and roads
     map.addLayer({ id: "streams", type: "line", source: "osm", filter: ["==", ["get", "kind"], "stream"], paint: { "line-color": "#2f78c0", "line-width": 1.6 } });
     map.addLayer({ id: "road-case", type: "line", source: "osm", filter: ["in", ["get", "kind"], ["literal", ["road_major", "road", "road_minor"]]],
@@ -417,7 +426,7 @@
     // data
     addImageSet(prefs.base, "anchor-base");
     // vector layers: one file per area, merged into one map source each
-    for (const k of ["osm", "reserves", "drainage", "contours"]) {
+    for (const k of ["osm", "reserves", "drainage", "contours", "gamezones"]) {
       Promise.all(manifests.map((m) => getJSON(`data/${m.id}/${k}.geojson`).catch(() => FC())))
         .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
     }
@@ -441,6 +450,7 @@
     sightings: ["sightings", "sightings-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
+    game: ["gamezones-fill", "gamezones-case", "gamezones-bed", "gamezones-food"],
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
   };
   function applyLayers() {
@@ -479,6 +489,7 @@
     $("#tilt").setAttribute("aria-pressed", String(on));
     if (on) { map.setTerrain({ source: "dem", exaggeration: prefs.exag }); if (animate) map.easeTo({ pitch: 62, duration: 900 }); }
     else { map.setTerrain(null); if (animate) map.easeTo({ pitch: 0, duration: 600 }); }
+    renderFlow();
   }
 
 
@@ -551,7 +562,7 @@
     }).join("");
   }
   function renderFlow() {
-    if (flow) flow.set({ on: prefs.windFlow, from: prefs.wind.from, speed: prefs.wind.speed });
+    if (flow) flow.set({ on: prefs.windFlow && is3D, from: prefs.wind.from, speed: prefs.wind.speed });   // only in 3D: flat they look like snow
   }
   const STAND_ICON = {
     tower: '<svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg>',
