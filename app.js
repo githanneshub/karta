@@ -1415,7 +1415,6 @@
       renderMyCone();
       Rec.onFix(ll, p.coords.accuracy);
       if (FAMILY) renderGoto();
-      if (Pocket.on) Pocket.tick();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       clearTimeout(startGPS.slow);
@@ -1650,19 +1649,6 @@
     const closeHunt = () => { hmenu.hidden = true; $("#huntBtn").setAttribute("aria-expanded", "false"); };
     $("#huntBtn").addEventListener("click", (e) => {
       e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
-    });
-    $("#pocketBtn").addEventListener("click", () => Pocket.enter());
-    const pocket = $("#pocket");
-    // only a double tap wakes it: brushes and pocket touches do nothing
-    pocket.addEventListener("pointerdown", (e) => {
-      e.preventDefault(); e.stopPropagation();
-      const now = Date.now();
-      if (now - Pocket.lastTap < 450) Pocket.exit();
-      Pocket.lastTap = now;
-    });
-    for (const ev of ["click", "touchstart", "touchmove", "wheel"]) pocket.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, { passive: false });
-    document.addEventListener("visibilitychange", () => {
-      if (Pocket.on && document.visibilityState === "visible") navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => { Pocket.wake = w; }).catch(() => {});
     });
     $("#dayCard").addEventListener("click", (e) => {
       const b = e.target.closest("[data-day]"); if (!b) return;
@@ -2136,34 +2122,6 @@
         const t = this.last.get(m.key) || 0;
         if (Date.now() - t > 60000) { this.last.set(m.key, Date.now()); try { navigator.vibrate && navigator.vibrate([500, 200, 500]); } catch { /* none */ } }
       }
-    },
-  };
-
-  // ---------- pocket mode: black screen, map and GPS keep running ----------
-  // iPhones stop web pages from reading the location once the screen locks, so the screen has to stay on.
-  // A black screen costs almost nothing on OLED iPhones; touches are ignored until a double tap.
-  const Pocket = {
-    on: false, wake: null, timer: 0, lastTap: 0,
-    async enter() {
-      if (FAMILY && Family.ready && !Family.sharing) Family.setSharing(true);
-      else if (watchId === null) startGPS();
-      this.on = true;
-      const el = $("#pocket"); el.hidden = false;
-      document.documentElement.classList.add("pocket");
-      try { this.wake = await navigator.wakeLock.request("screen"); } catch { this.wake = null; }
-      this.tick(); this.timer = setInterval(() => this.tick(), 30000);
-      if (flow) flow.set({ on: false, from: prefs.wind.from, speed: prefs.wind.speed });   // no animation behind a black screen
-    },
-    exit() {
-      this.on = false; clearInterval(this.timer);
-      $("#pocket").hidden = true; document.documentElement.classList.remove("pocket");
-      if (this.wake) { this.wake.release().catch(() => {}); this.wake = null; }
-      renderFlow(); map.resize();
-    },
-    tick() {
-      const t = new Date().toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-      const age = myFix ? Math.round((Date.now() - myFix.t) / 60000) : null;
-      $("#pocketInfo").textContent = `${t} · ` + (myFix ? tr(age < 1 ? "Sharing your position" : `Last position ${age} min ago`) : tr("Waiting for GPS…"));
     },
   };
 
