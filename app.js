@@ -75,7 +75,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false },
+    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false }, quietMode: "auto",
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -257,7 +257,7 @@
     }
   }
   function setImageSetVisible(name, on) {
-    if (on) addImageSet(name, ["wet", "steep", "game"].includes(name) ? "anchor-overlays" : "anchor-base");
+    if (on) addImageSet(name, ["wet", "steep", "game", "quiet_dry", "quiet_wet"].includes(name) ? "anchor-overlays" : "anchor-base");
     for (const id of imageIds(name)) if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
   }
 
@@ -445,6 +445,11 @@
     setImageSetVisible("steep", prefs.ov.steep);
     setImageSetVisible("game", prefs.ov.game);
     $("#gameLegend").hidden = !prefs.ov.game;
+    const wet = Ground.wet().wet;
+    setImageSetVisible("quiet_dry", prefs.ov.quiet && !wet);
+    setImageSetVisible("quiet_wet", prefs.ov.quiet && wet);
+    $("#quietLegend").hidden = !prefs.ov.quiet;
+    Ground.render();
     for (const id of ["cones", "cones-line"]) map.setLayoutProperty(id, "visibility", prefs.cones ? "visible" : "none");
   }
 
@@ -826,6 +831,38 @@
     if (prefs.windMode !== "manual" && Forecast.selT) applyForecastHour(Forecast.selT, false);
     renderForecast();
   }
+  // Tyst mark: the dry or the after-rain version, from the rain SMHI measured the last day at Ronneby-Bredåkra
+  // (14 km away) and the forecast for this hour. Frost makes leaves crunch, so it counts as dry.
+  const Ground = {
+    rain24: null, rain6: null, fetched: 0,
+    async load() {
+      if (Date.now() - this.fetched < 30 * 60e3) return;
+      try {
+        const r = await fetch("https://opendata-download-metobs.smhi.se/api/version/1.0/parameter/7/station/65160/period/latest-day/data.json", { cache: "no-store" });
+        if (!r.ok) throw new Error(r.status);
+        const now = Date.now(), v = ((await r.json()).value || []).map((x) => ({ t: x.date, mm: parseFloat(x.value) || 0 }));
+        this.rain24 = v.filter((x) => x.t > now - 24 * 3600e3).reduce((a, x) => a + x.mm, 0);
+        this.rain6 = v.filter((x) => x.t > now - 6 * 3600e3).reduce((a, x) => a + x.mm, 0);
+        this.fetched = now;
+      } catch { /* no rain data: decide from the forecast only */ }
+      applyLayers();
+    },
+    wet() {
+      if (prefs.quietMode === "dry") return { wet: false, why: "Showing dry ground (chosen)" };
+      if (prefs.quietMode === "wet") return { wet: true, why: "Showing wet ground (chosen)" };
+      const now = Date.now(), h = Forecast.hours.find((x) => x.t <= now && x.t > now - 3600e3) || Forecast.hours[0];
+      const mm = this.rain24 === null ? "" : ` · ${this.rain24.toFixed(1)} mm in 24 h`;
+      if (h && typeof h.temp === "number" && h.temp <= -1) return { wet: false, why: "Frost: frozen leaves crunch" + mm };
+      if (h && ["rain", "showers", "sleet", "thunder"].includes(wxKind(h)) && h.rain >= 0.1) return { wet: true, why: "Raining: wet ground" + mm };
+      if (this.rain6 >= 0.5 || this.rain24 >= 2) return { wet: true, why: "Wet after rain" + mm };
+      return { wet: false, why: (this.rain24 === null ? "Dry ground (no rain data)" : "Dry ground") + mm };
+    },
+    render() {
+      const el = $("#quietNow"); if (!el) return;
+      el.textContent = this.wet().why;
+      $$("[data-quiet]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.quiet === prefs.quietMode)));
+    },
+  };
   function applyForecastHour(t, scroll = true) {
     const h = Forecast.hours.find((x) => x.t === t);
     if (!h) return;
@@ -1608,8 +1645,9 @@
     });
     $$("[data-ov]").forEach((c) => {
       c.checked = !!prefs.ov[c.dataset.ov];
-      c.addEventListener("change", () => { prefs.ov[c.dataset.ov] = c.checked; savePrefs(); applyLayers(); });
+      c.addEventListener("change", () => { prefs.ov[c.dataset.ov] = c.checked; savePrefs(); applyLayers(); if (prefs.ov.quiet) Ground.load(); });
     });
+    $$("[data-quiet]").forEach((b) => b.addEventListener("click", () => { prefs.quietMode = b.dataset.quiet; savePrefs(); applyLayers(); }));
     $("#tilt").addEventListener("click", () => set3D(!is3D));
     $("#exag").value = prefs.exag; $("#exagOut").textContent = prefs.exag + "×";
     $("#exag").addEventListener("input", (e) => {
@@ -1854,8 +1892,9 @@
       applyForecastHour(Forecast.selT && Forecast.selT > now - 3600e3 ? Forecast.selT : first && first.t);
     });
     loadForecast();
+    if (prefs.ov.quiet) Ground.load();
     setInterval(loadForecast, 30 * 60e3);
-    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); });
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); if (document.visibilityState === "visible" && prefs.ov.quiet) Ground.load(); });
     $("#showMyCone").checked = prefs.myCone;
     $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
     $("#seasonSearch").addEventListener("input", renderSeasons);

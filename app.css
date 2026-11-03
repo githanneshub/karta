@@ -578,6 +578,12 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 .sw-game { background: linear-gradient(90deg, transparent 0 20%, #ff1fb4 20% 45%, transparent 45% 60%, #ff8fdc 60% 80%, transparent 80%); }
 .game-legend { display: flex; flex-direction: column; gap: 3px; margin: 6px 0 4px 30px; font-size: 12.5px; color: var(--muted); }
 .game-legend[hidden] { display: none; }
+.sw-quiet { background: linear-gradient(90deg, #1fae5b 0 33%, #f2d43d 33% 66%, #d62f2f 66%); }
+#quietNow { color: var(--fg); font-weight: 600; margin-top: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; width: max-content; }
+.seg button { background: none; border: 0; color: var(--muted); font: inherit; padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
 .game-legend span { display: flex; align-items: center; gap: 8px; }
 .game-legend i { width: 18px; height: 6px; border-radius: 3px; flex: none; }
 
