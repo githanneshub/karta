@@ -45,9 +45,6 @@ body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 1
 }
 #stage { position: relative; flex: 1; min-width: 0; }
 #map { position: absolute; inset: 0; background: #d8d3c3; }
-/* home-screen app on iPhone: the map runs under the status bar; a soft shade keeps the clock and battery readable */
-#stage::after { content: ""; position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: calc(env(safe-area-inset-top, 0px) * 1.4);
-  background: linear-gradient(rgb(0 0 0 / .5), rgb(0 0 0 / 0)); pointer-events: none; }
 
 /* Brand */
 .brand { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
@@ -235,16 +232,25 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .place-marker.sel span { background: #df5a12; color: #fff; }
 .me-dot { width: 18px; height: 18px; border-radius: 50%; background: #1d7cf2; border: 3px solid #fff; box-shadow: 0 0 0 6px rgb(29 124 242 / .25); }
 
-/* Phone: panel becomes a bottom sheet over the map */
+/* Phone: a tab bar at the very bottom, like an ordinary iPhone app; a tab's content opens above it */
 @media (max-width: 860px) {
-  #app { display: block; }
+  #app { display: block; --panes-h: calc(62vh - 48px); }   /* --panes-h: content height when open (read by the swipe code) */
   #stage { position: absolute; inset: 0; }
   #panel {
-    position: absolute; left: 0; right: 0; bottom: 0; width: auto; border-right: 0; border-top: 1px solid var(--line);
-    border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgb(0 0 0 / .18); height: 62%;
-    transition: transform .25s ease; padding-bottom: env(safe-area-inset-bottom, 0px);
+    position: absolute; left: 0; right: 0; bottom: 0; width: auto; height: auto; border-right: 0; border-top: 1px solid var(--line);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -6px 24px rgb(0 0 0 / .18); padding-bottom: env(safe-area-inset-bottom, 0px);
+    display: flex; flex-direction: column;
   }
-  #app[data-sheet="peek"] #panel { transform: translateY(calc(100% - 92px - env(safe-area-inset-bottom, 0px))); }
+  #panel .sheet-handle { order: 1; }
+  #panel .panes { order: 2; box-sizing: border-box; height: var(--panes-h); flex: none; transition: height .25s ease, padding .25s ease; }
+  #panel .tabs { order: 3; border-bottom: 0; border-top: 1px solid var(--line); }
+  .tabs button { border-bottom: 0; border-top: 3px solid transparent; }
+  .tabs button[aria-selected="true"] { border-top-color: var(--accent); }
+  /* closed: only the tab bar */
+  #app[data-sheet="peek"] #panel .panes { height: 0; padding-top: 0; padding-bottom: 0; overflow: hidden; }
+  #app[data-sheet="peek"] .sheet-handle { display: none; }
+  #app[data-sheet="peek"] #panel .tabs { border-top: 0; }
+  #app[data-sheet="peek"] .tabs button[aria-selected="true"] { border-top-color: transparent; color: var(--muted); }
   .sheet-handle { display: block; appearance: none; border: 0; background: none; padding: 8px 0 2px; cursor: pointer; }
   .sheet-handle span { display: block; width: 44px; height: 5px; border-radius: 3px; background: var(--line); margin: 0 auto; }
   .brand { padding: 0 16px 4px; }
@@ -257,7 +263,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
   .hint { max-width: calc(100% - 80px); left: calc(50% - 26px); font-size: 14px; }
   .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
 }
-@media (prefers-reduced-motion: reduce) { #panel, .loading { transition: none; } }
+@media (prefers-reduced-motion: reduce) { #panel, .panes, .loading { transition: none; } }
 
 .viewbox > .switch { align-self: flex-start; text-align: left; }
 
@@ -444,7 +450,6 @@ details.sect > .eyebrow:first-of-type { margin-top: 2px; }
 
 @media (max-width: 860px) {
   .brand { display: none; }
-  #app[data-sheet="peek"] #panel { transform: translateY(calc(100% - 64px - env(safe-area-inset-bottom, 0px))); }
   .readout { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
   .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
   .maplibregl-ctrl-bottom-left, .maplibregl-ctrl-bottom-right { bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }

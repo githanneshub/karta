@@ -199,34 +199,35 @@
   }
   const isPhone = () => window.matchMedia("(max-width: 860px)").matches;
   function setSheet(state) { $("#app").dataset.sheet = state; }
-  // Phone: the panel follows your finger. Drag the top (handle, title, tabs) up or down, or pull the content
-  // down when it is scrolled to the top; let go and it settles open or closed depending on how far and how fast.
+  // Phone: a tab bar at the bottom; the content above it follows your finger. Drag the tab bar or the handle up or
+  // down, or pull the content down when it is scrolled to the top; let go and it settles open or closed depending
+  // on how far and how fast.
   let sheetDragged = false;
   function sheetSwipe() {
-    const app = $("#app"), panel = $("#panel");
-    const ty = () => { const m = getComputedStyle(panel).transform; return m && m !== "none" ? new DOMMatrixReadOnly(m).m42 : 0; };
+    const app = $("#app"), panes = $(".panes");
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;pointer-events:none;width:0;height:var(--panes-h)";
+    app.appendChild(probe);
     let d = null;
-    panel.addEventListener("touchstart", (e) => {
+    $("#panel").addEventListener("touchstart", (e) => {
       if (!isPhone() || e.touches.length !== 1) return;
-      const top = e.target.closest(".sheet-handle, .brand, .tabs"), pane = e.target.closest(".panes");
+      const top = e.target.closest(".sheet-handle, .tabs"), pane = e.target.closest(".panes");
       if (!top && !(pane && app.dataset.sheet === "open")) return;
-      // where "closed" is: read it from the stylesheet without showing anything
-      const was = app.dataset.sheet, prev = panel.style.transition;
-      panel.style.transition = "none"; app.dataset.sheet = "peek"; const closed = ty(); app.dataset.sheet = was; panel.style.transition = prev;
-      d = { y: e.touches[0].clientY, t: Date.now(), base: ty(), closed, fromPane: !top, scroller: pane, on: false, dy: 0, hist: [] };
+      d = { y: e.touches[0].clientY, t: Date.now(), base: panes.offsetHeight, full: probe.offsetHeight, fromPane: !top, on: false, dy: 0, hist: [] };
     }, { passive: true });
-    panel.addEventListener("touchmove", (e) => {
+    $("#panel").addEventListener("touchmove", (e) => {
       if (!d) return;
       const dy = e.touches[0].clientY - d.y;
       if (!d.on) {
-        if (Math.abs(dy) < 8) return;
         // in the content only a pull-down from the very top moves the panel; anything else scrolls as usual
-        if (d.fromPane && (dy < 0 || d.scroller.scrollTop > 0)) { d = null; return; }
-        d.on = true; panel.style.transition = "none";
+        if (d.fromPane && (dy < 0 || panes.scrollTop > 0)) { d = null; return; }
+        if (d.fromPane) e.preventDefault();   // claim it before the iPhone starts its own rubber-band scroll
+        if (Math.abs(dy) < 8) return;
+        d.on = true; panes.style.transition = "none";
       }
       d.dy = dy;
       const now = Date.now(); d.hist.push({ dy, t: now }); while (d.hist.length > 2 && now - d.hist[0].t > 150) d.hist.shift();
-      panel.style.transform = `translateY(${Math.min(d.closed, Math.max(0, d.base + dy))}px)`;
+      panes.style.height = Math.min(d.full, Math.max(0, d.base - dy)) + "px";
       e.preventDefault();
     }, { passive: false });
     const end = () => {
@@ -236,13 +237,13 @@
       // speed over the last moment (px per ms): a short flick counts as much as a long drag
       const ref = was.hist.length > 1 ? was.hist[0] : { dy: 0, t: was.t };
       const v = (was.dy - ref.dy) / Math.max(1, Date.now() - ref.t);
-      const pos = Math.min(was.closed, Math.max(0, was.base + was.dy));
-      const open = v < -0.3 ? true : v > 0.3 ? false : pos < was.closed / 2;
-      panel.style.transition = ""; panel.style.transform = "";
+      const h = Math.min(was.full, Math.max(0, was.base - was.dy));
+      const open = v < -0.3 ? true : v > 0.3 ? false : h > was.full / 2;
+      panes.style.transition = ""; panes.style.height = "";
       setSheet(open ? "open" : "peek");
-      sheetDragged = true; setTimeout(() => { sheetDragged = false; }, 350);   // the handle's tap doesn't toggle it back
+      sheetDragged = true; setTimeout(() => { sheetDragged = false; }, 350);   // the finger lifting isn't also a tap
     };
-    panel.addEventListener("touchend", end); panel.addEventListener("touchcancel", end);
+    $("#panel").addEventListener("touchend", end); $("#panel").addEventListener("touchcancel", end);
   }
   function showTab(name, expand) {
     prefs.tab = name; savePrefs();
@@ -1702,7 +1703,12 @@
   // ---------- wire up UI ----------
   function initUI() {
     // tabs & sheet
-    $$(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab, true)));
+    $$(".tabs button").forEach((b) => b.addEventListener("click", () => {
+      if (sheetDragged) return;
+      // phone: tapping the open tab again closes it, like an ordinary app
+      if (isPhone() && $("#app").dataset.sheet === "open" && prefs.tab === b.dataset.tab) { setSheet("peek"); return; }
+      showTab(b.dataset.tab, true);
+    }));
     $("#sheetHandle").addEventListener("click", () => { if (!sheetDragged) setSheet($("#app").dataset.sheet === "open" ? "peek" : "open"); });
     sheetSwipe();
     showTab(prefs.tab, false);
