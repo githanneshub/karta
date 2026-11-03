@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "74f59e01a7";</script>
-<script src="firebase-config.js?v=74f59e01a7"></script>
-<script type="module" src="fb.js?v=74f59e01a7"></script>
+<script>window.APP_VERSION = "b820d5c63b";</script>
+<script src="firebase-config.js?v=b820d5c63b"></script>
+<script type="module" src="fb.js?v=b820d5c63b"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=74f59e01a7">
-<link rel="stylesheet" href="app.css?v=74f59e01a7">
+<link rel="stylesheet" href="maplibre-gl.css?v=b820d5c63b">
+<link rel="stylesheet" href="app.css?v=b820d5c63b">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -434,7 +434,12 @@
           <circle r="49" class="hud-face" fill="#1f281f" stroke="#3a463a" style="fill:#1f281f;stroke:#3a463a"/>
           <g id="hudRing"></g>
           <g id="hudHead" class="hud-head" hidden><path d="M0 -36 L7 -25 L-7 -25 Z"/></g>
-          <g id="hudWind" class="hud-wind"><path d="M-3 -20 L3 -20 L2.5 5 L7 5 L0 18 L-7 5 L-2.5 5 Z"/></g>
+          <!-- wind arrow: feathers where the wind comes from, head where it blows (your scent goes) -->
+          <g id="hudWind" class="hud-wind">
+            <path class="hw-tail" d="M-5 -22 L0 -17 L5 -22 M-5 -17 L0 -12 L5 -17" fill="none" stroke="#ffb27f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="fill:none;stroke:#ffb27f"/>
+            <path class="hw-shaft" d="M0 -14 L0 9" fill="none" stroke="#ff7a2e" stroke-width="3" stroke-linecap="round" style="fill:none;stroke:#ff7a2e"/>
+            <path class="hw-head" d="M0 23 L8.5 6.5 L0 11 L-8.5 6.5 Z" fill="#ff7a2e" stroke="#1f281f" stroke-width="1.2" stroke-linejoin="round" style="fill:#ff7a2e;stroke:#1f281f"/>
+          </g>
           <circle r="2.6" class="hud-pivot" fill="#f1f4ec" style="fill:#f1f4ec"/>
         </svg>
       </button>
@@ -488,12 +493,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=74f59e01a7"></script>
-<script src="geo.js?v=74f59e01a7"></script>
-<script src="view.js?v=74f59e01a7"></script>
-<script src="wind.js?v=74f59e01a7"></script>
-<script src="jakt.js?v=74f59e01a7"></script>
-<script src="app.js?v=74f59e01a7"></script>
+<script src="i18n.js?v=b820d5c63b"></script>
+<script src="geo.js?v=b820d5c63b"></script>
+<script src="view.js?v=b820d5c63b"></script>
+<script src="wind.js?v=b820d5c63b"></script>
+<script src="jakt.js?v=b820d5c63b"></script>
+<script src="app.js?v=b820d5c63b"></script>
 
 </body>
 </html>

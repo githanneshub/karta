@@ -337,7 +337,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud-north { fill: #d0332b; }
 .hud-rose text { fill: var(--muted); font: 700 13px var(--f-display); text-anchor: middle; dominant-baseline: central; }
 .hud-rose text:first-of-type { fill: #d0332b; }
-.hud-wind path { fill: var(--accent); stroke: var(--panel); stroke-width: 1.5; }
 .hud-wind.calm { opacity: .3; }
 .hud-head path { fill: #1d7cf2; }
 .hud-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
@@ -401,7 +400,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud .hud-rose text { fill: #f1f4ec; }
 .hud .hud-rose text.hud-n, .hud .hud-north { fill: #ff4d4d; }
 .hud .hud-pivot { fill: #f1f4ec; }
-.hud .hud-wind path { stroke: #1f281f; }
 .hud .hud-wind-text { color: #f1f4ec; }
 
 /* iPhone: buttons get a native light look unless told otherwise; the compass is always the dark instrument */
@@ -628,9 +626,13 @@ html, body { touch-action: manipulation; }
 html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 861px) { html.recording .map-legend { bottom: calc(98px + env(safe-area-inset-bottom, 0px)); } }
 
-/* home-screen app: the compass, buttons and + menu start below the solid top band */
+/* home-screen app (Safari "Add to Home Screen"): iOS 26 still softens the first ~40 points below the status bar,
+   so the compass, buttons, menus and banners start below that */
 @media (display-mode: standalone) {
-  .hud { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 10px); }
-  .toolbar { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 8px); }
-  .addmenu { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 12px); }
+  .hud { top: calc(env(safe-area-inset-top, 0px) + 46px); }
+  .toolbar { top: calc(env(safe-area-inset-top, 0px) + 44px); }
+  .addmenu { top: calc(env(safe-area-inset-top, 0px) + 48px); }
+  .hint, .safety, .mystand { top: calc(env(safe-area-inset-top, 0px) + 122px); }
+  html .safety:not([hidden]) ~ .mystand, .mystand:not([hidden]) ~ .hint, .safety:not([hidden]) ~ .hint { top: calc(env(safe-area-inset-top, 0px) + 178px); }
+  .safety:not([hidden]) ~ .mystand:not([hidden]) ~ .hint { top: calc(env(safe-area-inset-top, 0px) + 234px); }
 }
