@@ -2054,6 +2054,7 @@
   };
   const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎" };
   const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2 };   // how long each kind stays on the map
+  const BLINK_MIN = { help: Infinity, animal: Infinity, shot: 15, down: 15 };   // how long a pin blinks
   const Hunt = {
     events: [], stand: null, checkins: {}, seen: null, markers: new Map(), last: new Map(), blocked: false,
     start(db) {
@@ -2144,6 +2145,7 @@
         arrow.hidden = typeof e.heading !== "number";
         if (typeof e.heading === "number") arrow.style.transform = `rotate(${e.heading}deg)`;
         m.getElement().style.setProperty("--c", Family.colorFor(e.email));
+        m.getElement().classList.toggle("blink", Date.now() - e.tc < (BLINK_MIN[e.type] || 0) * 60e3);
       }
       for (const [id, m] of this.markers) if (!keep.has(id)) { m.remove(); this.markers.delete(id); }
       $("#huntOff").hidden = !this.stand;
@@ -2467,7 +2469,7 @@
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();
       }, () => {});
-      setInterval(() => this.render(), 30000);
+      setInterval(() => { this.render(); Hunt.render(); }, 30000);   // ages, fading dots and blinking pins
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible" || !this.sharing) return;
         this.requestWake();
