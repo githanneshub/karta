@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, deleteDoc,
-  getDoc, serverTimestamp, connectFirestoreEmulator, writeBatch, deleteField,
+  getDoc, serverTimestamp, connectFirestoreEmulator, writeBatch,
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const cfg = window.FIREBASE_CONFIG;
@@ -53,24 +53,8 @@ const db = {
   },
 };
 
-// phone notifications (Firebase Cloud Messaging), loaded only when used
-const messaging = async () => {
-  const m = await import("https://www.gstatic.com/firebasejs/11.0.2/firebase-messaging.js");
-  return { m, msg: m.getMessaging(app) };
-};
-const push = {
-  async token(reg) {
-    const { m, msg } = await messaging();
-    if (!(await m.isSupported())) throw new Error("not supported");
-    return m.getToken(msg, { serviceWorkerRegistration: reg, ...(cfg.vapidKey ? { vapidKey: cfg.vapidKey } : {}) });
-  },
-  async remove() { const { m, msg } = await messaging(); return m.deleteToken(msg); },
-};
-
 window.FB = {
   db,
-  push,
-  deleteField,
   serverTimestamp,
   onAuth: (cb) => onAuthStateChanged(auth, cb),
   currentUser: () => auth.currentUser,
