@@ -199,6 +199,51 @@
   }
   const isPhone = () => window.matchMedia("(max-width: 860px)").matches;
   function setSheet(state) { $("#app").dataset.sheet = state; }
+  // Phone: the panel follows your finger. Drag the top (handle, title, tabs) up or down, or pull the content
+  // down when it is scrolled to the top; let go and it settles open or closed depending on how far and how fast.
+  let sheetDragged = false;
+  function sheetSwipe() {
+    const app = $("#app"), panel = $("#panel");
+    const ty = () => { const m = getComputedStyle(panel).transform; return m && m !== "none" ? new DOMMatrixReadOnly(m).m42 : 0; };
+    let d = null;
+    panel.addEventListener("touchstart", (e) => {
+      if (!isPhone() || e.touches.length !== 1) return;
+      const top = e.target.closest(".sheet-handle, .brand, .tabs"), pane = e.target.closest(".panes");
+      if (!top && !(pane && app.dataset.sheet === "open")) return;
+      // where "closed" is: read it from the stylesheet without showing anything
+      const was = app.dataset.sheet, prev = panel.style.transition;
+      panel.style.transition = "none"; app.dataset.sheet = "peek"; const closed = ty(); app.dataset.sheet = was; panel.style.transition = prev;
+      d = { y: e.touches[0].clientY, t: Date.now(), base: ty(), closed, fromPane: !top, scroller: pane, on: false, dy: 0, hist: [] };
+    }, { passive: true });
+    panel.addEventListener("touchmove", (e) => {
+      if (!d) return;
+      const dy = e.touches[0].clientY - d.y;
+      if (!d.on) {
+        if (Math.abs(dy) < 8) return;
+        // in the content only a pull-down from the very top moves the panel; anything else scrolls as usual
+        if (d.fromPane && (dy < 0 || d.scroller.scrollTop > 0)) { d = null; return; }
+        d.on = true; panel.style.transition = "none";
+      }
+      d.dy = dy;
+      const now = Date.now(); d.hist.push({ dy, t: now }); while (d.hist.length > 2 && now - d.hist[0].t > 150) d.hist.shift();
+      panel.style.transform = `translateY(${Math.min(d.closed, Math.max(0, d.base + dy))}px)`;
+      e.preventDefault();
+    }, { passive: false });
+    const end = () => {
+      if (!d) return;
+      const was = d; d = null;
+      if (!was.on) return;
+      // speed over the last moment (px per ms): a short flick counts as much as a long drag
+      const ref = was.hist.length > 1 ? was.hist[0] : { dy: 0, t: was.t };
+      const v = (was.dy - ref.dy) / Math.max(1, Date.now() - ref.t);
+      const pos = Math.min(was.closed, Math.max(0, was.base + was.dy));
+      const open = v < -0.3 ? true : v > 0.3 ? false : pos < was.closed / 2;
+      panel.style.transition = ""; panel.style.transform = "";
+      setSheet(open ? "open" : "peek");
+      sheetDragged = true; setTimeout(() => { sheetDragged = false; }, 350);   // the handle's tap doesn't toggle it back
+    };
+    panel.addEventListener("touchend", end); panel.addEventListener("touchcancel", end);
+  }
   function showTab(name, expand) {
     prefs.tab = name; savePrefs();
     if (name === "seasons") renderSeasons();
@@ -582,8 +627,7 @@
   function plans(kind) { return Store.data[kind].filter(planShown); }
   function whoName(by) {
     if (!by) return "Unknown";
-    const m = FAMILY && Family.members.find((x) => x.email === by);
-    return (m && m.name) || by.split("@")[0];
+    return FAMILY ? Family.nameFor(by) : by.split("@")[0];
   }
   function whoTag(x) { return FAMILY && x.by ? ` · ${esc(whoName(x.by))}` : ""; }
   function renderWho() {
@@ -1659,7 +1703,8 @@
   function initUI() {
     // tabs & sheet
     $$(".tabs button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab, true)));
-    $("#sheetHandle").addEventListener("click", () => setSheet($("#app").dataset.sheet === "open" ? "peek" : "open"));
+    $("#sheetHandle").addEventListener("click", () => { if (!sheetDragged) setSheet($("#app").dataset.sheet === "open" ? "peek" : "open"); });
+    sheetSwipe();
     showTab(prefs.tab, false);
 
     // base & overlays
@@ -2110,15 +2155,16 @@
 
   // ---------- hunt day: quick messages, shot marker, who is on which stand, shooting-sector warning ----------
   const SAFETY_RANGE = 600;   // m: a bullet carries far past the stand's own range, so warn well beyond it
+  const who = (e) => (FAMILY ? Family.nameFor(e.email, e.name) : e.name);
   const EVENT_TEXT = {
-    onstand: (e) => `${e.name} is on stand ${e.standName || ""}`.trim(),
-    daystart: (e) => `${e.name} started the hunt day`,
-    dayend: (e) => `${e.name}: the hunt is over`,
-    offstand: (e) => `${e.name} left the stand`,
-    shot: (e) => `${e.name}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
-    down: (e) => `${e.name}: animal down`,
-    help: (e) => `${e.name} needs help`,
-    animal: (e) => `${e.name}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
+    onstand: (e) => `${who(e)} is on stand ${e.standName || ""}`.trim(),
+    daystart: (e) => `${who(e)} started the hunt day`,
+    dayend: (e) => `${who(e)}: the hunt is over`,
+    offstand: (e) => `${who(e)} left the stand`,
+    shot: (e) => `${who(e)}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
+    down: (e) => `${who(e)}: animal down`,
+    help: (e) => `${who(e)} needs help`,
+    animal: (e) => `${who(e)}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
   };
   const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎" };
   const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2 };   // how long each kind stays on the map
@@ -2258,13 +2304,13 @@
       const plannedId = Day.myStand(), planned = plannedId && Store.data.stands.find((x) => x.id === plannedId);
       const pos = myPos();
       const mine = (this.stand && Store.data.stands.find((x) => x.id === this.stand)) || (planned && pos && Geo.distance(pos.ll, [planned.lon, planned.lat]) < 50 ? planned : null);
-      if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${v.name || v.email} is in your shooting sector` });
+      if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${Family.nameFor(v.email, v.name)} is in your shooting sector` });
       if (pos) {
-        const others = new Map(), nameOf = (e) => { const m = Family.members.find((x) => x.email === e); return (m && m.name) || e.split("@")[0]; };
+        const others = new Map(), nameOf = (e) => Family.nameFor(e);
         for (const [sid, email] of this.sitting()) if (email !== me) others.set(sid, nameOf(email));   // checked in now
         if (Day.active()) for (const [email, sid] of Object.entries(Day.doc.assign || {})) {
           if (!sid || email === me || others.has(sid)) continue;
-          const m = Family.members.find((x) => x.email === email); others.set(sid, (m && m.name) || email.split("@")[0]);
+          others.set(sid, nameOf(email));
         }
         for (const [sid, name] of others) {
           const st = Store.data.stands.find((x) => x.id === sid);
@@ -2488,7 +2534,7 @@
           const cur = (d.assign || {})[m.email] || "";
           const opts = `<option value="">–</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
-            <span class="it-main"><div class="it-name">${esc(m.name || m.email)}</div></span>
+            <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div></span>
             <select data-assign="${esc(m.email)}"${lead ? "" : " disabled"} aria-label="Stand">${opts}</select></li>`;
         }).join("") + `</ul>`;
         if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
@@ -2542,14 +2588,22 @@
     },
     letterFor(email, name) {
       const look = this.looks[email];
-      return (look && look.letter) || (name || email || "?").trim().charAt(0).toUpperCase();
+      return (look && look.letter) || (this.nameFor(email, name) || "?").trim().charAt(0).toUpperCase();
+    },
+    // the name shown on the map: a short name anyone can set (e.g. just the first name), else the member's name
+    nameFor(email, name) {
+      const look = this.looks[email], m = this.members.find((x) => x.email === email);
+      return (look && look.name) || (m && m.name) || name || (email || "").split("@")[0];
     },
     openLook(email) {
       const m = this.members.find((x) => x.email === email); if (!m) return;
       this.editing = email;
       const f = $("#lookForm");
       $("#lookName").textContent = m.name || email;
-      $("#lookLetter").value = this.letterFor(email, m.name);
+      $("#lookShort").value = (this.looks[email] && this.looks[email].name) || "";
+      $("#lookShort").placeholder = m.name || email.split("@")[0];
+      $("#lookLetter").value = (this.looks[email] && this.looks[email].letter) || "";
+      $("#lookLetter").placeholder = this.letterFor(email, m.name);
       const cur = this.colorFor(email);
       $("#lookColors").innerHTML = LOOK_COLORS.map((c) => `<button type="button" class="swatch${c === cur ? " on" : ""}" data-color="${c}" style="background:${c}" aria-label="${c}"></button>`).join("");
       f.hidden = false; f.scrollIntoView({ block: "nearest" });
@@ -2557,9 +2611,10 @@
     async saveLook() {
       const email = this.editing; if (!email) return;
       const letter = $("#lookLetter").value.trim().toUpperCase().slice(0, 2);
+      const name = $("#lookShort").value.trim().slice(0, 20);
       const on = $("#lookColors .swatch.on"), color = on ? on.dataset.color : this.colorFor(email);
       $("#lookForm").hidden = true; this.editing = null;
-      try { await window.FB.db.doc("map/looks").update({ [email]: { letter, color } }); }
+      try { await window.FB.db.doc("map/looks").update({ [email]: { letter, color, name } }); }
       catch { toast("Couldn't save. Check your connection."); }
     },
     async init() {
@@ -2711,7 +2766,7 @@
       const list = this.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
       $("#familyList").innerHTML = list.length ? list.map((m) => `<li data-email="${esc(m.email)}">
           <span class="fam-dot" style="background:${this.colorFor(m.email)}" translate="no">${esc(this.letterFor(m.email, m.name))}</span>
-          <span class="it-main"><div class="it-name">${esc(m.name || m.email)}${m.role === "owner" ? " · owner" : ""}</div>
+          <span class="it-main"><div class="it-name">${esc(this.nameFor(m.email, m.name))}${m.role === "owner" ? " · owner" : ""}</div>
           <div class="it-sub">${esc(this.statusFor(m.email))}</div></span>
           ${this.whereIs(m.email) ? `<button class="btn small ghost" type="button" data-coords="${esc(m.email)}">Coordinates</button>` : ""}
           <button class="btn small ghost" type="button" data-look="${esc(m.email)}">Edit</button>
@@ -2733,7 +2788,7 @@
             const cur = this.positions.get(uid) || v;
             map.easeTo({ center: m.getLngLat(), zoom: Math.max(map.getZoom(), 16) });
             new maplibregl.Popup({ closeButton: false, offset: 18 }).setLngLat(m.getLngLat())
-              .setHTML(`<div class="pop"><b>${esc(cur.name || cur.email)}</b><br>${cur.lat.toFixed(5)}, ${cur.lon.toFixed(5)}<br>` +
+              .setHTML(`<div class="pop"><b>${esc(this.nameFor(cur.email, cur.name))}</b><br>${cur.lat.toFixed(5)}, ${cur.lon.toFixed(5)}<br>` +
                 `<button class="btn small primary" type="button" data-coords="${esc(cur.email)}">${esc(tr("Copy coordinates"))}</button></div>`).addTo(map);
           });
           m = new maplibregl.Marker({ element: el }).setLngLat([v.lon, v.lat]).addTo(map);
@@ -2746,7 +2801,7 @@
         el.classList.toggle("stale", !live);
         el.classList.toggle("batt-low", low);
         el.querySelector("b").textContent = this.letterFor(v.email, v.name);
-        el.querySelector("span").textContent = `${v.name || ""}${live ? (age && v.src !== "owntracks" ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}`;
+        el.querySelector("span").textContent = `${this.nameFor(v.email, v.name)}${live ? (age && v.src !== "owntracks" ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}`;
         // warn once per person and day when their phone is about to die in the forest
         if (low && live) {
           const key = `${v.email}|${new Date().toDateString()}`;
