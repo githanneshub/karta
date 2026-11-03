@@ -1597,13 +1597,14 @@
     const wx = wxHour(), hudKey = `${w.from}|${w.speed}|${wx ? wx.t : ""}`;
     if (renderHud.key !== hudKey) {   // the compass redraws on every map turn; only rebuild the text when the weather changes
       renderHud.key = hudKey;
-      $("#hudWindText").innerHTML = (wx ? wxSvg(wx) : "") + `<span>${w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s`}</span>`
+      // gusts from the SMHI forecast in brackets, like the SMHI app: "N 1.5 m/s (3)"
+      const gust = wx && prefs.windMode !== "manual" && typeof wx.gust === "number" ? ` (${Math.round(wx.gust)})` : "";
+      $("#hudWindText").innerHTML = (wx ? wxSvg(wx) : "") + `<span>${w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s${gust}`}</span>`
         + (wx && typeof wx.temp === "number" ? `<span class="hud-temp">${Math.round(wx.temp)}°</span>` : "");
     }
     const hasHead = Heading.on && Heading.deg !== null;
     if (hasHead) $("#hudHead").removeAttribute("hidden"); else $("#hudHead").setAttribute("hidden", "");
     if (hasHead) $("#hudHead").setAttribute("transform", `rotate(${Heading.deg - b})`);
-    $("#hudCone").classList.toggle("on", !!prefs.myCone && watchId !== null);
     if (meMarker) {
       meMarker.getElement().classList.toggle("has-heading", hasHead);
       if (hasHead) meMarker.setRotation(Heading.deg);
@@ -1744,12 +1745,6 @@
     buildHud();
     $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: is3D ? map.getPitch() : 0 }));
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
-    $("#hudCone").addEventListener("click", () => {
-      const on = !(prefs.myCone && watchId !== null);
-      prefs.myCone = on; savePrefs(); $("#showMyCone").checked = on;
-      if (on) startGPS();
-      renderMyCone(); renderHud();
-    });
     // moving the map by hand ends follow mode
     map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);

@@ -334,7 +334,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud-head path { fill: #1d7cf2; }
 .hud-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
 .hud-wind-text { appearance: none; border: 0; background: none; padding: 0; color: var(--fg); font: 700 17px var(--f-display); letter-spacing: .02em; cursor: pointer; white-space: nowrap; }
-.hud-btn { appearance: none; border: 0; background: none; padding: 0; color: var(--accent); font: 600 12px var(--f-ui); cursor: pointer; white-space: nowrap; }
 .hint { top: calc(84px + env(safe-area-inset-top, 0px)); }
 /* my position with optional facing beam */
 .me { width: 64px; height: 64px; display: grid; place-items: center; pointer-events: none; }
@@ -363,12 +362,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .vl-ok { background: #ece6d2; box-shadow: inset 0 0 0 1px rgb(0 0 0 / .35); }
 .vl-veg { background: #161a16; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .45); }
 
-.hud-btns { display: flex; gap: 12px; }
-.hud-btn.on { color: #1d7cf2; }
 
-.hud-btns { gap: 10px; flex-wrap: wrap; }
-.hud-btn { color: var(--muted); padding: 2px 0; border-bottom: 2px solid transparent; }
-.hud-btn.on { color: var(--accent); border-bottom-color: var(--accent); }
 
 /* compass bezel */
 .hud-rose { width: 66px; height: 66px; }
@@ -387,11 +381,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 /* keep the compass buttons inside the pill on narrow phones */
 .hud { max-width: calc(100% - 76px - env(safe-area-inset-right, 0px)); }
 .hud-info { flex: 1 1 auto; min-width: 0; }
-.hud-btns { flex-wrap: wrap; gap: 2px 10px; }
 @media (max-width: 860px) {
   .hud { padding-right: 14px; gap: 6px; }
-  .hud-btn { font-size: 13px; }
-  .hud-btns { gap: 2px 9px; }
 }
 
 /* the compass keeps the same dark instrument look in light and dark mode */
@@ -404,8 +395,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .hud .hud-pivot { fill: #f1f4ec; }
 .hud .hud-wind path { stroke: #1f281f; }
 .hud .hud-wind-text { color: #f1f4ec; }
-.hud .hud-btn { color: #aab4a2; }
-.hud .hud-btn.on { color: #ff7a2e; border-bottom-color: #ff7a2e; }
 
 /* iPhone: buttons get a native light look unless told otherwise; the compass is always the dark instrument */
 .hud { background: #161c16 !important; color: #e6eadf !important; color-scheme: dark; forced-color-adjust: none; }

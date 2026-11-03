@@ -253,7 +253,7 @@
     [/^Copied (.+)'s coordinates$/, (m, a) => `${/[sxz]$/i.test(a) ? a : a + "s"} koordinater kopierade`],
     [/^Position from (.+) ago$/, (m, a) => `Positionen är ${a.replace(" h", " tim")} gammal`],
     [/^Scent drifts toward ([A-Z]{1,3})$/, (m, a) => `Vittringen driver mot ${C(a)}`],
-    [/^([A-Z]{1,3}) ([\d.]+) m\/s\.?$/, (m, a, b) => `${C(a)} ${b} m/s`],
+    [/^([A-Z]{1,3}) ([\d.]+) m\/s( \(\d+\))?\.?$/, (m, a, b, g) => `${C(a)} ${b} m/s${g || ""}`],
     [/^Facing ([A-Z]{1,3}) (\d+)°$/, (m, a, b) => `Du tittar mot ${C(a)} ${b}°`],
     [/^Your scent carries about (\d+) m toward ([A-Z]{1,3})\.$/, (m, a, b) => `Din vittring bär cirka ${a} m mot ${C(b)}.`],
     [/^Hunting boundary: ([\d.]+) ha, (\d+) points\.$/, (m, a, b) => `Jaktgräns: ${a} ha, ${b} punkter.`],
