@@ -47,8 +47,13 @@ body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 1
 #map { position: absolute; inset: 0; background: #d8d3c3; }
 /* iPhone home-screen app: newer iOS blurs whatever lies under the status bar, so nothing of the map goes there:
    a solid band the colour of the app sits behind the clock (zero height in Safari and on computers) */
-#stage::before { content: ""; position: absolute; z-index: 3; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px);
+#stage::before { content: ""; position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: env(safe-area-inset-top, 0px);
   background: #171e17; pointer-events: none; }
+/* iOS 26 home-screen apps also soften the first ~20 points below the status bar: keep that strip solid too, so
+   only the plain band is softened and the map below it stays sharp (the compass and buttons sit on top of it) */
+@media (display-mode: standalone) and (max-width: 860px) {
+  #stage::before { height: calc(env(safe-area-inset-top, 0px) + 22px); }
+}
 
 /* Brand */
 .brand { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; }
