@@ -2242,7 +2242,7 @@
       // what has actually arrived from my phone's OwnTracks (shown whether or not the map itself is sharing)
       const v = Family.otMine, age = v ? Family.ageMin(v) : null;
       const last = v && age !== null
-        ? `<p class="ot-last ok"><span>Last position from your OwnTracks:</span> ${new Date(Family.posTime(v)).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} <span>(${age < 1 ? "now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"})</span></p>`
+        ? `<p class="ot-last ok"><span>Last position from your OwnTracks:</span> ${new Date(Family.posTime(v)).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} <span>(${age < 1 ? "now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"})</span>${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}</p>`
         : `<p class="ot-last"><span>Nothing has arrived from your OwnTracks yet.</span></p>`;
       box.innerHTML = url ? last + `<ol class="ot-steps">
           <li><span>Install</span> <b translate="no">OwnTracks</b> <span>from the App Store (free).</span></li>
@@ -2526,7 +2526,8 @@
       if (mine) {
         if (this.sharing) return myFix ? "You · sharing now" : "You · waiting for GPS…";
         const ot = this.positions.get(this.user.uid), oa = ot && ot.src === "owntracks" ? this.ageMin(ot) : null;
-        return oa === null ? "You · not sharing" : `You · OwnTracks · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}`;
+        const ob = ot && typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "";
+        return oa === null ? "You · not sharing" : `You · OwnTracks · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}${ob}`;
       }
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
