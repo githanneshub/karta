@@ -115,9 +115,12 @@
     cv.className = "wind-flow";
     map.getCanvasContainer().parentNode.appendChild(cv);
     const g = cv.getContext("2d");
-    let parts = [], raf = 0, on = false, from = 0, speed = 0, lastT = 0, dpr = 1;
+    let parts = [], raf = 0, on = false, from = 0, speed = 0, lastT = 0, dpr = 1, moving = false, odd = false;
     const phone = matchMedia("(max-width: 860px)").matches;
     const N = phone ? 220 : 450;
+    // on 3D terrain every dot needs a height lookup (about 0.1 ms each), so there fewer dots, drawn every other frame,
+    // and none while the map is being dragged: the map gets all the time it needs to move smoothly
+    const N3D = phone ? 80 : 160;
     // lines are coloured by how fast the air moves here compared with the area as a whole: sheltered = blue, exposed = white
     const COLORS = ["rgba(150,200,255,0.35)", "rgba(235,240,230,0.42)", "rgba(255,255,255,0.75)"];
 
@@ -138,7 +141,9 @@
     function clear() { g.clearRect(0, 0, cv.width, cv.height); for (const p of parts) p.px = null; }
     function frame(t) {
       raf = 0;
-      if (!on) return;
+      if (!on || moving) return;
+      const t3d = !!map.getTerrain();
+      if (t3d && (odd = !odd)) { raf = requestAnimationFrame(frame); return; }
       const dt = Math.min(0.05, lastT ? (t - lastT) / 1000 : 0.016); lastT = t;
       // fade old trails
       g.globalCompositeOperation = "destination-in"; g.fillStyle = "rgba(0,0,0,0.93)"; g.fillRect(0, 0, cv.width, cv.height);
@@ -147,7 +152,7 @@
       const k = 24 * mpp * Math.max(speed, 1.5) / 4;   // screen speed grows with the wind
       g.lineWidth = 1.1 * dpr; g.lineCap = "round";
       const paths = COLORS.map(() => new Path2D());
-      for (const p of parts) {
+      for (const p of t3d ? parts.slice(0, N3D) : parts) {
         if (!p.a || p.age > 160) { seed(p); continue; }
         const w = TW.field(p.a, from).at(p.E, p.N);
         if (!w) { seed(p); continue; }
@@ -165,7 +170,8 @@
       raf = requestAnimationFrame(frame);
     }
     function start() { if (!raf && on && document.visibilityState === "visible") { lastT = 0; raf = requestAnimationFrame(frame); } }
-    map.on("movestart", clear); map.on("move", clear); map.on("resize", () => { size(); clear(); });
+    map.on("movestart", () => { moving = true; clear(); }); map.on("move", clear);
+    map.on("moveend", () => { moving = false; start(); }); map.on("resize", () => { size(); clear(); });
     document.addEventListener("visibilitychange", start);
     size();
     return {
