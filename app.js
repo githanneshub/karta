@@ -269,12 +269,18 @@
     return g.getImageData(0, 0, s, s);
   }
 
-  async function getJSON(p) { const r = await fetch(abs(p)); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+  async function getJSON(p) { const r = await fetch(abs(p), { cache: "no-cache" }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
+  // the lists of areas and layers: tagged with the app version so an older offline cache can't hand back an old list
+  // (which would leave new layers blank); the plain address is the fallback offline
+  async function getFresh(p) {
+    if (window.APP_VERSION) { try { return await getJSON(`${p}?v=${window.APP_VERSION}`); } catch { /* offline */ } }
+    return getJSON(p);
+  }
 
   map.on("load", async () => {
     try {
-      const list = await getJSON("data/areas.json");
-      manifests = await Promise.all(list.map((a) => getJSON(`data/${a.id}/manifest.json`)));
+      const list = await getFresh("data/areas.json");
+      manifests = await Promise.all(list.map((a) => getFresh(`data/${a.id}/manifest.json`)));
     } catch { $("#loading").textContent = "Map data didn't load. Reload the page."; return; }
     AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
     const U = unionBounds();

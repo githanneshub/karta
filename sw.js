@@ -1,10 +1,10 @@
-// Offline support for the family map (filled in by scripts/build_site.py: 1f8ee1e467, 90237ebee2, {"app": ["./", "version.json", "manifest.webmanifest", "firebase-config.js", "icon-180.png", "icon-192.png", "icon-512.png", "app.css?v=1f8ee1e467", "app.js?v=1f8ee1e467", "geo.js?v=1f8ee1e467", "i18n.js?v=1f8ee1e467", "jakt.js?v=1f8ee1e467", "maplibre-gl.css?v=1f8ee1e467", "view.js?v=1f8ee1e467", "wind.js?v=1f8ee1e467", "fb.js?v=1f8ee1e467"], "ext": ["https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js", "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap", "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js"], "data": ["data/areas.json", "data/alnaryd/contours.geojson", "data/alnaryd/drainage.geojson", "data/alnaryd/forest_0_0.webp", "data/alnaryd/game.geojson", "data/alnaryd/game_0_0.png", "data/alnaryd/height_0_0.webp", "data/alnaryd/info.png", "data/alnaryd/manifest.json", "data/alnaryd/osm.geojson", "data/alnaryd/quiet_dry_0_0.webp", "data/alnaryd/quiet_wet_0_0.webp", "data/alnaryd/relief_0_0.webp", "data/alnaryd/reserves.geojson", "data/alnaryd/steep_0_0.png", "data/alnaryd/wet_0_0.png", "data/alnaryd/wind.json", "data/alnaryd/wind.png", "glyphs/0-255.txt", "glyphs/256-511.txt"]}, [[15.398225, 56.334191, 15.465921999999999, 56.374908, 8, 15]]).
+// Offline support for the family map (filled in by scripts/build_site.py: ef70d20d62, 90237ebee2, {"app": ["./", "version.json", "manifest.webmanifest", "firebase-config.js", "icon-180.png", "icon-192.png", "icon-512.png", "app.css?v=ef70d20d62", "app.js?v=ef70d20d62", "geo.js?v=ef70d20d62", "i18n.js?v=ef70d20d62", "jakt.js?v=ef70d20d62", "maplibre-gl.css?v=ef70d20d62", "view.js?v=ef70d20d62", "wind.js?v=ef70d20d62", "fb.js?v=ef70d20d62"], "ext": ["https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js", "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap", "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js"], "data": ["data/areas.json", "data/alnaryd/contours.geojson", "data/alnaryd/drainage.geojson", "data/alnaryd/forest_0_0.webp", "data/alnaryd/game.geojson", "data/alnaryd/game_0_0.png", "data/alnaryd/height_0_0.webp", "data/alnaryd/info.png", "data/alnaryd/manifest.json", "data/alnaryd/osm.geojson", "data/alnaryd/quiet_dry_0_0.webp", "data/alnaryd/quiet_wet_0_0.webp", "data/alnaryd/relief_0_0.webp", "data/alnaryd/reserves.geojson", "data/alnaryd/steep_0_0.png", "data/alnaryd/wet_0_0.png", "data/alnaryd/wind.json", "data/alnaryd/wind.png", "glyphs/0-255.txt", "glyphs/256-511.txt"]}, [[15.398225, 56.334191, 15.465921999999999, 56.374908, 8, 15]]).
 // The app, the map data for the hunting ground and the elevation tiles around it are stored on the phone,
 // so the map, compass, wind and your own position work without coverage. Firebase queues writes by itself.
-const VER = "1f8ee1e467";
+const VER = "ef70d20d62";
 const APP = "app-" + VER, DATA = "data-90237ebee2", DEM = "dem-v1", EXT = "ext-v1";
 const EXT_HOSTS = ["cdnjs.cloudflare.com", "cdn.jsdelivr.net", "www.gstatic.com", "fonts.googleapis.com", "fonts.gstatic.com"];
-const PRECACHE = {"app": ["./", "version.json", "manifest.webmanifest", "firebase-config.js", "icon-180.png", "icon-192.png", "icon-512.png", "app.css?v=1f8ee1e467", "app.js?v=1f8ee1e467", "geo.js?v=1f8ee1e467", "i18n.js?v=1f8ee1e467", "jakt.js?v=1f8ee1e467", "maplibre-gl.css?v=1f8ee1e467", "view.js?v=1f8ee1e467", "wind.js?v=1f8ee1e467", "fb.js?v=1f8ee1e467"], "ext": ["https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js", "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap", "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js"], "data": ["data/areas.json", "data/alnaryd/contours.geojson", "data/alnaryd/drainage.geojson", "data/alnaryd/forest_0_0.webp", "data/alnaryd/game.geojson", "data/alnaryd/game_0_0.png", "data/alnaryd/height_0_0.webp", "data/alnaryd/info.png", "data/alnaryd/manifest.json", "data/alnaryd/osm.geojson", "data/alnaryd/quiet_dry_0_0.webp", "data/alnaryd/quiet_wet_0_0.webp", "data/alnaryd/relief_0_0.webp", "data/alnaryd/reserves.geojson", "data/alnaryd/steep_0_0.png", "data/alnaryd/wet_0_0.png", "data/alnaryd/wind.json", "data/alnaryd/wind.png", "glyphs/0-255.txt", "glyphs/256-511.txt"]};
+const PRECACHE = {"app": ["./", "version.json", "manifest.webmanifest", "firebase-config.js", "icon-180.png", "icon-192.png", "icon-512.png", "app.css?v=ef70d20d62", "app.js?v=ef70d20d62", "geo.js?v=ef70d20d62", "i18n.js?v=ef70d20d62", "jakt.js?v=ef70d20d62", "maplibre-gl.css?v=ef70d20d62", "view.js?v=ef70d20d62", "wind.js?v=ef70d20d62", "fb.js?v=ef70d20d62"], "ext": ["https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js", "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap", "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js", "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js"], "data": ["data/areas.json", "data/alnaryd/contours.geojson", "data/alnaryd/drainage.geojson", "data/alnaryd/forest_0_0.webp", "data/alnaryd/game.geojson", "data/alnaryd/game_0_0.png", "data/alnaryd/height_0_0.webp", "data/alnaryd/info.png", "data/alnaryd/manifest.json", "data/alnaryd/osm.geojson", "data/alnaryd/quiet_dry_0_0.webp", "data/alnaryd/quiet_wet_0_0.webp", "data/alnaryd/relief_0_0.webp", "data/alnaryd/reserves.geojson", "data/alnaryd/steep_0_0.png", "data/alnaryd/wet_0_0.png", "data/alnaryd/wind.json", "data/alnaryd/wind.png", "glyphs/0-255.txt", "glyphs/256-511.txt"]};
 const DEM_BOXES = [[15.398225, 56.334191, 15.465921999999999, 56.374908, 8, 15]];   // [west, south, east, north, minZoom, maxZoom] around each hunting ground
 const DEM_URL = "https://tiles.mapterhorn.com/";
 
@@ -21,11 +21,12 @@ function tilesFor([w, s, e, n, z0, z1]) {
 self.addEventListener("install", (e) => {
   e.waitUntil((async () => {
     const app = await caches.open(APP);
-    await app.addAll(PRECACHE.app);
+    // cache: "reload" skips the browser's own cache: right after a release it can still hold the old files
+    await app.addAll(PRECACHE.app.map((u) => new Request(u, { cache: "reload" })));
     const ext = await caches.open(EXT);
     for (const u of PRECACHE.ext) if (!(await ext.match(u))) await ext.add(new Request(u, { mode: "cors" })).catch(() => {});
     const data = await caches.open(DATA);
-    for (const u of PRECACHE.data) if (!(await data.match(u))) await data.add(u).catch(() => {});
+    for (const u of PRECACHE.data) if (!(await data.match(u))) await data.add(new Request(u, { cache: "reload" })).catch(() => {});
     // elevation for 3D and relief around the hunting ground: best effort, never blocks the update
     const dem = await caches.open(DEM);
     for (const u of DEM_BOXES.flatMap(tilesFor)) if (!(await dem.match(u))) await dem.add(u).catch(() => {});
@@ -47,14 +48,15 @@ async function cacheFirst(req, name) {
   if (res.ok || res.type === "opaque") c.put(req, res.clone());
   return res;
 }
-async function networkFirst(req, name) {
+// key: store under one address whatever the ?v= tag, so offline always gets the newest copy
+async function networkFirst(req, name, key = req) {
   const c = await caches.open(name);
   try {
     const res = await fetch(req);
-    if (res.ok) c.put(req, res.clone());
+    if (res.ok) await c.put(key, res.clone());
     return res;
   } catch {
-    return (await c.match(req, { ignoreSearch: true })) || (await caches.match("./")) || Response.error();
+    return (await c.match(key)) || (await c.match(req, { ignoreSearch: true })) || (await caches.match("./")) || Response.error();
   }
 }
 
@@ -66,6 +68,7 @@ self.addEventListener("fetch", (e) => {
     if (req.mode === "navigate" || url.pathname.endsWith("/version.json") || url.pathname.endsWith("/index.html")) {
       e.respondWith(networkFirst(req, APP)); return;
     }
+    if (url.pathname.endsWith("/manifest.json") || url.pathname.endsWith("/areas.json")) { e.respondWith(networkFirst(req, DATA, url.origin + url.pathname)); return; }
     if (url.pathname.includes("/data/") || url.pathname.includes("/glyphs/")) { e.respondWith(cacheFirst(req, DATA)); return; }
     e.respondWith(cacheFirst(req, APP)); return;
   }
