@@ -298,7 +298,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "game", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -378,12 +378,6 @@
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
       paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
-    map.addLayer({ id: "game-pts", type: "circle", source: "game", minzoom: 13,
-      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 4, 17, 9], "circle-color": "#ff1fb4", "circle-stroke-color": "#fff", "circle-stroke-width": 2,
-        "circle-opacity": ["interpolate", ["linear"], ["get", "strength"], 0, .55, 1, 1] } });
-    map.addLayer({ id: "game-pts-label", type: "symbol", source: "game", minzoom: 15,
-      layout: { "text-field": tr("Passage"), "text-font": ["Open Sans Semibold"], "text-size": 11, "text-offset": [0, 1.2], "text-anchor": "top" },
-      paint: { "text-color": "#7a0d12", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
     // recorded tracks and blood-tracking marks
     map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
@@ -421,9 +415,6 @@
       Promise.all(manifests.map((m) => getJSON(`data/${m.id}/${k}.geojson`).catch(() => FC())))
         .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
     }
-    // game-trail model: passages where trails funnel together (areas that have the model)
-    Promise.all(manifests.filter((m) => m.gamePoints).map((m) => getJSON(m.gamePoints).catch(() => FC())))
-      .then((parts) => map.getSource("game").setData(FC(parts.flatMap((d) => d.features))));
     loadInfoGrid();
 
     applyLayers();
@@ -442,7 +433,6 @@
     roads: ["road-case", "road", "track", "path", "power", "buildings", "road-label"],
     reserve: ["reserve-fill", "reserve-line-halo", "reserve-line"],
     sightings: ["sightings", "sightings-label"],
-    game: ["game-pts", "game-pts-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
