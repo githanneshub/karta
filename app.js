@@ -1262,7 +1262,7 @@
       const col = Math.floor((E - g.origin[0]) / g.cell), row = Math.floor((g.origin[1] - N) / g.cell);
       if (col < 0 || row < 0 || col >= g.width || row >= g.height) continue;
       const i = (row * g.width + col) * 4;
-      return { code: g.codes[g.px[i] - 1], tree: g.px[i + 1] / 8, twi: g.px[i + 2] / 20 };
+      return { code: g.codes[g.px[i] - 1], tree: g.px[i + 1] / 8, thicket: g.px[i + 2] / 2.5 };   // thicket: % cover of 0.5-5 m vegetation
     }
     return null;
   }
@@ -1304,9 +1304,11 @@
     const inf = lookupInfo(lon, lat);
     if (!inf) return { veg: 0, rate: 0 };
     if ((inf.code === 118 || inf.code === 128) && inf.tree > 8) return { veg: 2.5, rate: .05 };  // felled since the tree data
-    if (inf.tree < 1.5) return { veg: 0, rate: 0 };
+    // dense undergrowth (laser: cover of 0.5-5 m vegetation) blocks the view at eye level, even under tall trees
+    const under = (inf.thicket || 0) / 100;
+    if (inf.tree < 1.5) return under > .2 ? { veg: 2, rate: .03 + under * .06 } : { veg: 0, rate: 0 };
     if (inf.tree < 8) return { veg: inf.tree, rate: .07 };
-    return { veg: inf.tree, rate: MATURE_RATE[inf.code] || .015 };
+    return { veg: inf.tree, rate: (MATURE_RATE[inf.code] || .015) + under * .05 };
   }
   async function groundSampler(lon, lat, radius) {
     const z = 15, n = 2 ** z, rad = Math.PI / 180;
