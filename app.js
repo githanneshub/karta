@@ -1894,7 +1894,7 @@
       if (this.on) { toast("Already recording."); return; }
       if (watchId === null) { if (FAMILY && Family.ready) Family.setSharing(true); else startGPS(); }
       const pts = from ? [from.lon, from.lat] : myFix ? [...myFix.ll] : [];
-      this.on = { id: newId("tk"), kind, pts, marks: [], start: Date.now(), from: from ? from.label || "" : "" };
+      this.on = { id: newId("tk"), kind, pts, ts: pts.length ? [Date.now()] : [], marks: [], start: Date.now(), from: from ? from.label || "" : "" };
       try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => { this.wake = w; }).catch(() => {}); } catch { /* no wake lock */ }
       this.timer = setInterval(() => this.renderBar(), 15000);
       this.renderBar(); renderTracks(); this.save();
@@ -1904,9 +1904,32 @@
       const r = this.on; if (!r || acc > 40) return;
       const n = r.pts.length;
       if (n >= 2 && Geo.distance([r.pts[n - 2], r.pts[n - 1]], ll) < 4) return;
-      r.pts.push(ll[0], ll[1]);
+      r.pts.push(ll[0], ll[1]); r.ts.push(Date.now());
       renderTracks(); this.renderBar();
       if (Date.now() - this.lastSave > 20000) this.save();
+    },
+    // While the phone was locked the map had no GPS, but OwnTracks kept sending: put those points into the
+    // track in time order instead of a straight line across the gap.
+    backfill() {
+      const r = this.on, v = FAMILY && Family.otMine;
+      if (!r || !v || !Array.isArray(v.hist)) return;
+      const have = new Set(r.ts.map((t) => Math.round(t / 1000))), all = [];
+      for (let i = 0; i < r.ts.length; i++) all.push([r.pts[2 * i], r.pts[2 * i + 1], r.ts[i]]);
+      let added = 0;
+      for (let i = 0; i + 2 < v.hist.length; i += 3) {
+        const t = v.hist[i + 2] * 1000;
+        if (t >= r.start && t <= Date.now() && !have.has(Math.round(t / 1000))) { all.push([v.hist[i], v.hist[i + 1], t]); added++; }
+      }
+      if (!added) return;
+      all.sort((a, b) => a[2] - b[2]);
+      const pts = [], ts = [];
+      for (const [lo, la, t] of all) {
+        const n = pts.length;
+        if (n >= 2 && Geo.distance([pts[n - 2], pts[n - 1]], [lo, la]) < 4) continue;
+        pts.push(lo, la); ts.push(t);
+      }
+      r.pts = pts; r.ts = ts;
+      renderTracks(); this.renderBar(); this.save();
     },
     mark(kind) {
       if (!this.on) return;
@@ -1920,13 +1943,13 @@
       const r = this.on; if (!r) return;
       this.lastSave = Date.now();
       const old = Store.data.tracks.find((x) => x.id === r.id);
-      Store.put("tracks", { ...(old || {}), id: r.id, kind: r.kind, pts: r.pts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: true });
+      Store.put("tracks", { ...(old || {}), id: r.id, kind: r.kind, pts: r.pts, ts: r.ts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: true });
     },
     stop() {
       const r = this.on; if (!r) return;
       this.save();
       const old = Store.data.tracks.find((x) => x.id === r.id) || {};
-      Store.put("tracks", { ...old, id: r.id, kind: r.kind, pts: r.pts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: false });
+      Store.put("tracks", { ...old, id: r.id, kind: r.kind, pts: r.pts, ts: r.ts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: false });
       this.on = null; clearInterval(this.timer);
       if (this.wake) { this.wake.release().catch(() => {}); this.wake = null; }
       this.renderBar(); renderTracks();
@@ -2372,14 +2395,16 @@
       }, () => {});
       db.collection("positions").onSnapshot((snap) => {
         const best = new Map(), me = this.user.email.toLowerCase();
+        this.otMine = null;
         for (const d of snap.docs) {
           const v = d.data(), k = v.email || d.id, t = this.posTime(v), cur = best.get(k);
+          if (v.src === "owntracks" && v.email === me) this.otMine = v;
           if (!cur || t > cur.t) best.set(k, { id: d.id, v, t });
         }
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
-        syncMarkers(); Hunt.checkSafety();
+        syncMarkers(); Hunt.checkSafety(); Rec.backfill();
       }, () => {});
       Hunt.start(db); Day.start(db); OT.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
@@ -2580,6 +2605,8 @@
 
   renderPosBtn();
 
+  // back from a locked screen while recording: fill the gap from OwnTracks once its latest points have arrived
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Rec.on) setTimeout(() => Rec.backfill(), 2500); });
   window.addEventListener("offline", () => toast("No coverage. The map still works; positions and messages are sent when you're back online.", 6000));
   window.addEventListener("online", () => toast("Back online."));
 
