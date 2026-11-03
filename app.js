@@ -2189,13 +2189,6 @@
       const t = this.tokens[this.me()]; if (!this.url || !t) return "";
       return `${this.url}${this.url.includes("?") ? "&" : "?"}u=${encodeURIComponent(this.me())}&k=${t}`;
     },
-    // one tap opens OwnTracks with everything filled in (HTTP mode, our address, "move" mode for steady updates)
-    configLink() {
-      const url = this.personalUrl(); if (!url) return "";
-      const tid = Family.letterFor(this.me(), Family.member && Family.member.name).slice(0, 2);
-      const cfg = { _type: "configuration", mode: 3, url, tid, monitoring: 2, locatorDisplacement: 15, locatorInterval: 60 };
-      return "owntracks:///config?inline=" + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
-    },
     render() {
       const box = $("#otBox"); if (!box || !Family.user) return;
       const owner = Family.member && Family.member.role === "owner";
@@ -2207,7 +2200,7 @@
         return;
       }
       this.ensureToken();
-      const link = this.configLink(), url = this.personalUrl();
+      const url = this.personalUrl();
       // what has actually arrived from my phone's OwnTracks (shown whether or not the map itself is sharing)
       const v = Family.otMine, age = v ? Family.ageMin(v) : null;
       const last = v && age !== null
@@ -2215,10 +2208,22 @@
         : `<p class="ot-last"><span>Nothing has arrived from your OwnTracks yet.</span></p>`;
       box.innerHTML = url ? last + `<ol class="ot-steps">
           <li><span>Install</span> <b translate="no">OwnTracks</b> <span>from the App Store (free).</span></li>
-          <li><a class="btn primary" href="${esc(link)}">Set up OwnTracks</a> <span>Tap this on your iPhone; OwnTracks opens with everything filled in.</span></li>
-          <li><span>Allow location "Always" for OwnTracks when it asks, and keep its mode on "Move" during the hunt.</span></li>
+          <li><button class="btn primary small" type="button" data-ot="copy">Copy my address</button> <span>Your own address with your personal code. Don't share it.</span></li>
+          <li><span>In OwnTracks, tap Settings:</span><ul>
+            <li><b translate="no">Mode</b>: <b translate="no">HTTP</b></li>
+            <li><b translate="no">URL</b>: <span>paste your address</span></li>
+            <li><b translate="no">Authentication</b>: <span>off</span></li></ul></li>
+          <li><span>Further down in Settings, under Expert Mode:</span><ul>
+            <li><b translate="no">locatorDisplacement</b>: 15</li>
+            <li><b translate="no">locatorInterval</b>: 60</li></ul></li>
+          <li><span>Settings → Remote Control: turn on</span> <b translate="no">cmd</b> <span>and</span> <b translate="no">remote configuration</b>. <span>Then OwnTracks switches between Move and battery-saving by itself.</span></li>
+          <li><span>iPhone settings → OwnTracks → Location:</span> <b>Always</b>, <span>and Precise Location on. Also: General → Background App Refresh → OwnTracks on.</span></li>
+          <li><span>Within a minute the line above turns green. Done.</span></li>
         </ol>
-        <p class="note small">Didn't open? In OwnTracks: Settings → Mode HTTP, and paste your address as URL: <button class="btn small ghost" type="button" data-ot="copy">Copy my address</button></p>
+        <h3 class="ot-h">Every hunt</h3>
+        <p class="note small"><span>When you leave for the hunt: set OwnTracks to</span> <b translate="no">Significant</b>. <span>It switches to</span> <b translate="no">Move</b> <span>by itself at the hunting ground or when a hunt day starts.</span><br>
+          <span>When you're home again: set it to</span> <b translate="no">Quiet</b> <span>(nothing is shared). Switch at home, not at the hunting ground, or you'll look like you're still there.</span><br>
+          <span>Don't swipe OwnTracks away, and avoid Low Power Mode during the hunt.</span></p>
         ${owner ? `<p class="note small"><button class="btn small ghost" type="button" data-ot="reset">Change receiver address</button></p>` : ""}`
         : `<p class="note small">Making your personal code…</p>`;
     },

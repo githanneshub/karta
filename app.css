@@ -614,3 +614,6 @@ html .safety:not([hidden]) ~ .mystand { top: calc(140px + env(safe-area-inset-to
 
 .ot-last { margin: 6px 0; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--bad) 18%, var(--raise)); font-size: 13.5px; }
 .ot-last.ok { background: color-mix(in srgb, var(--good) 18%, var(--raise)); }
+
+.ot-steps ul { margin: 4px 0 2px; padding-left: 18px; }
+.ot-h { font: 600 14px var(--f-ui); margin: 12px 0 4px; }

@@ -13,17 +13,17 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
-<script>window.APP_VERSION = "496ad0d6ae";</script>
-<script src="firebase-config.js?v=496ad0d6ae"></script>
-<script type="module" src="fb.js?v=496ad0d6ae"></script>
+<script>window.APP_VERSION = "5e038a8b92";</script>
+<script src="firebase-config.js?v=5e038a8b92"></script>
+<script type="module" src="fb.js?v=5e038a8b92"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=496ad0d6ae">
-<link rel="stylesheet" href="app.css?v=496ad0d6ae">
+<link rel="stylesheet" href="maplibre-gl.css?v=5e038a8b92">
+<link rel="stylesheet" href="app.css?v=5e038a8b92">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div id="app" data-sheet="peek">
@@ -293,15 +293,18 @@
       <!-- FAMILY (hosted site only) -->
       <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
         <div class="day-card" id="dayCard"></div>
-        <div class="share-card">
-          <label class="switch big" for="shareMe"><input type="checkbox" id="shareMe"><span>Share my position</span></label>
-          <p class="note small" id="shareState">Off. Your family can't see you.</p>
-          <p class="note small">Positions only update while the map is open. On iPhone, set Auto-Lock to Never during the hunt.</p>
-        </div>
-        <details class="sect" id="otSect">
-          <summary>Background tracking (phone locked)</summary>
-          <p class="note small">The map can only send your position while it's open. OwnTracks keeps sending it with the phone locked in your pocket, and your dot shows on everyone's map.</p>
+        <details class="sect" id="otSect" open>
+          <summary>Your position (OwnTracks)</summary>
+          <p class="note small">We share positions with the OwnTracks app. It keeps sending with the phone locked in your pocket, and your dot shows on everyone's map. Set it up once:</p>
           <div id="otBox"></div>
+        </details>
+        <details class="sect" id="shareSect">
+          <summary>Share from the map instead</summary>
+          <div class="share-card">
+            <label class="switch big" for="shareMe"><input type="checkbox" id="shareMe"><span>Share my position</span></label>
+            <p class="note small" id="shareState">Off. Your family can't see you.</p>
+            <p class="note small">Only for a phone without OwnTracks: it sends only while the map is open on screen. Don't turn it on on a computer.</p>
+          </div>
         </details>
         <details class="sect" id="gpsHelp">
           <summary>Position not working?</summary>
@@ -471,12 +474,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=496ad0d6ae"></script>
-<script src="geo.js?v=496ad0d6ae"></script>
-<script src="view.js?v=496ad0d6ae"></script>
-<script src="wind.js?v=496ad0d6ae"></script>
-<script src="jakt.js?v=496ad0d6ae"></script>
-<script src="app.js?v=496ad0d6ae"></script>
+<script src="i18n.js?v=5e038a8b92"></script>
+<script src="geo.js?v=5e038a8b92"></script>
+<script src="view.js?v=5e038a8b92"></script>
+<script src="wind.js?v=5e038a8b92"></script>
+<script src="jakt.js?v=5e038a8b92"></script>
+<script src="app.js?v=5e038a8b92"></script>
 
 </body>
 </html>
