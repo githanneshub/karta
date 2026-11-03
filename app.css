@@ -632,4 +632,3 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
   .toolbar { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 8px); }
   .addmenu { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 12px); }
 }
-}
