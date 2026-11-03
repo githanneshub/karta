@@ -2333,8 +2333,7 @@
           <li><button class="btn primary small" type="button" data-ot="copy">Copy my address</button> <span>Your own address with your personal code. Don't share it.</span></li>
           <li><span>In OwnTracks, tap Settings:</span><ul>
             <li><b translate="no">Mode</b>: <b translate="no">HTTP</b></li>
-            <li><b translate="no">URL</b>: <span>paste your address</span></li>
-            <li><b translate="no">Authentication</b>: <span>off</span></li></ul></li>
+            <li><b translate="no">URL</b>: <span>paste your address</span></li></ul></li>
           <li><span>Further down in Settings, under Expert Mode:</span><ul>
             <li><b translate="no">locatorDisplacement</b>: 15</li>
             <li><b translate="no">locatorInterval</b>: 60</li></ul></li>
@@ -2693,7 +2692,7 @@
         const still = v.src === "owntracks" && age >= 3 ? `Still for ${age} min` : `Sharing · ${age ? age + " min ago" : "now"}`;
         return `${still}${where}${via}${batt}`;
       }
-      return `Last seen ${age === null ? "" : age < 1 ? "just now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"}${where}`;
+      return `Last seen ${age === null ? "" : age < 1 ? "just now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"}${where}${batt}`;
     },
     render() {
       renderWho();
@@ -2742,8 +2741,9 @@
         const low = typeof v.batt === "number" && v.batt <= 15;
         el.style.setProperty("--c", this.colorFor(v.email));
         el.classList.toggle("stale", !live);
+        el.classList.toggle("batt-low", low);
         el.querySelector("b").textContent = this.letterFor(v.email, v.name);
-        el.querySelector("span").textContent = `${v.name || ""}${live ? (age && v.src !== "owntracks" ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}${low ? ` · 🔋${v.batt}%` : ""}`;
+        el.querySelector("span").textContent = `${v.name || ""}${live ? (age && v.src !== "owntracks" ? ` · ${age} min` : "") : ` · ${age < 60 ? age + " min" : Math.round(age / 60) + " h"} ago`}${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}`;
         // warn once per person and day when their phone is about to die in the forest
         if (low && live) {
           const key = `${v.email}|${new Date().toDateString()}`;
@@ -2763,7 +2763,8 @@
         const el = this.meOt.getElement(), me = this.user.email.toLowerCase();
         el.style.setProperty("--c", this.colorFor(me));
         el.querySelector("b").textContent = this.letterFor(me, this.member && this.member.name);
-        el.querySelector("span").textContent = tr("You (OwnTracks)");
+        el.querySelector("span").textContent = tr("You (OwnTracks)") + (typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "");
+        el.classList.toggle("batt-low", typeof ot.batt === "number" && ot.batt <= 15);
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
     },
     // where someone is: their latest position (my own: the map's GPS or my OwnTracks)
