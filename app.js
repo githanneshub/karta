@@ -1654,7 +1654,8 @@
       const b = e.target.closest("[data-ot]"); if (!b) return;
       if (b.dataset.ot === "save") {
         const u = $("#otUrlIn").value.trim();
-        if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u)) { toast("That doesn't look like an Apps Script web app address."); return; }
+        // the Cloudflare forwarder (OwnTracks can't follow the redirect Apps Script answers with)
+        if (!/^https:\/\/[a-z0-9.-]+\.workers\.dev\/?$/i.test(u)) { toast("Paste the forwarder address, the one ending in workers.dev."); return; }
         await window.FB.db.doc("map/config").update({ otUrl: u }).catch(() => toast("Couldn't save. Check your connection."));
       }
       if (b.dataset.ot === "reset") await window.FB.db.doc("map/config").update({ otUrl: "" }).catch(() => {});
@@ -2169,8 +2170,8 @@
       const owner = Family.member && Family.member.role === "owner";
       if (!this.url) {
         box.innerHTML = owner
-          ? `<p class="note small">Set up the receiver once (see tools/owntracks), then paste its web app address here.</p>
-             <div class="row gap"><input id="otUrlIn" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"><button class="btn" type="button" data-ot="save">Save</button></div>`
+          ? `<p class="note small">Set up the receiver and the forwarder once (see tools/owntracks/SETUP.md), then paste the forwarder address here.</p>
+             <div class="row gap"><input id="otUrlIn" placeholder="https://alnaryd-owntracks.….workers.dev" autocomplete="off"><button class="btn" type="button" data-ot="save">Save</button></div>`
           : `<p class="note small">The map owner needs to set up the receiver first.</p>`;
         return;
       }

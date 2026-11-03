@@ -153,14 +153,14 @@
     "Add or draw": "Lägg till eller rita", "Background tracking (phone locked)": "Bakgrundsspårning (låst telefon)",
     "The map can only send your position while it's open. OwnTracks keeps sending it with the phone locked in your pocket, and your dot shows on everyone's map.":
       "Kartan kan bara skicka din position medan den är öppen. OwnTracks fortsätter skicka den med telefonen låst i fickan, och din prick syns på allas karta.",
-    "Set up the receiver once (see tools/owntracks), then paste its web app address here.": "Sätt upp mottagaren en gång (se tools/owntracks) och klistra sedan in dess webbappsadress här.",
+    "Set up the receiver and the forwarder once (see tools/owntracks/SETUP.md), then paste the forwarder address here.": "Sätt upp mottagaren och vidarebefordraren en gång (se tools/owntracks/SETUP.md) och klistra sedan in vidarebefordrarens adress här.",
     "The map owner needs to set up the receiver first.": "Kartans ägare behöver sätta upp mottagaren först.",
     "Install": "Installera", "from the App Store (free).": "från App Store (gratis).", "Set up OwnTracks": "Ställ in OwnTracks",
     "Tap this on your iPhone; OwnTracks opens with everything filled in.": "Tryck på den på din iPhone, så öppnas OwnTracks med allt ifyllt.",
     "Allow location \"Always\" for OwnTracks when it asks, and keep its mode on \"Move\" during the hunt.": "Tillåt plats \"Alltid\" för OwnTracks när den frågar, och ha läget \"Move\" under jakten.",
     "Didn't open? In OwnTracks: Settings → Mode HTTP, and paste your address as URL:": "Öppnades den inte? I OwnTracks: Settings → Mode HTTP, och klistra in din adress som URL:",
     "Copy my address": "Kopiera min adress", "Change receiver address": "Ändra mottagarens adress", "Making your personal code…": "Skapar din personliga kod…",
-    "That doesn't look like an Apps Script web app address.": "Det ser inte ut som en Apps Script-webbappsadress.", "Copied": "Kopierat", "Pocket mode: black screen, keeps sharing": "Fickläge: svart skärm, delar position", "Double-tap to open the map": "Dubbeltryck för att öppna kartan",
+    "Paste the forwarder address, the one ending in workers.dev.": "Klistra in vidarebefordrarens adress, den som slutar på workers.dev.", "Copied": "Kopierat", "Pocket mode: black screen, keeps sharing": "Fickläge: svart skärm, delar position", "Double-tap to open the map": "Dubbeltryck för att öppna kartan",
     "Sharing your position": "Delar din position", "Waiting for GPS…": "Väntar på GPS…",
     "iPhones only share the position while the map is on screen. In the pocket, use pocket mode (the phone button on the right): the screen goes black, which uses almost no battery on newer iPhones, and the position keeps updating. Don't press the side button, it locks the phone.":
       "iPhone delar bara positionen medan kartan är på skärmen. I fickan: använd fickläget (telefonknappen till höger). Skärmen blir svart, vilket nästan inte drar batteri på nyare iPhones, och positionen fortsätter uppdateras. Tryck inte på sidoknappen, då låses telefonen.", "Game trails": "Viltstråk", "model": "modell", "Passage": "Passage",
