@@ -2406,7 +2406,7 @@
       // what has actually arrived from my phone's OwnTracks (shown whether or not the map itself is sharing)
       const v = Family.otMine, age = v ? Family.ageMin(v) : null;
       const last = v && age !== null
-        ? `<p class="ot-last ok"><span>Last position from your OwnTracks:</span> ${new Date(Family.posTime(v)).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} <span>(${age < 1 ? "now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"})</span>${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}</p>`
+        ? `<p class="ot-last ok"><span>Last position from your OwnTracks:</span> ${new Date(Family.posTime(v)).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} <span>(${age < 1 ? "now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"})</span>${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}${OT_MODES[v.mode] ? ` · <b translate="no">${OT_MODES[v.mode]}</b>` : ""}</p>`
         : `<p class="ot-last"><span>Nothing has arrived from your OwnTracks yet.</span></p>`;
       box.innerHTML = url ? last + `<ol class="ot-steps">
           <li><span>Install</span> <b translate="no">OwnTracks</b> <span>from the App Store (free).</span></li>
@@ -2604,6 +2604,9 @@
 
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
   const LOOK_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d", "#e03131", "#495057", "#f5c518", "#ffffff"];
+  // the mode OwnTracks reported (saved by the receiver): Move = a position every minute
+  const OT_MODES = { 2: "Move", 1: "Significant", 0: "Manual", "-1": "Quiet" };
+  const otMode = (v) => (v && typeof v.mode === "number" && OT_MODES[v.mode] ? ` (${OT_MODES[v.mode]})` : "");
   const FAMILY_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d"];
   const Family = {
     ready: false, user: null, member: null, members: [], positions: new Map(), sharing: false, lastWrite: null,
@@ -2768,14 +2771,14 @@
       if (mine) {
         if (this.sharing) return myFix ? "You · sharing now" : "You · waiting for GPS…";
         const ot = this.positions.get(this.user.uid), oa = ot && ot.src === "owntracks" ? this.ageMin(ot) : null;
-        const ob = ot && typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "";
+        const ob = (ot ? otMode(ot) : "") + (ot && typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "");
         return oa === null ? "You · not sharing" : `You · OwnTracks · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}${ob}`;
       }
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
       const here = myPos();
       const where = here ? ` · ${Math.round(Geo.distance(here.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(here.ll, [v.lon, v.lat]))}` : "";
-      const via = v.src === "owntracks" ? " · OwnTracks" : "";
+      const via = v.src === "owntracks" ? ` · OwnTracks${otMode(v)}` : "";
       const batt = typeof v.batt === "number" ? ` · 🔋${v.batt}%` : "";
       if (this.isCurrent(v, 10)) {
         const still = v.src === "owntracks" && age >= 3 ? `Still for ${age} min` : `Sharing · ${age ? age + " min ago" : "now"}`;
