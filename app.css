@@ -626,13 +626,10 @@ html, body { touch-action: manipulation; }
 html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0px)); }
 @media (min-width: 861px) { html.recording .map-legend { bottom: calc(98px + env(safe-area-inset-bottom, 0px)); } }
 
-/* home-screen app (Safari "Add to Home Screen"): iOS 26 still softens the first ~40 points below the status bar,
-   so the compass, buttons, menus and banners start below that */
+/* home-screen app: the compass, buttons and + menu start just below the solid top band */
 @media (display-mode: standalone) {
-  .hud { top: calc(env(safe-area-inset-top, 0px) + 46px); }
-  .toolbar { top: calc(env(safe-area-inset-top, 0px) + 44px); }
-  .addmenu { top: calc(env(safe-area-inset-top, 0px) + 48px); }
-  .hint, .safety, .mystand { top: calc(env(safe-area-inset-top, 0px) + 122px); }
-  html .safety:not([hidden]) ~ .mystand, .mystand:not([hidden]) ~ .hint, .safety:not([hidden]) ~ .hint { top: calc(env(safe-area-inset-top, 0px) + 178px); }
-  .safety:not([hidden]) ~ .mystand:not([hidden]) ~ .hint { top: calc(env(safe-area-inset-top, 0px) + 234px); }
+  .hud { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 10px); }
+  .toolbar { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 8px); }
+  .addmenu { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 12px); }
+}
 }
