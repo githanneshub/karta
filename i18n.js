@@ -197,7 +197,7 @@
     "swipe the app or Safari away and open the map again, then tap the position button. Answer Allow when it asks about location.":
       "svep bort appen eller Safari och öppna kartan igen, tryck sedan på positionsknappen. Svara Tillåt när den frågar om plats.",
     "The compass is asked for on the next tap on the map, after the position works.": "Kompassen frågas efter vid nästa tryck på kartan, när positionen fungerar.", "Scent from me": "Vittring från mig", "Scent from stands": "Vittring från passen",
-    "Calm mornings scent rises uphill, evenings it sinks along hollows.": "Stilla morgnar stiger vittringen uppför, på kvällen sjunker den längs sänkorna.",
+    "In light wind scent sinks downhill and along hollows in the evening and at night, and rises uphill in the middle of the day.": "I svag vind sjunker vittringen nedför och längs sänkorna på kvällen och natten, och stiger uppför mitt på dagen.",
     "Clear": "Klart", "Nearly clear": "Nästan klart", "Variable cloud": "Växlande molnighet", "Half clear": "Halvklart", "Cloudy": "Molnigt", "Overcast": "Mulet",
     "Fog": "Dimma", "Light rain showers": "Lätta regnskurar", "Rain showers": "Regnskurar", "Heavy rain showers": "Kraftiga regnskurar", "Thunderstorm": "Åskväder",
     "Light sleet showers": "Lätta byar av snöblandat regn", "Sleet showers": "Byar av snöblandat regn", "Heavy sleet showers": "Kraftiga byar av snöblandat regn",

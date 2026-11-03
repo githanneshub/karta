@@ -749,7 +749,18 @@
     viewKey = ""; $("#sf-viewStats").textContent = "";
     updateStandOutputs();
     renderAll();
-    setTimeout(() => $("#sf-name").focus({ preventScroll: true }), 50);
+    showForm("#standForm", [s.lon, s.lat]);
+    if (!isPhone()) setTimeout(() => $("#sf-name").focus({ preventScroll: true }), 50);   // on a phone the keyboard would cover it all
+  }
+  // A form opened from the map: show it from its first field, and on a phone keep the spot visible above the panel
+  function showForm(sel, ll) {
+    const panes = $(".panes"), f = $(sel);
+    panes.scrollTop = Math.max(0, f.offsetTop - panes.offsetTop - 8);
+    if (!isPhone() || !ll) return;
+    setTimeout(() => {
+      const top = $("#panel").getBoundingClientRect().top, p = map.project(ll);
+      if (p.y > top - 50) map.easeTo({ center: ll, offset: [0, top / 2 - map.getContainer().clientHeight / 2], duration: 400 });
+    }, 300);   // after the panel has opened
   }
   function updateStandOutputs() {
     $("#sf-facingOut").textContent = `${Geo.compassName(+$("#sf-facing").value)} · ${$("#sf-facing").value}°`;
@@ -1068,7 +1079,7 @@
     $("#dial").setAttribute("aria-valuenow", String(w.from));
     $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
-    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` · gusts ${Math.round(fh.gust)}` : "");
+    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "");   // gusts in brackets, like the compass
     const wx = wxHour();
     $("#wxIcon").innerHTML = wx ? wxSvg(wx) : "";
     $("#wxTemp").textContent = wx && typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : "";
@@ -1090,6 +1101,8 @@
   const LAYOUT_TOOLS = ["layout", "editTrail", "newTrail", "newPlace"];
   function setTool(t, { draw = false, trailId = null } = {}) {
     if (t === "boundary" && !draw && Store.data.boundary && pairs(Store.data.boundary).length >= 3) t = "editBoundary";
+    // starting something new puts away a stand or sighting you were filling in (and its preview on the map)
+    if (t) { if (draftStand) closeStandForm(); if (draftSighting) closeSightForm(); }
     tool = t; pts = [];
     edit = null;
     if (t === "editBoundary") edit = { kind: "boundary", closed: true, pts: pairs(Store.data.boundary), sel: -1, history: [] };
@@ -1337,6 +1350,7 @@
     $("#lf-delete").hidden = s.isNew;
     $("#lf-wind").textContent = s.isNew ? `Saved with the wind you have set: ${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s.` : (s.wind ? `Wind at the time: ${s.wind}` : "");
     updateDraftPin();
+    showForm("#sightForm", [s.lon, s.lat]);
   }
   let draftPin = null;
   function updateDraftPin() {
