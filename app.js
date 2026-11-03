@@ -1650,6 +1650,18 @@
     $("#huntBtn").addEventListener("click", (e) => {
       e.stopPropagation(); hmenu.hidden = !hmenu.hidden; $("#huntBtn").setAttribute("aria-expanded", String(!hmenu.hidden));
     });
+    $("#otBox").addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-ot]"); if (!b) return;
+      if (b.dataset.ot === "save") {
+        const u = $("#otUrlIn").value.trim();
+        if (!/^https:\/\/script\.google(usercontent)?\.com\/.+/.test(u)) { toast("That doesn't look like an Apps Script web app address."); return; }
+        await window.FB.db.doc("map/config").update({ otUrl: u }).catch(() => toast("Couldn't save. Check your connection."));
+      }
+      if (b.dataset.ot === "reset") await window.FB.db.doc("map/config").update({ otUrl: "" }).catch(() => {});
+      if (b.dataset.ot === "copy") {
+        try { await navigator.clipboard.writeText(OT.personalUrl()); toast("Copied"); } catch { prompt("Your OwnTracks address:", OT.personalUrl()); }
+      }
+    });
     $("#dayCard").addEventListener("click", (e) => {
       const b = e.target.closest("[data-day]"); if (!b) return;
       if (b.dataset.day === "start") Day.begin();
@@ -2125,6 +2137,56 @@
     },
   };
 
+  // ---------- background tracking with OwnTracks (positions while the phone is locked) ----------
+  // OwnTracks posts to the family's Apps Script receiver (tools/owntracks), which writes positions/ot_<email>.
+  // The receiver's address lives in map/config, each person's code in map/ot_tokens (made here on first use).
+  const OT = {
+    url: "", tokens: {},
+    start(db) {
+      db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
+      db.doc("map/ot_tokens").onSnapshot((snap) => { this.tokens = snap.exists ? snap.data() : {}; this.render(); }, () => {});
+    },
+    me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
+    async ensureToken() {
+      if (!this.url || !this.me() || this.tokens[this.me()]) return;
+      const a = new Uint8Array(15); crypto.getRandomValues(a);
+      const tok = btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
+      await window.FB.db.doc("map/ot_tokens").update({ [this.me()]: tok }).catch(() => {});
+    },
+    personalUrl() {
+      const t = this.tokens[this.me()]; if (!this.url || !t) return "";
+      return `${this.url}${this.url.includes("?") ? "&" : "?"}u=${encodeURIComponent(this.me())}&k=${t}`;
+    },
+    // one tap opens OwnTracks with everything filled in (HTTP mode, our address, "move" mode for steady updates)
+    configLink() {
+      const url = this.personalUrl(); if (!url) return "";
+      const tid = Family.letterFor(this.me(), Family.member && Family.member.name).slice(0, 2);
+      const cfg = { _type: "configuration", mode: 3, url, tid, monitoring: 2, locatorDisplacement: 15, locatorInterval: 60 };
+      return "owntracks:///config?inline=" + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(cfg)))));
+    },
+    render() {
+      const box = $("#otBox"); if (!box || !Family.user) return;
+      const owner = Family.member && Family.member.role === "owner";
+      if (!this.url) {
+        box.innerHTML = owner
+          ? `<p class="note small">Set up the receiver once (see tools/owntracks), then paste its web app address here.</p>
+             <div class="row gap"><input id="otUrlIn" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"><button class="btn" type="button" data-ot="save">Save</button></div>`
+          : `<p class="note small">The map owner needs to set up the receiver first.</p>`;
+        return;
+      }
+      this.ensureToken();
+      const link = this.configLink(), url = this.personalUrl();
+      box.innerHTML = url ? `<ol class="ot-steps">
+          <li><span>Install</span> <b translate="no">OwnTracks</b> <span>from the App Store (free).</span></li>
+          <li><a class="btn primary" href="${esc(link)}">Set up OwnTracks</a> <span>Tap this on your iPhone; OwnTracks opens with everything filled in.</span></li>
+          <li><span>Allow location "Always" for OwnTracks when it asks, and keep its mode on "Move" during the hunt.</span></li>
+        </ol>
+        <p class="note small">Didn't open? In OwnTracks: Settings → Mode HTTP, and paste your address as URL: <button class="btn small ghost" type="button" data-ot="copy">Copy my address</button></p>
+        ${owner ? `<p class="note small"><button class="btn small ghost" type="button" data-ot="reset">Change receiver address</button></p>` : ""}`
+        : `<p class="note small">Making your personal code…</p>`;
+    },
+  };
+
   // ---------- hunt day: leader, who sits where, start and end, summary ----------
   // Stored in map/huntday (the map collection is open to every member, so no new rules are needed);
   // finished days are kept as map/day_<id> summaries.
@@ -2308,11 +2370,17 @@
         this.render();
       }, () => {});
       db.collection("positions").onSnapshot((snap) => {
-        this.positions = new Map(snap.docs.map((d) => [d.id, d.data()]));
+        const best = new Map(), me = this.user.email.toLowerCase();
+        for (const d of snap.docs) {
+          const v = d.data(), k = v.email || d.id, t = this.posTime(v), cur = best.get(k);
+          if (!cur || t > cur.t) best.set(k, { id: d.id, v, t });
+        }
+        // my own entry is keyed by my uid so the map never draws me as someone else
+        this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
         syncMarkers(); Hunt.checkSafety();
       }, () => {});
-      Hunt.start(db); Day.start(db);
+      Hunt.start(db); Day.start(db); OT.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();
@@ -2355,6 +2423,7 @@
       this.render();
       Hunt.checkSafety();
     },
+    posTime(v) { return (v.t && v.t.toMillis ? v.t.toMillis() : 0) || v.tc || 0; },
     ageMin(pos) {
       const t = pos.t && pos.t.toMillis ? pos.t.toMillis() : pos.tc;
       return t ? Math.max(0, Math.round((Date.now() - t) / 60000)) : null;
@@ -2366,7 +2435,8 @@
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
       const where = myFix ? ` · ${Math.round(Geo.distance(myFix.ll, [v.lon, v.lat]))} m ${Geo.compassName(Geo.bearing(myFix.ll, [v.lon, v.lat]))}` : "";
-      if (v.sharing && age !== null && age < 10) return `Sharing · ${age ? age + " min ago" : "now"}${where}`;
+      const via = v.src === "owntracks" ? " · OwnTracks" : "";
+      if (v.sharing && age !== null && age < 10) return `Sharing · ${age ? age + " min ago" : "now"}${where}${via}`;
       return `Last seen ${age === null ? "" : age < 1 ? "just now" : age < 60 ? age + " min ago" : Math.round(age / 60) + " h ago"}${where}`;
     },
     render() {
