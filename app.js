@@ -1858,7 +1858,6 @@
       else map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 16) });
     });
     hmenu.addEventListener("click", (e) => {
-      if (e.target.closest("[data-day]")) { closeHunt(); if (Day.active()) showTab("family", true); else Day.begin(); return; }
       const b = e.target.closest("[data-ev]"); if (!b) return;
       closeHunt();
       if (b.dataset.ev === "animal" || b.dataset.ev === "sound") { setTool(b.dataset.ev); return; }   // first tap where the animal (or the sound) is
@@ -2878,7 +2877,6 @@
         }).join("") + `</ul>`;
       }
       card.innerHTML = h;
-      $("#dayStartBtn").hidden = this.active();
     },
   };
   // the stand you were given today: a chip on the map and a line from you to it
