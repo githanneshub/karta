@@ -188,7 +188,7 @@
     "No route yet": "Ingen väg än", "No stand yet": "Inget pass än", "Chosen start": "Vald startpunkt", "Tap the start on the map…": "Välj start på kartan…",
     "Via a road or track…": "Via en väg eller stig…", "Via the chosen road": "Via vald väg",
     "Tap the map where they will sit": "Tryck på kartan där personen ska sitta", "Tap the road, track or spot they will walk via": "Tryck på vägen, stigen eller platsen personen ska gå via",
-    "Tap where they start walking": "Tryck där personen börjar gå", "Stands from last time are filled in. Change what differs today.": "Passen från förra gången är ifyllda. Ändra det som skiljer i dag.", "Change route": "Ändra väg", "From": "Från", "No route": "Ingen väg", "Close": "Stäng",
+    "Tap where they start walking": "Tryck där personen börjar gå", "Change route": "Ändra väg", "From": "Från", "No route": "Ingen väg", "Close": "Stäng",
     "Easiest": "Lättast", "Quietest": "Tystast", "Scent-safe": "Vindsäker", "Another way": "Annan väg",
     "Add a place first (e.g. Parkering) to start the walk from.": "Lägg först till en plats (t.ex. Parkering) att gå från.",
     "Couldn't find a way there from that start.": "Hittade ingen väg dit från den starten.", "Thermals now: cold air is running downhill and along the hollows. Scent follows it down.": "Termik nu: kalluften rinner nedför och längs sänkorna. Vittringen följer med nedåt.",

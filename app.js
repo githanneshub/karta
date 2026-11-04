@@ -2734,15 +2734,18 @@
   }
   const ROUTE_LOOK = { fast: ["A", "#4dabf7", "Easiest"], quiet: ["B", "#51cf66", "Quietest"], wind: ["C", "#b197fc", "Scent-safe"], other: ["D", "#ffa94d", "Another way"],
     via: ["V", "#ffd43b", "Via the chosen road"] };
-  // where a walk to a stand starts: the parking or an entrance nearest the stand, or any named place, or where they are
+  // where a walk to a stand starts, in this order: the parking (the default), where they are now, entrances,
+  // then any other named place (each group nearest the stand first)
   function routeStarts(email, st) {
-    const out = [];
     const places = Store.data.places.slice().sort((p, q) => Geo.distance([p.lon, p.lat], [st.lon, st.lat]) - Geo.distance([q.lon, q.lat], [st.lon, st.lat]));
-    const entry = places.filter((p) => /parker|ingång|grind|bil|start|väg/i.test(p.name || ""));
-    for (const p of [...entry, ...places.filter((p) => !entry.includes(p))]) out.push({ id: "p:" + p.id, name: p.name || "Place", ll: [p.lon, p.lat] });
+    const item = (p) => ({ id: "p:" + p.id, name: p.name || "Place", ll: [p.lon, p.lat] });
+    const parking = places.filter((p) => /parker/i.test(p.name || "") || p.kind === "parking");
+    const entry = places.filter((p) => !parking.includes(p) && /ingång|grind|bil|start|väg/i.test(p.name || ""));
+    const rest = places.filter((p) => !parking.includes(p) && !entry.includes(p));
+    const out = parking.map(item);
     const w = Family.whereIs(email);
-    if (w && w.ll) out.unshift({ id: "here", name: tr(`Where ${Family.nameFor(email)} is now`), ll: w.ll });
-    return out;
+    if (w && w.ll) out.push({ id: "here", name: tr(`Where ${Family.nameFor(email)} is now`), ll: w.ll });
+    return [...out, ...entry.map(item), ...rest.map(item)];
   }
   // the chooser in the hunt-day card: one person at a time
   const RoutePick = {
@@ -2755,7 +2758,7 @@
       const starts = routeStarts(email, st);
       if (this.custom) starts.unshift(this.custom);
       if (!starts.length) { toast("Add a place first (e.g. Parkering) to start the walk from."); return; }
-      this.email = email; this.start = starts.find((x) => x.id === startId) || (startId === undefined && starts.find((x) => x.id !== "here")) || starts[0];
+      this.email = email; this.start = starts.find((x) => x.id === startId) || starts[0];   // first = the parking
       this.opts = Router.suggest(this.start.ll, st) || [];
       this.sel = -1;
       if (!this.opts.length) toast("Couldn't find a way there from that start.");
@@ -2780,7 +2783,7 @@
     fromPoint(ll) {
       const email = this.pending || this.email; if (!email) return;
       this.custom = { id: "custom", name: tr("Chosen start"), ll, email };
-      showTab("family", true); this.open(email, "custom");
+      showTab("stands", true); this.open(email, "custom");
     },
     via(ll) {
       const email = this.pending || this.email, st = email && Day.placeOf(email);
@@ -2800,7 +2803,7 @@
       const cells = [...p1, ...p2.slice(1)], coords = Router.toCoords(cells, this.start.ll, [st.lon, st.lat]);
       let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
       this.email = email; this.opts.push({ kind: "via", cells, coords, len });
-      showTab("family", true);
+      showTab("stands", true);
       this.choose(this.opts.length - 1);
     },
     async choose(i) {
@@ -2881,7 +2884,7 @@
     setSpot(email, ll) {
       const at = [+ll[0].toFixed(6), +ll[1].toFixed(6)];
       window.FB.db.doc("map/huntday").update({ spots: { [email]: at }, assign: { [email]: "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
-      setTimeout(() => { showTab("family", true); RoutePick.open(email); }, 250);   // straight on to the way there
+      setTimeout(() => { showTab("stands", true); RoutePick.open(email); }, 250);   // straight on to the way there
     },
     whoOn(standId) {
       if (!this.active()) return null;
@@ -2889,35 +2892,14 @@
       return null;
     },
     canLead() { return this.active() && (this.doc.leader === this.me() || (Family.member && Family.member.role === "owner")); },
-    // Start from last time's stands and routes (the same people usually sit the same stands), then whoever is
-    // already checked in; the leader only changes what differs today.
+    // A new hunt day starts empty: the leader places everyone's stand for today.
     async begin() {
-      const prev = this.doc || {}, members = new Set(Family.members.map((m) => m.email)), stands = new Set(Store.data.stands.map((s) => s.id));
-      let last = prev.lastAssign || {};
-      if (!Object.keys(last).length && this.past.length) {   // older days kept only names: match them back
-        last = {};
-        for (const x of this.past[0].sat || []) {
-          const m = Family.members.find((mm) => [mm.name, Family.nameFor(mm.email), mm.email.split("@")[0]].includes(x.name));
-          const st = Store.data.stands.find((s) => (s.name || "?") === x.stand);
-          if (m && st) last[m.email] = st.id;
-        }
-      }
-      const assign = {}, routes = {}, spots = {};
-      for (const [email, sid] of Object.entries(last)) if (sid && members.has(email) && stands.has(sid)) {
-        assign[email] = sid;
-        const r = (prev.lastRoutes || {})[email]; if (r && r.stand === sid) routes[email] = r;
-      }
-      for (const [email, sp] of Object.entries(prev.lastSpots || {})) if (sp && sp.length === 2 && members.has(email) && !assign[email]) {
-        spots[email] = sp;
-        const r = (prev.lastRoutes || {})[email]; if (r && !r.stand && r.at && Geo.distance(r.at, sp) < 5) routes[email] = r;
-      }
-      for (const [sid, email] of Hunt.sitting()) { if (assign[email] !== sid) delete routes[email]; assign[email] = sid; }   // already sitting
       window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
-        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, spots, routes, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
+        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign: {}, spots: {}, routes: {}, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
         .catch(() => toast("Couldn't save. Check your connection."));
-      if (Object.keys(assign).length || Object.keys(spots).length) toast("Stands from last time are filled in. Change what differs today.", 6000);
+      window.FB.db.doc("map/onstand").set({}).catch(() => {});   // old check-ins don't carry into a new day
       Hunt.post("daystart");
-      showTab("family", true);
+      showTab("stands", true);
     },
     async assign(email, standId) {
       // a new stand means the old route no longer fits
@@ -2936,10 +2918,9 @@
         tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
       };
       await window.FB.db.doc(`days/${since}`).set(summary).catch(() => {});
-      // keep who sat where (and their routes) for next time
-      const lastRoutes = {};
-      for (const [email, r] of Object.entries(d.routes || {})) if (r && this.placeOf(email)) lastRoutes[email] = { ...r, stand: (d.assign || {})[email] || "" };
-      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now(), lastAssign: d.assign || {}, lastSpots: d.spots || {}, lastRoutes }).catch(() => toast("Couldn't save. Check your connection."));
+      // nothing carries over: spots, routes and check-ins end with the day
+      window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now() }).catch(() => toast("Couldn't save. Check your connection."));
+      window.FB.db.doc("map/onstand").set({}).catch(() => {});
       Hunt.post("dayend");
     },
     render() {
@@ -2968,19 +2949,6 @@
       } else {
         h += `<h2 class="eyebrow">Hunt day</h2><p class="note small">Start a hunt day to give everyone a stand. Given stands count for the shooting-sector warning right away.</p>
           <button class="btn primary" type="button" data-day="start">Start hunt day</button>`;
-      }
-      if (this.past.length) {
-        h += `<h2 class="eyebrow">Earlier hunt days</h2><ul class="items day-past">` + this.past.slice(0, 10).map((p) => {
-          const day = new Date(p.started).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
-          const lines = [
-            p.sat && p.sat.length ? p.sat.map((x) => `${esc(x.name)}: ${esc(x.stand)}`).join(", ") : "",
-            (p.shots || []).map((x) => `<span>Shot</span> ${hm(x.t)} ${esc(x.name)}${x.dir ? " → " + x.dir : ""}`).join("<br>"),
-            (p.downs || []).map((x) => `<span>Animal down</span> ${hm(x.t)} ${esc(x.name)}`).join("<br>"),
-            (p.tracks || []).map((x) => `<span>${x.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(x.name)} ${esc(x.len)}`).join("<br>"),
-          ].filter(Boolean).join("<br>");
-          return `<li><details><summary><b>${esc(day)}</b> ${hm(p.started)}–${hm(p.ended)} · ${(p.shots || []).length} <span>shots</span> · ${(p.downs || []).length} <span>down</span></summary>
-            <div class="it-sub">${p.wind ? `<span>Wind</span> ${esc(p.wind)}<br>` : ""}${lines || ""}</div></details></li>`;
-        }).join("") + `</ul>`;
       }
       card.innerHTML = h;
     },
