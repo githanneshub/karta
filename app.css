@@ -673,3 +673,14 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .row-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .row-head .eyebrow { margin-bottom: 4px; }
 
+/* hunt day: at the stand / on the way, and the participant's own card */
+.at-stand { color: #69db7c; }
+.day-mine { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 8px 0 6px; font-size: 15px; }
+.day-mine .btn { margin-top: 2px; }
+/* Familj: ready for the hunt */
+.ready { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ready-chip { font-size: 11.5px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.ready-chip.ok { border-color: #2f9e44; color: #b2f2bb; }
+.ready-chip.low { border-color: #e03131; color: #ffa8a8; }
+.more-layers { margin-top: 6px; }
+

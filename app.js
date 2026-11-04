@@ -650,7 +650,7 @@
     }).join("");
   }
   function renderFlow() {
-    if (flow) flow.set({ on: prefs.windFlow && is3D, from: prefs.wind.from, speed: prefs.wind.speed });   // only in 3D: flat they look like snow
+    if (flow) flow.set({ on: is3D, from: prefs.wind.from, speed: prefs.wind.speed });   // only in 3D: flat they look like snow
   }
   const STAND_ICON = {
     tower: '<svg viewBox="0 0 24 24"><path d="M7 21 10 9h4l3 12M8.5 15h7M6 9h12l-2-5H8z"/></svg>',
@@ -886,7 +886,7 @@
         <span class="it-main"><div class="it-name">${esc(s.name || "Unnamed stand")}</div>
         <div class="it-sub">${esc(STAND_TYPES[s.type] || "")}${typeof s.facing === "number" ? ` · faces ${Geo.compassName(s.facing)}` : ""} · ${+s.height || 0} m${whoTag(s)}</div></span>
         <span class="pill ${st.cls}">${st.text}</span></li>`;
-    }).join("") : `<li class="empty">No stands yet. Add one with +.</li>`;
+    }).join("") : `<li class="empty">No stands yet.</li>`;
 
     const rl = $("#routeList");
     const routes = plans("routes");
@@ -1405,7 +1405,7 @@
   function localInput(iso) { const d = iso ? new Date(iso) : new Date(); const off = d.getTimezoneOffset(); return new Date(d.getTime() - off * 60000).toISOString().slice(0, 16); }
   function openSightForm() {
     const s = draftSighting;
-    showTab("log", true);
+    showTab("stands", true);
     $("#sightForm").hidden = false;
     $("#lf-species").value = s.species; $("#lf-count").value = s.count; $("#lf-kind").value = s.kind;
     $("#lf-when").value = localInput(s.when); $("#lf-notes").value = s.notes || "";
@@ -1802,6 +1802,7 @@
     }));
     $("#sheetHandle").addEventListener("click", () => { if (!sheetDragged) setSheet($("#app").dataset.sheet === "open" ? "peek" : "open"); });
     sheetSwipe();
+    if (prefs.tab === "log") prefs.tab = "stands";   // observations live in the Pass tab now
     showTab(prefs.tab, false);
 
     // base & overlays
@@ -1880,6 +1881,7 @@
     });
     $("#dayCard").addEventListener("click", async (e) => {
       const sp = e.target.closest("[data-spot]"); if (sp) { Day.startSpot(sp.dataset.spot); return; }
+      if (e.target.closest("[data-show-way]")) { Day.showWay(); return; }
       if (e.target.closest("[data-route-via]")) { RoutePick.pickVia(); return; }
       const r = e.target.closest("[data-route]"); if (r) { RoutePick.email === r.dataset.route ? RoutePick.close() : RoutePick.open(r.dataset.route); return; }
       const p = e.target.closest("[data-route-pick]"); if (p) { RoutePick.choose(+p.dataset.routePick); return; }
@@ -2077,8 +2079,6 @@
     $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
     $("#seasonSearch").addEventListener("input", renderSeasons);
     $("#seasonOpen").addEventListener("change", renderSeasons);
-    $("#showFlow").checked = prefs.windFlow;
-    $("#showFlow").addEventListener("change", (e) => { prefs.windFlow = e.target.checked; savePrefs(); renderFlow(); });
     $("#showCones").checked = prefs.cones;
     $("#showCones").addEventListener("change", (e) => { prefs.cones = e.target.checked; savePrefs(); applyLayers(); });
 
@@ -2405,8 +2405,6 @@
         m.getElement().classList.toggle("blink", Date.now() - e.tc < (BLINK_MIN[e.type] || 0) * 60e3);
       }
       for (const [id, m] of this.markers) if (!keep.has(id)) { m.remove(); this.markers.delete(id); }
-      $("#huntOff").hidden = !this.stand;
-      $("#huntOn").hidden = !!this.stand;
       $("#eventList").innerHTML = this.events.length ? this.events.slice(0, 30).map((e) => `<li${typeof e.lon === "number" ? ` data-lon="${e.lon}" data-lat="${e.lat}"` : ""}>
           <span class="fam-dot" style="background:${Family.colorFor(e.email)}" translate="no">${esc(Family.letterFor(e.email, e.name))}</span>
           <span class="it-main"><div class="it-name">${esc(EVENT_TEXT[e.type] ? EVENT_TEXT[e.type](e) : e.type)}</div>
@@ -2540,8 +2538,9 @@
   const NTFY_LOOK = { shot: [4, "boom"], down: [4, "white_check_mark"], help: [5, "rotating_light"], animal: [4, "deer"], sound: [3, "ear"],
     daystart: [3, "evergreen_tree"], dayend: [3, "checkered_flag"] };
   const Ntfy = {
-    topics: {}, loaded: false,
+    topics: {}, loaded: false, ok: {},
     start(db) {
+      db.doc("map/ntfyok").onSnapshot((snap) => { this.ok = (snap.exists && snap.data()) || {}; Family.render(); }, () => {});
       db.doc("map/ntfy").onSnapshot((snap) => {
         if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;
         this.topics = (snap.exists && snap.data()) || {}; this.loaded = true;
@@ -2595,8 +2594,13 @@
           click: `${location.origin}${location.pathname}?ev=${encodeURIComponent(id)}` });
       }
     },
+    toPerson(email, msg) {
+      const topic = this.topics[email]; if (!topic) return;
+      this.publish(topic, { ...msg, click: `${location.origin}${location.pathname}` });
+    },
     async test() {
       const ok = await this.publish(this.mine(), { title: tr("Test from the hunting map"), message: tr("Notifications work on this phone."), tags: ["evergreen_tree"] });
+      if (ok) window.FB.db.doc("map/ntfyok").update({ [this.me()]: Date.now() }).catch(() => {});
       toast(ok ? "Test sent. It should arrive in a few seconds." : "Couldn't reach ntfy. Check your connection.");
     },
     render() {
@@ -2850,6 +2854,7 @@
       this.sel = i; this.draw();
       // not awaited: offline the save waits for signal, but shows on this phone right away
       const pl = Day.placeOf(email) || {};
+      if ((Day.doc.routes || {})[email]) Day.tell(email, "Your way to the stand has been changed. Tap to see it on the map.");
       window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name, stand: (Day.doc.assign || {})[email] || "", at: [pl.lon, pl.lat] } } })
         .catch(() => toast("Couldn't save. Check your connection."));
       toast(tr(`Route saved for ${Family.nameFor(email)}`));
@@ -2914,6 +2919,22 @@
       return sp && sp.length === 2 ? { id: "", lon: sp[0], lat: sp[1], name: tr(`${Family.nameFor(email)}'s stand`) } : null;
     },
     myPlace() { return this.active() ? this.placeOf(this.me()) : null; },
+    // on a hunt day: is this person at their spot (within 40 m, position less than 30 min old)? null = unknown
+    where(email) {
+      const pl = this.placeOf(email), w = pl && Family.whereIs(email);
+      if (!pl || !w || !w.ll || (w.age || 0) > 30) return null;
+      const d = Geo.distance(w.ll, [pl.lon, pl.lat]);
+      return { at: d <= 40, d };
+    },
+    whereText(email) {
+      const w = this.where(email);
+      return !w ? "" : w.at ? tr("At the stand") : tr(`On the way, ${Math.round(w.d / 10) * 10} m left`);
+    },
+    // tell someone their spot or route was changed during the hunt (they may have the map closed)
+    tell(email, what) {
+      if (!this.active() || email === this.me()) return;
+      Ntfy.toPerson(email, { title: Family.nameFor(this.me()), message: tr(what), priority: 4, tags: ["round_pushpin"] });
+    },
     spotFor: null,
     startSpot(email) {
       this.spotFor = email; RoutePick.close(true);
@@ -2922,6 +2943,7 @@
     },
     setSpot(email, ll) {
       const at = [+ll[0].toFixed(6), +ll[1].toFixed(6)];
+      if (this.placeOf(email)) this.tell(email, "Your stand has been moved. Tap to see it on the map.");
       window.FB.db.doc("map/huntday").update({ spots: { [email]: at }, assign: { [email]: "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
       setTimeout(() => { showTab("stands", true); RoutePick.open(email); }, 250);   // straight on to the way there
     },
@@ -2941,6 +2963,7 @@
       showTab("stands", true);
     },
     async assign(email, standId) {
+      if (standId && this.placeOf(email)) this.tell(email, "Your stand has been changed. Tap to see it on the map.");
       // a new stand means the old route no longer fits
       window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" }, spots: { [email]: null }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
       if (standId && this.canLead()) setTimeout(() => RoutePick.open(email), 200);   // straight on to choosing the way there
@@ -2962,6 +2985,31 @@
       window.FB.db.doc("map/onstand").set({}).catch(() => {});
       Hunt.post("dayend");
     },
+    // what someone in the hunt (not the leader) needs: their stand, the way there, shooting light, who sits where
+    mine(hm) {
+      const d = this.doc, me = this.me(), pl = this.placeOf(me), rt = (d.routes || {})[me], sun = sunTimes(Date.now());
+      let h = `<h2 class="eyebrow">Your hunt day</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
+      if (!pl) h += `<p class="day-mine">${esc(tr("You have no stand yet. The leader places it."))}</p>`;
+      else {
+        h += `<div class="day-mine"><b>${esc(pl.name || tr("Your stand"))}</b>${this.where(me) ? ` · <span class="${this.where(me).at ? "at-stand" : ""}">${esc(this.whereText(me))}</span>` : ""}
+          ${rt && rt.pts ? `<div class="note small">${esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`))}</div>` : ""}
+          <button class="btn primary small" type="button" data-show-way>${esc(tr(rt && rt.pts ? "Show the way" : "Show my stand"))}</button></div>`;
+      }
+      if (sun.up && sun.down) h += `<p class="note small">${esc(tr("Shooting light today"))} ${hm(sun.up - 3600e3)}–${hm(sun.down + 3600e3)}</p>`;
+      const others = Family.members.filter((m) => m.email !== me && this.placeOf(m.email));
+      if (others.length) h += `<h2 class="eyebrow">Who sits where</h2><ul class="items">` + others.map((m) =>
+        `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
+          <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div><div class="it-sub">${esc(this.placeOf(m.email).name || "")}${this.whereText(m.email) ? ` · ${esc(this.whereText(m.email))}` : ""}</div></span></li>`).join("") + `</ul>`;
+      return h;
+    },
+    showWay() {
+      const pl = this.myPlace(); if (!pl) return;
+      const rt = (this.doc.routes || {})[this.me()], pts = rt && rt.pts ? pairs(rt.pts) : [[pl.lon, pl.lat]];
+      const pos = myPos(); if (pos) pts.push(pos.ll);
+      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+      if (isPhone()) setSheet("peek");
+      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 17 });
+    },
     render() {
       const card = $("#dayCard"); if (!card) return;
       const hm = (t) => new Date(t).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
@@ -2969,6 +3017,7 @@
       let h = "";
       if (this.active()) {
         const d = this.doc, lead = this.canLead();
+        if (!lead) { card.innerHTML = this.mine(hm); return; }
         h += `<h2 class="eyebrow">Hunt day in progress</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
         h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
           const cur = (d.assign || {})[m.email] || "", spot = !cur && (d.spots || {})[m.email], place = this.placeOf(m.email);
@@ -2977,7 +3026,7 @@
           const rt = (d.routes || {})[m.email], hasRoute = place && rt && rt.pts;
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
             <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
-              <div class="it-sub">${place ? (hasRoute ? esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`)) : esc(tr("No route yet"))) : esc(tr("No stand yet"))}</div></span>
+              <div class="it-sub">${place ? (hasRoute ? esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`)) : esc(tr("No route yet"))) : esc(tr("No stand yet"))}${this.where(m.email) ? ` · <b class="${this.where(m.email).at ? "at-stand" : ""}">${esc(this.whereText(m.email))}</b>` : ""}</div></span>
             ${lead ? (stands.length ? `<select data-assign="${esc(m.email)}" aria-label="Stand">${opts}</select>` : "")
                 + `<button type="button" class="btn small${place ? " ghost" : " primary"}" data-spot="${esc(m.email)}"><span>${place ? "Move" : "Place stand"}</span></button>`
                 + (place ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : "")
@@ -3097,6 +3146,7 @@
         this.render();
       }, () => {});
       db.collection("positions").onSnapshot((snap) => {
+        if (!this.user) return;   // signing out: one last cached update can still arrive
         const best = new Map(), me = this.user.email.toLowerCase();
         this.otMine = null;
         for (const d of snap.docs) {
@@ -3116,7 +3166,7 @@
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();
       }, () => {});
-      setInterval(() => { this.render(); Hunt.render(); }, 30000);   // ages, fading dots and blinking pins
+      setInterval(() => { this.render(); Hunt.render(); Day.render(); }, 30000);   // ages, fading dots, blinking pins, who is at their stand
       document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible" || !this.sharing) return;
         this.requestWake();
@@ -3197,7 +3247,7 @@
       $("#syncState").textContent = (this.member && this.member.name) || "Signed in";
       $("#syncState").dataset.state = "shared";
       $("#meInfo").textContent = `Signed in as ${this.user.email}.`;
-      $("#memberForm").hidden = !owner; $("#ownerTools").hidden = !owner; $("#boundaryTools").hidden = !owner;
+      $("#memberForm").hidden = !owner; $("#boundaryTools").hidden = !owner;
       $("#shareState").textContent = this.sharing
         ? (myFix ? "On. Your family sees you while this map is open. Keep the screen on." : "On. Waiting for GPS…")
         : "Off. Your family can't see you.";
@@ -3205,7 +3255,7 @@
       $("#familyList").innerHTML = list.length ? list.map((m) => `<li data-email="${esc(m.email)}">
           <span class="fam-dot" style="background:${this.colorFor(m.email)}" translate="no">${esc(this.letterFor(m.email, m.name))}</span>
           <span class="it-main"><div class="it-name">${esc(this.nameFor(m.email, m.name))}${m.role === "owner" ? " · owner" : ""}</div>
-          <div class="it-sub">${esc(this.statusFor(m.email))}</div></span>
+          <div class="it-sub">${esc(this.statusFor(m.email))}</div>${this.readyChips(m.email)}</span>
           ${this.whereIs(m.email) ? `<button class="btn small ghost" type="button" data-coords="${esc(m.email)}">Coordinates</button>` : ""}
           <button class="btn small ghost" type="button" data-look="${esc(m.email)}">Edit</button>
           ${owner && m.role !== "owner" ? `<button class="btn small ghost" type="button" data-remove="${esc(m.email)}">Remove</button>` : ""}</li>`).join("")
@@ -3262,6 +3312,15 @@
         el.querySelector("span").textContent = tr("You (OwnTracks)") + (typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "");
         el.classList.toggle("batt-low", typeof ot.batt === "number" && ot.batt <= 15);
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
+    },
+    // ready for the hunt: OwnTracks sending (and in which mode), notifications tested, battery
+    readyChips(email) {
+      const v = [...this.positions.values()].find((x) => x.email === email && x.src === "owntracks");
+      const otOk = v && this.ageMin(v) !== null && this.ageMin(v) < 24 * 60;
+      const mode = otOk && typeof v.mode === "number" && OT_MODES[v.mode] ? ` (${OT_MODES[v.mode]})` : "";
+      const nt = !!Ntfy.ok[email], batt = v && typeof v.batt === "number" ? v.batt : null;
+      const chip = (ok, text) => `<span class="ready-chip ${ok ? "ok" : ""}">${ok ? "✓" : "–"} ${esc(text)}</span>`;
+      return `<div class="ready">${chip(otOk, tr("OwnTracks") + mode)}${chip(nt, tr("Notifications"))}${batt !== null ? `<span class="ready-chip${batt <= 20 ? " low" : " ok"}">🔋 ${batt}%</span>` : ""}</div>`;
     },
     // where someone is: their latest position (my own: the map's GPS or my OwnTracks)
     whereIs(email) {
@@ -3344,7 +3403,8 @@
     $("#gate-resend").addEventListener("click", async () => { try { await window.FB.resendVerification(); msg("Sent again. Check spam too."); } catch (err) { msg(friendly(err)); } });
     $("#gate-retry").addEventListener("click", () => Family.onUser(window.FB.currentUser()));
     for (const b of $$(".gate-signout")) b.addEventListener("click", () => window.FB.signOut());
-    $("#signOut").addEventListener("click", () => { Family.setSharing(false); window.FB.signOut(); });
+    // signing out starts the map afresh, so nothing keeps running for the old account
+    $("#signOut").addEventListener("click", async () => { Family.setSharing(false); await window.FB.signOut().catch(() => {}); location.reload(); });
     $("#shareMe").addEventListener("change", (e) => Family.setSharing(e.target.checked));
     $("#memberForm").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -3374,7 +3434,6 @@
     });
     $("#lookForm").addEventListener("submit", (e) => { e.preventDefault(); Family.saveLook(); });
     $("#lookCancel").addEventListener("click", () => { $("#lookForm").hidden = true; Family.editing = null; });
-    $("#importFile").addEventListener("change", (e) => { const f = e.target.files[0]; if (f) Family.importFile(f); e.target.value = ""; });
     setMode("signin");
   }
 
