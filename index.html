@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "c60bdca1ca";</script>
-<script src="firebase-config.js?v=c60bdca1ca"></script>
-<script type="module" src="fb.js?v=c60bdca1ca"></script>
+<script>window.APP_VERSION = "d237bdb476";</script>
+<script src="firebase-config.js?v=d237bdb476"></script>
+<script type="module" src="fb.js?v=d237bdb476"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=c60bdca1ca">
-<link rel="stylesheet" href="app.css?v=c60bdca1ca">
+<link rel="stylesheet" href="maplibre-gl.css?v=d237bdb476">
+<link rel="stylesheet" href="app.css?v=d237bdb476">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -176,7 +176,7 @@
         </div>
         <p class="note small" id="thermalNote">In light wind scent sinks downhill and along hollows in the evening and at night, and rises uphill in the middle of the day.</p>
 
-        <div id="windManual">
+        <div id="windManual" hidden>
           <h2 class="eyebrow">Adjust by hand</h2>
           <div class="wind-head">
             <svg id="dial" class="dial" viewBox="-110 -110 220 220" role="slider" tabindex="0" aria-label="Wind direction (where the wind comes from)" aria-valuemin="0" aria-valuemax="359" aria-valuenow="225"></svg>
@@ -305,6 +305,26 @@
 
       <!-- FAMILY (hosted site only) -->
       <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
+        <h2 class="eyebrow">Family</h2>
+        <ul class="items" id="familyList"></ul>
+        <form id="lookForm" class="editor" hidden autocomplete="off">
+          <h2 class="eyebrow"><span id="lookName"></span></h2>
+          <label for="lookShort">Name on the map</label>
+          <input id="lookShort" maxlength="20" autocapitalize="words">
+          <label for="lookLetter">Letter on the map</label>
+          <input id="lookLetter" maxlength="2" autocapitalize="characters">
+          <label>Colour</label>
+          <div class="swatches" id="lookColors"></div>
+          <div class="row gap"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" id="lookCancel">Cancel</button></div>
+        </form>
+        <div id="whoBox" hidden>
+          <h2 class="eyebrow">Whose plans to show</h2>
+          <p class="note small">Stands, stalk routes and sightings. Only changes what you see on this phone.</p>
+          <ul class="toggles" id="whoList"></ul>
+        </div>
+        <h2 class="eyebrow">Today's messages</h2>
+        <ul class="items" id="eventList"></ul>
+        <h2 class="eyebrow">Settings</h2>
         <details class="sect" id="pushSect">
           <summary>Notifications</summary>
           <p class="note small">Shots, "need help", "animal near me" and sounds buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:</p>
@@ -331,25 +351,6 @@
           <p class="note small"><b>3. Close and open again:</b> swipe the app or Safari away and open the map again, then tap the position button. Answer Allow when it asks about location.</p>
           <p class="note small">The compass is asked for on the next tap on the map, after the position works.</p>
         </details>
-        <h2 class="eyebrow">Today's messages</h2>
-        <ul class="items" id="eventList"></ul>
-        <h2 class="eyebrow">Family</h2>
-        <ul class="items" id="familyList"></ul>
-        <form id="lookForm" class="editor" hidden autocomplete="off">
-          <h2 class="eyebrow"><span id="lookName"></span></h2>
-          <label for="lookShort">Name on the map</label>
-          <input id="lookShort" maxlength="20" autocapitalize="words">
-          <label for="lookLetter">Letter on the map</label>
-          <input id="lookLetter" maxlength="2" autocapitalize="characters">
-          <label>Colour</label>
-          <div class="swatches" id="lookColors"></div>
-          <div class="row gap"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" id="lookCancel">Cancel</button></div>
-        </form>
-        <div id="whoBox" hidden>
-          <h2 class="eyebrow">Whose plans to show</h2>
-          <p class="note small">Stands, stalk routes and sightings. Only changes what you see on this phone.</p>
-          <ul class="toggles" id="whoList"></ul>
-        </div>
         <form id="memberForm" class="editor" hidden autocomplete="off">
           <h2 class="eyebrow">Add someone</h2>
           <div class="grid2">
@@ -497,12 +498,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=c60bdca1ca"></script>
-<script src="geo.js?v=c60bdca1ca"></script>
-<script src="view.js?v=c60bdca1ca"></script>
-<script src="wind.js?v=c60bdca1ca"></script>
-<script src="jakt.js?v=c60bdca1ca"></script>
-<script src="app.js?v=c60bdca1ca"></script>
+<script src="i18n.js?v=d237bdb476"></script>
+<script src="geo.js?v=d237bdb476"></script>
+<script src="view.js?v=d237bdb476"></script>
+<script src="wind.js?v=d237bdb476"></script>
+<script src="jakt.js?v=d237bdb476"></script>
+<script src="app.js?v=d237bdb476"></script>
 
 </body>
 </html>

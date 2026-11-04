@@ -660,7 +660,14 @@
   };
 
   // Plans (stands, routes, sightings) belong to whoever made them; each person can hide others' plans on their own phone.
-  function planShown(x) { return !(prefs.hideBy || {})[x.by || "?"]; }
+  // Until you choose for yourself: your own plans, the map owner's and today's hunt leader's.
+  function defaultShown(by) {
+    if (!FAMILY || !Family.user || !by || by === "?") return true;
+    if (by === Family.user.email.toLowerCase()) return true;
+    if (Family.members.some((m) => m.email === by && m.role === "owner")) return true;
+    return !!(Day.active() && Day.doc.leader === by);
+  }
+  function planShown(x) { return prefs.hideBy ? !prefs.hideBy[x.by || "?"] : defaultShown(x.by || "?"); }
   function plans(kind) { return Store.data[kind].filter(planShown); }
   function whoName(by) {
     if (!by) return "Unknown";
@@ -675,10 +682,10 @@
     const extra = new Set();
     for (const k of PLAN_KINDS) for (const x of Store.data[k]) if (!known.has(x.by || "?")) extra.add(x.by || "?");
     for (const k of extra) people.push({ key: k, name: k === "?" ? "Made before names were saved" : k.split("@")[0], color: "#8a9384" });
-    const me = Family.user.email.toLowerCase(), hide = prefs.hideBy || {};
+    const me = Family.user.email.toLowerCase(), shown = (key) => (prefs.hideBy ? !prefs.hideBy[key] : defaultShown(key));
     const count = (key) => PLAN_KINDS.reduce((n, k) => n + Store.data[k].filter((x) => (x.by || "?") === key).length, 0);
     box.hidden = people.length < 2;
-    $("#whoList").innerHTML = people.map((p) => `<li><label><input type="checkbox" data-who="${esc(p.key)}"${hide[p.key] ? "" : " checked"}>
+    $("#whoList").innerHTML = people.map((p) => `<li><label><input type="checkbox" data-who="${esc(p.key)}"${shown(p.key) ? " checked" : ""}>
       <span class="sw" style="background:${p.color};border-radius:50%;width:12px;height:12px;margin:0 5px"></span>${esc(p.name)}${p.key === me ? " <span>(you)</span>" : ""} <small>${count(p.key)}</small></label></li>`).join("");
   }
 
@@ -965,6 +972,7 @@
     const now = Date.now();
     Forecast.hours = Forecast.hours.filter((h) => h.t > now - 3600e3).slice(0, 72);
     if (!Forecast.selT || Forecast.selT < now - 3600e3) Forecast.selT = Forecast.hours.length ? Forecast.hours[0].t : null;
+    if (prefs.windMode === "manual" && Forecast.hours.length) prefs.windMode = "forecast";   // no hand-set wind any more
     if (prefs.windMode !== "manual" && Forecast.selT) applyForecastHour(Forecast.selT, false);
     renderForecast();
   }
@@ -2043,7 +2051,10 @@
 
     $("#whoList").addEventListener("change", (e) => {
       const k = e.target.dataset.who; if (!k) return;
-      prefs.hideBy = { ...(prefs.hideBy || {}) };
+      if (!prefs.hideBy) {   // first own choice: start from what the default showed
+        prefs.hideBy = {};
+        for (const box of document.querySelectorAll("#whoList [data-who]")) if (box.dataset.who !== k && !defaultShown(box.dataset.who)) prefs.hideBy[box.dataset.who] = true;
+      } else prefs.hideBy = { ...prefs.hideBy };
       if (e.target.checked) delete prefs.hideBy[k]; else prefs.hideBy[k] = true;
       savePrefs(); renderAll();
     });
