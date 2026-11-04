@@ -648,3 +648,4 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .day-place { font-size: 13px; color: var(--muted); }
 .day-assign li > .btn { white-space: nowrap; }
 
+.ev-marker.ev-sound b, .huntmenu .ev-sound { letter-spacing: -.12em; font-weight: 800; }

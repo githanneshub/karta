@@ -2264,7 +2264,7 @@
       ? `${who(e)}: heard a sound ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
       : `${who(e)}: heard a sound`,
   };
-  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎", sound: "♪" };
+  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎", sound: "))" };
   const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2, sound: 2 };   // how long each kind stays on the map
   const BLINK_MIN = { help: Infinity, animal: Infinity, shot: 15, down: 15, sound: 15 };   // how long a pin blinks
   const Hunt = {
