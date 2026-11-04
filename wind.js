@@ -23,6 +23,21 @@
     });
   }
 
+  function boxBlur(src, W, H, r) {
+    const tmp = new Float32Array(W * H), out = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) { let acc = 0, n = 0;
+      for (let x = -r; x < W + r; x++) {
+        if (x + r < W) { acc += src[y * W + x + r]; n++; }
+        if (x - r - 1 >= 0) { acc -= src[y * W + x - r - 1]; n--; }
+        if (x >= 0 && x < W) tmp[y * W + x] = acc / n; } }
+    for (let x = 0; x < W; x++) { let acc = 0, n = 0;
+      for (let y = -r; y < H + r; y++) {
+        if (y + r < H) { acc += tmp[(y + r) * W + x]; n++; }
+        if (y - r - 1 >= 0) { acc -= tmp[(y - r - 1) * W + x]; n--; }
+        if (y >= 0 && y < H) out[y * W + x] = acc / n; } }
+    return out;
+  }
+
   // A field for one incoming direction ("from", degrees): the two nearest model runs blended.
   function makeField(area, from) {
     const { meta, layers } = area, n = meta.dirs.length, step = 360 / n;
@@ -59,8 +74,47 @@
     },
     field(area, from) {
       area._f = area._f && area._f.from === from ? area._f : makeField(area, from);
-      return area._f;
+      const F = area._f, k = this.thermalK;
+      if (!k || !this.slopes.length) return F;
+      // thermals on top of the wind: + = cold air running downhill, - = warm air rising uphill (in wind-ratio units)
+      return { from, at: (E, N) => { const w = F.at(E, N); if (!w) return w; const d = this.downhill(E, N); return d ? [w[0] + k * d[0], w[1] + k * d[1]] : w; } };
     },
+
+    // ---- thermals: which way is downhill, from the terrain grid (terrain.png, 5 m) ----
+    slopes: [], thermalK: 0,
+    async loadTerrain(urlFor, grids) {
+      for (const g of grids) {
+        try {
+          const img = new Image(); img.crossOrigin = "anonymous"; img.src = urlFor(g.url); await img.decode();
+          const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+          const ctx = c.getContext("2d", { willReadFrequently: true }); ctx.drawImage(img, 0, 0);
+          const px = ctx.getImageData(0, 0, img.width, img.height).data, W = g.width, H = g.height;
+          const z = new Float32Array(W * H), slope = new Float32Array(W * H);
+          for (let i = 0; i < W * H; i++) { z[i] = (px[i * 4] * 256 + px[i * 4 + 1]) / 10; slope[i] = px[i * 4 + 2] / 4; }
+          // smooth over ~30 m so the flow follows slopes and hollows, not every little bump
+          let s = z; for (let p = 0; p < 2; p++) s = boxBlur(s, W, H, 6);
+          const dE = new Float32Array(W * H), dN = new Float32Array(W * H);
+          for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+            const i = y * W + x, gx = (s[i + 1] - s[i - 1]) / (2 * g.cell), gn = (s[i - W] - s[i + W]) / (2 * g.cell);   // rows run north to south
+            const m = Math.hypot(gx, gn); if (m < 1e-6) continue;
+            const w = Math.min(1, Math.atan(m) / rad / 6);   // full strength from about 6 degrees
+            dE[i] = -gx / m * w; dN[i] = -gn / m * w;
+          }
+          this.slopes.push({ ...g, z, slope, dE, dN });
+        } catch { /* no terrain grid for this area */ }
+      }
+      return this.slopes.length > 0;
+    },
+    // unit-ish vector pointing downhill (E, N), weighted by how steep it is; null outside the grids
+    downhill(E, N) {
+      for (const g of this.slopes) {
+        const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
+        if (c < 0 || r < 0 || c >= g.width || r >= g.height) continue;
+        const i = r * g.width + c; return [g.dE[i], g.dN[i]];
+      }
+      return null;
+    },
+    setThermal(k) { if (k !== this.thermalK) { this.thermalK = k; for (const a of this.areas) a._f = null; } },
     // Local wind at a point: { from (deg), ratio } or null outside the model.
     local(lon, lat, from) {
       const [E, N] = Geo.toSweref(lon, lat), a = this.areaAt(E, N);

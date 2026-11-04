@@ -632,3 +632,16 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
   .toolbar { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 8px); }
   .addmenu { top: calc(max(12px, env(safe-area-inset-top, 0px)) + 12px); }
 }
+.ev-marker.ev-sound { --pc: #4dabf7; }
+.ev-marker.ev-sound b { background: #4dabf7; }
+.huntmenu .ev-sound { color: #74c0fc; }
+
+/* hunt day: choosing the way to a stand */
+.day-assign li { flex-wrap: wrap; }
+.route-pick { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; margin: 6px 0 2px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
+.route-from { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.route-from select { flex: 1; min-width: 0; }
+.route-opts { display: flex; flex-direction: column; gap: 6px; }
+.route-opt { justify-content: flex-start; border-left: 6px solid var(--rc); text-align: left; }
+.route-opt b { color: var(--rc); }
+

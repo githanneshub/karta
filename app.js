@@ -346,9 +346,10 @@
     AREAS = manifests.map((m) => ({ id: m.id, name: m.name, bounds: m.bounds }));
     const U = unionBounds();
     // terrain wind (WindNinja) where it has been modelled; straight cones elsewhere
-    window.TerrainWind.load(abs, AREAS.map((a) => a.id)).then((ok) => {
+    window.TerrainWind.load(abs, AREAS.map((a) => a.id)).then(async (ok) => {
       if (!ok) return;
       terrainWind = true; flow = window.TerrainWind.Flow(map);
+      await window.TerrainWind.loadTerrain(abs, manifests.filter((m) => m.terrain).map((m) => m.terrain));
       renderAll(); renderFlow();
     });
 
@@ -365,7 +366,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "routeopts", "dayroutes", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -454,6 +455,16 @@
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
       paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
+    // hunt day: the way each person walks to their stand (their colour), and the suggestions while choosing one
+    map.addLayer({ id: "dayroutes", type: "line", source: "dayroutes", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["get", "color"], "line-width": 2.5, "line-opacity": .85, "line-dasharray": [2, 1.2] } });
+    map.addLayer({ id: "routeopts-case", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#10160f", "line-width": ["case", ["get", "sel"], 9, 6], "line-opacity": .55 } });
+    map.addLayer({ id: "routeopts", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["get", "color"], "line-width": ["case", ["get", "sel"], 5.5, 3.5] } });
+    map.addLayer({ id: "routeopts-label", type: "symbol", source: "routeopts",
+      layout: { "symbol-placement": "line-center", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 13, "text-allow-overlap": true },
+      paint: { "text-color": "#fff", "text-halo-color": ["get", "color"], "text-halo-width": 2.2 } });
     // recorded tracks and blood-tracking marks
     map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
@@ -492,7 +503,7 @@
     // vector layers: one file per area, merged into one map source each
     for (const k of ["osm", "reserves", "drainage", "contours", "gamezones"]) {
       Promise.all(manifests.map((m) => getFresh(`data/${m.id}/${k}.geojson`).catch(() => FC())))
-        .then((parts) => map.getSource(k).setData(FC(parts.flatMap((d) => d.features))));
+        .then((parts) => { vectors[k] = parts.flatMap((d) => d.features); map.getSource(k).setData(FC(vectors[k])); if (k === "osm") Router.base = null; });
     }
     loadInfoGrid();
 
@@ -562,7 +573,7 @@
   const markers = new Map();
 
   function standStatus(s, w = prefs.wind) {
-    if (w.speed < 1) return { cls: "warn", text: "Calm, swirling" };
+    if (w.speed < 1 && !thermal.kind) return { cls: "warn", text: "Calm, swirling" };   // with thermals the air still has a direction
     const down = (localFrom(s.lon, s.lat, w.from) + 180) % 360;
     const d = Geo.angleDiff(down, s.facing);
     if (d <= s.width / 2 + 15) return { cls: "bad", text: "Scent into sector" };
@@ -790,7 +801,28 @@
   }
 
   // ---------- render ----------
+  // Thermals: with little wind, air follows the terrain. After sunset and at night (and the first hour or so after
+  // sunrise) cold air runs downhill and along hollows; once the sun is up and warming the slopes, air rises uphill.
+  // Clouds and rain weaken it, and wind of a few m/s mixes it away. K in m/s; + = downhill, - = uphill.
+  let thermal = { K: 0, k: 0, kind: "" };
+  function updateThermal() {
+    const t = (prefs.windMode !== "manual" && Forecast.selT) || Date.now();
+    const alt = sunAlt(t, HOME[0], HOME[1]), rising = sunAlt(t + 30 * 60e3, HOME[0], HOME[1]) > alt;
+    let K = alt < 0 ? 0.9 : alt < 8 ? (rising ? 0.4 : 0.7) : alt < 15 ? 0 : -0.6;
+    const wx = wxHour(), kind = wx ? wxKind(wx) : "partly";
+    K *= { clear: 1, partly: 0.85, cloud: 0.6, fog: 0.7 }[kind] || 0.35;   // rain, snow, showers: weak
+    K *= clamp(1 - (prefs.wind.speed - 1) / 5, 0, 1);                       // wind mixes it away
+    const k = K / Math.max(prefs.wind.speed, 0.8);
+    thermal = { K, k, kind: Math.abs(K) < 0.15 ? "" : K > 0 ? "down" : "up" };
+    if (window.TerrainWind) window.TerrainWind.setThermal(Math.abs(K) < 0.15 ? 0 : k);
+    const el = $("#thermalNote");
+    if (el) el.textContent = thermal.kind === "down" ? "Thermals now: cold air is running downhill and along the hollows. Scent follows it down."
+      : thermal.kind === "up" ? "Thermals now: the sun warms the slopes and the air rises uphill. Scent drifts up."
+      : "Thermals now: hardly any (too windy, cloudy or the air is turning).";
+  }
+
   function renderAll() {
+    updateThermal();
     if (!map.getSource("sectors")) { renderLists(); renderWind(); return; }
     syncMarkers();
     renderStandGeometry();
@@ -1196,7 +1228,7 @@
     $("#hintUndo").hidden = !multi || !pts.length;
     $("#hintDone").hidden = !multi || pts.length < (tool === "boundary" ? 3 : 2);
     $("#hintDone").textContent = tool === "measure" ? "Clear" : "Finish";
-    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
+    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", sound: "Tap roughly where the sound came from", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
       newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go" }[tool];
     if (pts.length >= 2 && tool !== "boundary") {
       let d = 0; for (let i = 1; i < pts.length; i++) d += Geo.distance(pts[i - 1], pts[i]);
@@ -1262,7 +1294,7 @@
     }
     if (tool === "stand") { newStandAt(e.lngLat); setTool(null); return; }
     if (tool === "sighting") { newSightingAt(e.lngLat); setTool(null); return; }
-    if (tool === "animal") { setTool(null); Hunt.send("animal", [e.lngLat.lng, e.lngLat.lat]); return; }
+    if (tool === "animal" || tool === "sound") { const t = tool; setTool(null); Hunt.send(t, [e.lngLat.lng, e.lngLat.lat]); return; }
     if (tool) { pts.push([e.lngLat.lng, e.lngLat.lat]); updateHint(); updateDraft(); return; }
     if (isPhone() && $("#app").dataset.sheet === "open") { setSheet("peek"); return; }
     const hit = map.queryRenderedFeatures(e.point, { layers: ["sightings"] })[0];
@@ -1376,6 +1408,7 @@
 
   // ---------- tap-to-inspect ----------
   let info = null;   // forest and wetness lookup grids, one per area
+  const vectors = {};   // the map's own line data (OSM roads, tracks and paths), kept for the route planner
   async function loadInfoGrid() {
     const grids = await Promise.all(manifests.map(async (m) => {
       try {
@@ -1807,7 +1840,17 @@
         Day.end();
       }
     });
-    $("#dayCard").addEventListener("change", (e) => { const s = e.target.closest("[data-assign]"); if (s) Day.assign(s.dataset.assign, s.value); });
+    $("#dayCard").addEventListener("change", (e) => {
+      const s = e.target.closest("[data-assign]"); if (s) Day.assign(s.dataset.assign, s.value);
+      const f = e.target.closest("[data-route-from]"); if (f) RoutePick.open(f.dataset.routeFrom, f.value);
+    });
+    $("#dayCard").addEventListener("click", async (e) => {
+      const r = e.target.closest("[data-route]"); if (r) { RoutePick.email === r.dataset.route ? RoutePick.close() : RoutePick.open(r.dataset.route); return; }
+      const p = e.target.closest("[data-route-pick]"); if (p) { RoutePick.choose(+p.dataset.routePick); return; }
+      const n = e.target.closest("[data-route-none]");
+      if (n) { await window.FB.db.doc("map/huntday").update({ routes: { [n.dataset.routeNone]: null } }).catch(() => {}); RoutePick.close(); return; }
+      if (e.target.closest("[data-route-close]")) RoutePick.close();
+    });
     $("#myStandChip").addEventListener("click", () => {
       const st = Store.data.stands.find((x) => x.id === $("#myStandChip").dataset.id); if (!st) return;
       const pos = myPos();
@@ -1818,7 +1861,7 @@
       if (e.target.closest("[data-day]")) { closeHunt(); if (Day.active()) showTab("family", true); else Day.begin(); return; }
       const b = e.target.closest("[data-ev]"); if (!b) return;
       closeHunt();
-      if (b.dataset.ev === "animal") { setTool("animal"); return; }   // first tap where the animal is
+      if (b.dataset.ev === "animal" || b.dataset.ev === "sound") { setTool(b.dataset.ev); return; }   // first tap where the animal (or the sound) is
       Hunt.send(b.dataset.ev);
     });
     document.addEventListener("click", (e) => { if (!hmenu.hidden && !e.target.closest("#huntMenu")) closeHunt(); });
@@ -2201,10 +2244,13 @@
     animal: (e) => Array.isArray(e.from)
       ? `${who(e)}: animal ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
       : `${who(e)}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
+    sound: (e) => Array.isArray(e.from)
+      ? `${who(e)}: heard a sound ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
+      : `${who(e)}: heard a sound`,
   };
-  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎" };
-  const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2 };   // how long each kind stays on the map
-  const BLINK_MIN = { help: Infinity, animal: Infinity, shot: 15, down: 15 };   // how long a pin blinks
+  const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎", sound: "♪" };
+  const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2, sound: 2 };   // how long each kind stays on the map
+  const BLINK_MIN = { help: Infinity, animal: Infinity, shot: 15, down: 15, sound: 15 };   // how long a pin blinks
   const Hunt = {
     events: [], stand: null, checkins: {}, seen: null, markers: new Map(), last: new Map(), blocked: false,
     start(db) {
@@ -2441,9 +2487,9 @@
   // Each person subscribes in the ntfy app to their own secret channel (kept in map/ntfy, readable only by
   // members). A hunt message is sent straight from the map to everyone else's channel, so your own phone stays
   // quiet. ntfy.sh is a free outside service: only the short message text passes through it.
-  const PUSH_TYPES = ["shot", "down", "help", "animal", "daystart", "dayend"];
+  const PUSH_TYPES = ["shot", "down", "help", "animal", "sound", "daystart", "dayend"];
   const NTFY = "https://ntfy.sh/";
-  const NTFY_LOOK = { shot: [4, "boom"], down: [4, "white_check_mark"], help: [5, "rotating_light"], animal: [4, "deer"],
+  const NTFY_LOOK = { shot: [4, "boom"], down: [4, "white_check_mark"], help: [5, "rotating_light"], animal: [4, "deer"], sound: [3, "ear"],
     daystart: [3, "evergreen_tree"], dayend: [3, "checkered_flag"] };
   const Ntfy = {
     topics: {}, loaded: false,
@@ -2483,7 +2529,9 @@
       const dir = typeof e.heading === "number" ? Geo.compassName(e.heading) : "";
       const what = { shot: dir ? `Shot fired toward ${dir}` : "Shot fired", down: "Animal down", help: "Need help!",
         animal: Array.isArray(e.from) ? `Animal ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
-          : dir ? `Animal near me toward ${dir}` : "Animal near me", daystart: "Started the hunt day", dayend: "The hunt is over" }[e.type];
+          : dir ? `Animal near me toward ${dir}` : "Animal near me",
+        sound: Array.isArray(e.from) ? `Heard a sound ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me` : "Heard a sound",
+        daystart: "Started the hunt day", dayend: "The hunt is over" }[e.type];
       const at = e.standName ? `at ${e.standName}` : "";
       for (const [email, topic] of Object.entries(this.topics)) {
         if (email === this.me() || !topic) continue;
@@ -2523,6 +2571,218 @@
     },
   };
 
+  // ---------- route planner: suggested ways to walk to a stand ----------
+  // Least-cost paths on the 5 m terrain grid. Walking cost per cell comes from the slope, the land (fields,
+  // mires, regrowth, thickets, water) and gets much cheaper on our own trails and on tracks and paths. Three kinds:
+  //   fast   the easiest way: least climbing and rough ground, trails and tracks where they help
+  //   quiet  avoids loud ground: dry broadleaf litter, regrowth and dense undergrowth
+  //   wind   keeps your scent out of the stand's sector in the current wind, and doesn't cross the sector itself
+  // A suggestion that comes out almost the same as an earlier one is replaced by a clearly different way.
+  const Router = {
+    base: null, quiet: null, grid: null,
+    build() {
+      const g = window.TerrainWind && window.TerrainWind.slopes[0];
+      if (!g) return false;
+      const inf = info && info.find((x) => x.origin[0] === g.origin[0] && x.origin[1] === g.origin[1] && x.cell === g.cell);
+      const W = g.width, H = g.height, n = W * H, base = new Float32Array(n), quiet = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+        const sl = g.slope[i];
+        let c = 1 + (sl / 12) ** 2 + (sl > 35 ? 25 : 0), q = 0;
+        if (inf) {
+          const code = inf.codes[inf.px[i * 4] - 1], th = inf.px[i * 4 + 2] / 2.5;
+          if (code === 61 || code === 62) c = 1e4;
+          else if (code === 51 || code === 52) c += 30;
+          else if (code === 3) c *= 1.15;
+          else if (code >= 200 && code < 300) c *= 2.2;
+          else if (code === 118 || code === 128) { c *= 2; q += 0.7; }
+          if (code >= 121 && code <= 128) c += 0.3;
+          if ([115, 116, 117, 125, 126, 127].includes(code)) q += 0.6;
+          else if (code === 111 || code === 121) q += 0.2;
+          c *= 1 + th / 60; q += th / 120;
+        }
+        base[i] = c; quiet[i] = q;
+      }
+      // trails and tracks: cheap, and quiet underfoot
+      const burn = (coords, cost) => {
+        for (let k = 1; k < coords.length; k++) {
+          const a = Geo.toSweref(...coords[k - 1]), b = Geo.toSweref(...coords[k]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.ceil(L / 2.5) + 1;
+          for (let t = 0; t <= steps; t++) {
+            const E = a[0] + (b[0] - a[0]) * t / steps, N = a[1] + (b[1] - a[1]) * t / steps;
+            const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
+            if (c < 0 || r < 0 || c >= W || r >= H) continue;
+            const i = r * W + c; if (base[i] < 1e3) { base[i] = Math.min(base[i], cost); quiet[i] = 0; }
+          }
+        }
+      };
+      for (const f of vectors.osm || []) {
+        const kind = f.properties && f.properties.kind;
+        if (f.geometry.type !== "LineString" || !["track", "path", "road", "road_minor", "road_major"].includes(kind)) continue;
+        burn(f.geometry.coordinates, kind === "track" || kind === "path" ? 0.4 : 0.5);
+      }
+      for (const t of Store.data.trails) burn(pairs(t.pts), 0.35);
+      this.grid = g; this.base = base; this.quiet = quiet;
+      return true;
+    },
+    cell(ll) {
+      const g = this.grid, [E, N] = Geo.toSweref(ll[0], ll[1]);
+      const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
+      return c < 0 || r < 0 || c >= g.width || r >= g.height ? -1 : r * g.width + c;
+    },
+    // extra cost for the scent-safe kind: cells whose scent drifts into the stand's sector, and the sector itself
+    windCost(st) {
+      const g = this.grid, W = g.width, H = g.height, out = new Float32Array(W * H);
+      const [sE, sN] = Geo.toSweref(st.lon, st.lat), down = ((localFrom(st.lon, st.lat) + 180) % 360) * Math.PI / 180;
+      const dx = Math.sin(down), dy = Math.cos(down), face = (st.facing || 0) * Math.PI / 180, half = ((st.width || 90) / 2 + 10) * Math.PI / 180;
+      const inSec = (E, N) => {
+        const ex = E - sE, ny = N - sN, d = Math.hypot(ex, ny); if (d < 25 || d > 250) return false;
+        let a = Math.atan2(ex, ny) - face; a = Math.atan2(Math.sin(a), Math.cos(a)); return Math.abs(a) <= half;
+      };
+      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
+        const E = g.origin[0] + (c + 0.5) * g.cell, N = g.origin[1] - (r + 0.5) * g.cell;
+        let x = 0;
+        if (inSec(E, N)) x += 4;
+        for (const t of [40, 90, 150]) if (inSec(E + dx * t, N + dy * t)) { x += 3; break; }
+        out[r * W + c] = x;
+      }
+      return out;
+    },
+    // Dijkstra on 8 neighbours from cell a to cell b with cost per cell cost(i)
+    path(a, b, cost) {
+      const g = this.grid, W = g.width, H = g.height, n = W * H;
+      const dist = new Float32Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n);
+      const heap = [[0, a]]; dist[a] = 0;
+      const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
+      const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0;
+        for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
+      const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
+      while (heap.length) {
+        const [d, i] = pop(); if (done[i]) continue; done[i] = 1; if (i === b) break;
+        const x = i % W, y = (i - x) / W, ci = cost(i);
+        for (const [ox, oy, f] of NB) {
+          const nx = x + ox, ny = y + oy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const j = ny * W + nx; if (done[j]) continue;
+          const nd = d + (ci + cost(j)) / 2 * f * g.cell;
+          if (nd < dist[j]) { dist[j] = nd; prev[j] = i; push(nd, j); }
+        }
+      }
+      if (prev[b] < 0 && a !== b) return null;
+      const cells = []; for (let i = b; i >= 0; i = prev[i]) { cells.push(i); if (i === a) break; }
+      return cells.reverse();
+    },
+    toCoords(cells, from, to) {
+      const g = this.grid, W = g.width;
+      const pts = cells.map((i) => { const c = i % W, r = (i - c) / W; return Geo.fromSweref(g.origin[0] + (c + 0.5) * g.cell, g.origin[1] - (r + 0.5) * g.cell); });
+      pts[0] = from; pts[pts.length - 1] = to;
+      // smooth the staircase a little and drop points that add nothing
+      const sm = pts.map((p, i) => i === 0 || i === pts.length - 1 ? p : [(pts[i - 1][0] + 2 * p[0] + pts[i + 1][0]) / 4, (pts[i - 1][1] + 2 * p[1] + pts[i + 1][1]) / 4]);
+      return simplifyLine(sm, 2.5);
+    },
+    // up to three suggestions from `from` to stand `st`: [{ kind, coords, len, overlap }]
+    suggest(from, st) {
+      if (!this.base && !this.build()) return null;
+      const a = this.cell(from), b = this.cell([st.lon, st.lat]);
+      if (a < 0 || b < 0) return null;
+      const base = this.base, quiet = this.quiet, wind = this.windCost(st), used = new Float32Array(base.length);
+      const kinds = [["fast", (i) => base[i]], ["quiet", (i) => base[i] + 1.6 * quiet[i]], ["wind", (i) => base[i] + wind[i]]];
+      const out = [];
+      for (const [kind, cost] of kinds) {
+        let cells = this.path(a, b, (i) => cost(i) + used[i]);
+        if (!cells) continue;
+        const same = (cs) => out.some((o) => { const set = new Set(o.cells); return cs.filter((i) => set.has(i)).length / cs.length > 0.8; });
+        let label = kind;
+        if (same(cells)) {   // nearly the same way: look for a clearly different one instead
+          for (const o of out) for (const i of o.cells) for (const d of [0, 1, -1, this.grid.width, -this.grid.width]) if (used[i + d] !== undefined) used[i + d] += 4;
+          const alt = this.path(a, b, (i) => cost(i) + used[i]);
+          if (!alt || same(alt)) continue;
+          cells = alt; label = "other";
+        }
+        const coords = this.toCoords(cells, from, [st.lon, st.lat]);
+        let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
+        out.push({ kind: label, cells, coords, len });
+      }
+      return out;
+    },
+  };
+  function simplifyLine(pts, tol) {   // Douglas-Peucker in metres
+    if (pts.length < 3) return pts;
+    const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+    const xy = pts.map((p) => Geo.toSweref(p[0], p[1]));
+    const rec = (i, j) => {
+      let best = -1, bd = tol; const [ax, ay] = xy[i], [bx, by] = xy[j], L = Math.hypot(bx - ax, by - ay) || 1;
+      for (let k = i + 1; k < j; k++) { const d = Math.abs((bx - ax) * (ay - xy[k][1]) - (ax - xy[k][0]) * (by - ay)) / L; if (d > bd) { bd = d; best = k; } }
+      if (best > 0) { keep[best] = 1; rec(i, best); rec(best, j); }
+    };
+    rec(0, pts.length - 1);
+    return pts.filter((_, i) => keep[i]).map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]);
+  }
+  const ROUTE_LOOK = { fast: ["A", "#4dabf7", "Easiest"], quiet: ["B", "#51cf66", "Quietest"], wind: ["C", "#b197fc", "Scent-safe"], other: ["D", "#ffa94d", "Another way"] };
+  // where a walk to a stand starts: the parking or an entrance nearest the stand, or any named place, or where they are
+  function routeStarts(email, st) {
+    const out = [];
+    const places = Store.data.places.slice().sort((p, q) => Geo.distance([p.lon, p.lat], [st.lon, st.lat]) - Geo.distance([q.lon, q.lat], [st.lon, st.lat]));
+    const entry = places.filter((p) => /parker|ingång|grind|bil|start|väg/i.test(p.name || ""));
+    for (const p of [...entry, ...places.filter((p) => !entry.includes(p))]) out.push({ id: "p:" + p.id, name: p.name || "Place", ll: [p.lon, p.lat] });
+    const w = Family.whereIs(email);
+    if (w && w.ll) out.unshift({ id: "here", name: tr(`Where ${Family.nameFor(email)} is now`), ll: w.ll });
+    return out;
+  }
+  // the chooser in the hunt-day card: one person at a time
+  const RoutePick = {
+    email: null, start: null, opts: [], sel: -1,
+    open(email, startId) {
+      const sid = (Day.doc.assign || {})[email], st = Store.data.stands.find((x) => x.id === sid);
+      if (!st) return;
+      const starts = routeStarts(email, st);
+      if (!starts.length) { toast("Add a place first (e.g. Parkering) to start the walk from."); return; }
+      this.email = email; this.start = starts.find((x) => x.id === startId) || (startId === undefined && starts.find((x) => x.id !== "here")) || starts[0];
+      this.opts = Router.suggest(this.start.ll, st) || [];
+      this.sel = -1;
+      if (!this.opts.length) toast("Couldn't find a way there from that start.");
+      this.draw();
+      const all = this.opts.flatMap((o) => o.coords);
+      if (all.length) {
+        const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
+        const bottom = isPhone() ? Math.round(innerHeight - $("#panel").getBoundingClientRect().top) + 20 : 60;
+        map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 90, left: 40, right: 70, bottom }, maxZoom: 17 });
+      }
+      Day.render();
+    },
+    draw() {
+      const src = map.getSource("routeopts"); if (!src) return;
+      src.setData(FC(this.opts.map((o, i) => { const [l, color] = ROUTE_LOOK[o.kind];
+        return { type: "Feature", properties: { color, sel: i === this.sel, label: `${l} · ${Math.round(o.len)} m` }, geometry: { type: "LineString", coordinates: o.coords } }; })));
+    },
+    close() { this.email = null; this.opts = []; const src = map.getSource("routeopts"); if (src) src.setData(FC()); Day.render(); },
+    async choose(i) {
+      const o = this.opts[i], email = this.email; if (!o) return;
+      this.sel = i; this.draw();
+      // not awaited: offline the save waits for signal, but shows on this phone right away
+      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name } } })
+        .catch(() => toast("Couldn't save. Check your connection."));
+      toast(tr(`Route saved for ${Family.nameFor(email)}`));
+      this.close();
+    },
+    html(email) {
+      if (this.email !== email) return "";
+      const startOpts = routeStarts(email, Store.data.stands.find((x) => x.id === (Day.doc.assign || {})[email]) || {}).map((s) =>
+        `<option value="${esc(s.id)}"${s.id === this.start.id ? " selected" : ""}>${esc(s.name)}</option>`).join("");
+      return `<div class="route-pick">
+          <label class="route-from"><span>From</span> <select data-route-from="${esc(email)}">${startOpts}</select></label>
+          <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = ROUTE_LOOK[o.kind];
+            return `<button type="button" class="btn small route-opt" data-route-pick="${i}" style="--rc:${color}"><b>${l}</b> <span>${esc(tr(name))}</span> · ${Math.round(o.len)} m</button>`; }).join("")}</div>
+          <p class="note small">Tap the way ${esc(Family.nameFor(email))} says they will walk. The lines are on the map.</p>
+          <div class="row gap"><button type="button" class="btn small ghost" data-route-none="${esc(email)}">No route</button><button type="button" class="btn small ghost" data-route-close>Close</button></div>
+        </div>`;
+    },
+  };
+  // everyone's chosen way on a hunt day, in their colour
+  function renderDayRoutes() {
+    const src = map.getSource("dayroutes"); if (!src) return;
+    const r = FAMILY && Day.active() && Day.doc.routes ? Day.doc.routes : {};
+    src.setData(FC(Object.entries(r).filter(([email, v]) => v && v.pts && v.pts.length >= 4 && (Day.doc.assign || {})[email] && email !== (Family.user && Family.user.email.toLowerCase()))
+      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }))));
+  }
+
   // ---------- hunt day: leader, who sits where, start and end, summary ----------
   // Stored in map/huntday (the map collection is open to every member, so no new rules are needed);
   // finished days are kept as summaries in days/<start time>.
@@ -2532,7 +2792,7 @@
       db.doc("map/huntday").onSnapshot((snap) => {
         const was = this.active();
         this.doc = snap.exists ? snap.data() : null;
-        this.render(); syncMarkers(); Hunt.checkSafety(); renderGoto();
+        this.render(); syncMarkers(); Hunt.checkSafety(); renderGoto(); renderDayRoutes();
         if (!was && this.active() && this.myStand() && this.doc.leader !== Family.user.email.toLowerCase()) {
           const st = Store.data.stands.find((x) => x.id === this.myStand());
           if (st) toast(tr(`Your stand today: ${st.name || "Stand"}`), 7000);
@@ -2561,7 +2821,9 @@
       showTab("family", true);
     },
     async assign(email, standId) {
-      await window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" } }).catch(() => toast("Couldn't save. Check your connection."));
+      // a new stand means the old route no longer fits
+      window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
+      if (standId && this.canLead()) setTimeout(() => RoutePick.open(email), 200);   // straight on to choosing the way there
     },
     async end() {
       const d = this.doc; if (!d) return;
@@ -2589,9 +2851,13 @@
         h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
           const cur = (d.assign || {})[m.email] || "";
           const opts = `<option value="">–</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
+          const rt = (d.routes || {})[m.email], hasRoute = cur && rt && rt.pts;
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
-            <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div></span>
-            <select data-assign="${esc(m.email)}"${lead ? "" : " disabled"} aria-label="Stand">${opts}</select></li>`;
+            <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
+              ${hasRoute ? `<div class="it-sub">${esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`))}</div>` : ""}</span>
+            <select data-assign="${esc(m.email)}"${lead ? "" : " disabled"} aria-label="Stand">${opts}</select>
+            ${lead && cur ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : ""}
+            ${RoutePick.html(m.email)}</li>`;
         }).join("") + `</ul>`;
         if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
       } else {
@@ -2624,6 +2890,8 @@
     const pos = myPos(), near = pos && Geo.distance(pos.ll, [st.lon, st.lat]);
     chip.textContent = tr(`Your stand: ${st.name || "Stand"}`) + (pos ? ` · ${Math.round(near)} m ${Geo.compassName(Geo.bearing(pos.ll, [st.lon, st.lat]))}` : "");
     chip.dataset.id = st.id;
+    const rt = Day.doc && Day.doc.routes && Day.doc.routes[Family.user.email.toLowerCase()];
+    if (rt && rt.pts && rt.pts.length >= 4) { if (src) src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: pairs(rt.pts) } }])); return; }   // the agreed way
     if (src) src.setData(FC(pos && near > 30 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [pos.ll, [st.lon, st.lat]] } }] : []));
   }
 

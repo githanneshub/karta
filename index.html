@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "e8fe422056";</script>
-<script src="firebase-config.js?v=e8fe422056"></script>
-<script type="module" src="fb.js?v=e8fe422056"></script>
+<script>window.APP_VERSION = "11d76f48cc";</script>
+<script src="firebase-config.js?v=11d76f48cc"></script>
+<script type="module" src="fb.js?v=11d76f48cc"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=e8fe422056">
-<link rel="stylesheet" href="app.css?v=e8fe422056">
+<link rel="stylesheet" href="maplibre-gl.css?v=11d76f48cc">
+<link rel="stylesheet" href="app.css?v=11d76f48cc">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -174,7 +174,7 @@
           <h2 class="eyebrow">Best stands</h2>
           <div id="bestList"></div>
         </div>
-        <p class="note small">In light wind scent sinks downhill and along hollows in the evening and at night, and rises uphill in the middle of the day.</p>
+        <p class="note small" id="thermalNote">In light wind scent sinks downhill and along hollows in the evening and at night, and rises uphill in the middle of the day.</p>
 
         <div id="windManual">
           <h2 class="eyebrow">Adjust by hand</h2>
@@ -390,6 +390,7 @@
       <button type="button" role="menuitem" data-ev="onstand" id="huntOn"><span class="ev-ico">◉</span>On my stand</button>
       <button type="button" role="menuitem" data-ev="offstand" id="huntOff" hidden><span class="ev-ico">○</span>Leaving my stand</button>
       <button type="button" role="menuitem" data-ev="animal"><span class="ev-ico ev-animal">◎</span>Animal near me</button>
+      <button type="button" role="menuitem" data-ev="sound"><span class="ev-ico ev-sound">♪</span>Heard a sound</button>
       <button type="button" role="menuitem" data-ev="shot"><span class="ev-ico ev-shot">✛</span>Shot fired</button>
       <button type="button" role="menuitem" data-ev="down"><span class="ev-ico ev-down">✔</span>Animal down</button>
       <button type="button" role="menuitem" data-ev="help"><span class="ev-ico ev-help">!</span>Need help</button>
@@ -493,12 +494,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=e8fe422056"></script>
-<script src="geo.js?v=e8fe422056"></script>
-<script src="view.js?v=e8fe422056"></script>
-<script src="wind.js?v=e8fe422056"></script>
-<script src="jakt.js?v=e8fe422056"></script>
-<script src="app.js?v=e8fe422056"></script>
+<script src="i18n.js?v=11d76f48cc"></script>
+<script src="geo.js?v=11d76f48cc"></script>
+<script src="view.js?v=11d76f48cc"></script>
+<script src="wind.js?v=11d76f48cc"></script>
+<script src="jakt.js?v=11d76f48cc"></script>
+<script src="app.js?v=11d76f48cc"></script>
 
 </body>
 </html>
