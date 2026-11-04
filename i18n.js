@@ -262,6 +262,7 @@
     [/^Shot fired toward ([A-Z]{1,3})$/, (m, a) => `Skott mot ${C(a)}`],
     [/^Animal (\d+) m ([A-Z]{1,3}) of me$/, (m, a, b) => `Djur ${a} m ${C(b)} om mig`],
     [/^Where (.+) is now$/, (m, a) => `Där ${a} är nu`],
+    [/^Scent goes ([A-Z]{1,3})$/, (m, a) => `Vittring mot ${C(a)}`],
     [/^(.+)'s stand$/, (m, a) => `${/[sxz]$/i.test(a) ? a : a + "s"} pass`],
     [/^Route saved for (.+)$/, (m, a) => `Väg sparad för ${a}`],
     [/^Walks from (.+), (\d+) m$/, (m, a, b) => `Går från ${a}, ${b} m`],

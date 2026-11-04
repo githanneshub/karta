@@ -8,16 +8,27 @@
   const SPECIES = [
     // klövvilt
     { n: "Älg", en: "moose elk", g: "Klövvilt", light: HOOF, p: [["10-08", "01-31"]],
+      cats: [{ n: "Tjur", p: [["10-08", "01-31"]] }, { n: "Ko", p: [["10-08", "01-31"]] }, { n: "Kalv", p: [["10-08", "01-31"]] }],
+      today: "Bara enligt tilldelning i licens- eller älgskötselområde.",
       note: "Jakt på vuxna djur kräver licens- eller älgskötselområde med tilldelning. Utanför sådana områden: bara kalv, i fem dagar från 8 okt." },
-    { n: "Rådjur", en: "roe deer", g: "Klövvilt", light: HOOF, p: [["10-01", "01-31"]], sub: [
+    { n: "Rådjur", en: "roe deer", g: "Klövvilt", light: HOOF, p: [["10-01", "01-31"]],
+      cats: [{ n: "Bock", p: [["10-01", "01-31"], ["08-16", "09-30", SV], ["05-01", "06-15", SV]] }, { n: "Get", p: [["10-01", "01-31"]] },
+        { n: "Kid", p: [["10-01", "01-31"], ["09-01", "09-30", SV]] }], sub: [
       { n: "bock (hornbärande)", p: [["08-16", "09-30", SV], ["05-01", "06-15", SV]] },
       { n: "kid", p: [["09-01", "09-30", SV]] }] },
-    { n: "Vildsvin", en: "wild boar pig", g: "Klövvilt", p: [["04-01", "01-31"]], note: "Inte sugga som följs av randiga eller bruna små kultingar.", sub: [
+    { n: "Vildsvin", en: "wild boar pig", g: "Klövvilt", p: [["04-01", "01-31"]], note: "Inte sugga som följs av randiga eller bruna små kultingar.",
+      cats: [{ n: "Galt", p: [["04-01", "01-31"]] }, { n: "Sugga", p: [["04-01", "01-31"]], note: "inte med små randiga eller bruna kultingar" }, { n: "Årsunge", p: [["07-01", "06-30"]] }], sub: [
       { n: "årsunge", p: [["07-01", "06-30"]] }] },
-    { n: "Dovhjort", en: "fallow deer", g: "Klövvilt", light: HOOF, p: [["10-01", "10-20"], ["11-16", "02-29"]], sub: [
+    { n: "Dovhjort", en: "fallow deer", g: "Klövvilt", light: HOOF, p: [["10-01", "10-20"], ["11-16", "02-29"]],
+      cats: [{ n: "Hjort", p: [["10-01", "10-20"], ["11-16", "02-29"], ["09-01", "09-30", SV]] },
+        { n: "Hind", p: [["10-01", "10-20"], ["10-21", "11-15"], ["11-16", "02-29"], ["03-01", "03-31", SV]] },
+        { n: "Kalv", p: [["10-01", "10-20"], ["10-21", "11-15"], ["11-16", "02-29"], ["09-01", "09-30", SV], ["03-01", "03-31", SV]] }], sub: [
       { n: "hornbärande djur och kalv", p: [["09-01", "09-30", SV]] },
       { n: "hind och kalv", p: [["10-21", "11-15"], ["03-01", "03-31", SV]] }] },
-    { n: "Kronhjort", en: "red deer", g: "Klövvilt", light: HOOF, p: [], note: "Utanför kronhjortsskötselområde bara årskalv. Vuxna djur: inom kronhjortsskötselområde.", sub: [
+    { n: "Kronhjort", en: "red deer", g: "Klövvilt", light: HOOF, p: [], note: "Utanför kronhjortsskötselområde bara årskalv. Vuxna djur: inom kronhjortsskötselområde.",
+      cats: [{ n: "Årskalv", p: [["08-16", "09-30", SV], ["10-01", "01-31"]] },
+        { n: "Hjort", p: [["10-08", "01-31"]], area: true }, { n: "Hind", p: [["08-16", "09-30", SV], ["10-01", "01-31"], ["02-01", "02-29", SV]], area: true }],
+      today: "Hjort och hind bara inom kronhjortsskötselområde.", sub: [
       { n: "årskalv", p: [["08-16", "09-30", SV], ["10-01", "01-31"]] },
       { n: "hjort, i kronhjortsskötselområde", p: [["10-08", "01-31"]] },
       { n: "hind och årskalv, i kronhjortsskötselområde", p: [["08-16", "09-30", SV], ["10-01", "01-31"], ["02-01", "02-29", SV]] }] },
@@ -95,6 +106,22 @@
     }
     return { open: false, next };
   }
-  root.Jakttider = { SPECIES, status, periodText, label, SV, HOOF, FOWL,
+  // open today for one kind of animal: { open, only (smyg/vakt only), until (end of the open period), next (start when closed) }
+  function catStatus(cat, date) {
+    const now = cat.p.filter((p) => inPeriod(p, date));
+    if (now.length) {
+      const full = now.find((p) => !p[2]);
+      // follow on through periods that start the next day (hind: 21 okt-15 nov, then 16 nov-28 feb)
+      let until = (full || now[0])[1];
+      for (let k = 0; k < 4; k++) {
+        const e = md(until), next = new Date(2001, e.m - 1, e.d + (e.m === 2 && e.d === 29 ? 0 : 1)), key = `${String(next.getMonth() + 1).padStart(2, "0")}-${String(next.getDate()).padStart(2, "0")}`;
+        const cont = cat.p.find((p) => p[0] === key && !!p[2] === !full);
+        if (!cont) break; until = cont[1];
+      }
+      return { open: true, only: !full, until };
+    }
+    return { open: false, next: status({ p: cat.p }, date).next };
+  }
+  root.Jakttider = { SPECIES, status, catStatus, periodText, label, SV, HOOF, FOWL,
     source: "Jaktförordningen (1987:905) bilaga 1–4, ändrad t.o.m. SFS 2026:1693. Gäller till 30 juni 2027." };
 })(window);

@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "ee015a39b7";</script>
-<script src="firebase-config.js?v=ee015a39b7"></script>
-<script type="module" src="fb.js?v=ee015a39b7"></script>
+<script>window.APP_VERSION = "f77fff6b13";</script>
+<script src="firebase-config.js?v=f77fff6b13"></script>
+<script type="module" src="fb.js?v=f77fff6b13"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=ee015a39b7">
-<link rel="stylesheet" href="app.css?v=ee015a39b7">
+<link rel="stylesheet" href="maplibre-gl.css?v=f77fff6b13">
+<link rel="stylesheet" href="app.css?v=f77fff6b13">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -205,19 +205,21 @@
             </div>
             <div>
               <label for="sf-height">Seat height (m)</label>
-              <input id="sf-height" type="number" min="0" max="12" step="0.5" value="3">
+              <input id="sf-height" type="number" min="0" max="12" step="0.5" value="1">
             </div>
           </div>
+          <div hidden>
           <label class="slider" for="sf-facing">Facing <output id="sf-facingOut">N</output></label>
           <input type="range" id="sf-facing" min="0" max="355" step="5" value="0">
           <label class="slider" for="sf-width">Shooting sector <output id="sf-widthOut">90°</output></label>
           <input type="range" id="sf-width" min="20" max="240" step="5" value="90">
           <label class="slider" for="sf-range">Max shooting distance <output id="sf-rangeOut">120 m</output></label>
           <input type="range" id="sf-range" min="30" max="300" step="10" value="120">
+          </div>
           <div class="viewbox">
             <label class="switch"><input type="checkbox" id="sf-showView" checked><span>Show what I can see from here</span></label>
             <div class="view-legend" id="sf-viewLegend">
-              <label for="sf-target" class="vl-target">Looking for
+              <label for="sf-target" class="vl-target" hidden>Looking for
                 <select id="sf-target">
                   <option value="0.8">roe deer, boar</option>
                   <option value="1.2">fallow, red deer</option>
@@ -292,7 +294,9 @@
 
       <!-- SEASONS: hunting seasons and shooting light in Blekinge (written in Swedish, it is Swedish law) -->
       <section class="pane" id="pane-seasons" role="tabpanel" aria-labelledby="tab-seasons" hidden translate="no">
+        <div class="today-card" id="todayCard"></div>
         <div class="light-card" id="lightCard"></div>
+        <h2 class="eyebrow">Alla jakttider</h2>
         <input type="search" id="seasonSearch" placeholder="Sök art, t.ex. rådjur" autocomplete="off" enterkeyhint="search">
         <label class="switch season-open"><input type="checkbox" id="seasonOpen"><span>Bara de med jakt i dag</span></label>
         <div id="seasonList"></div>
@@ -493,12 +497,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=ee015a39b7"></script>
-<script src="geo.js?v=ee015a39b7"></script>
-<script src="view.js?v=ee015a39b7"></script>
-<script src="wind.js?v=ee015a39b7"></script>
-<script src="jakt.js?v=ee015a39b7"></script>
-<script src="app.js?v=ee015a39b7"></script>
+<script src="i18n.js?v=f77fff6b13"></script>
+<script src="geo.js?v=f77fff6b13"></script>
+<script src="view.js?v=f77fff6b13"></script>
+<script src="wind.js?v=f77fff6b13"></script>
+<script src="jakt.js?v=f77fff6b13"></script>
+<script src="app.js?v=f77fff6b13"></script>
 
 </body>
 </html>

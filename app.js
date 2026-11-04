@@ -580,6 +580,7 @@
   function standStatus(s, w = prefs.wind) {
     if (w.speed < 1 && !thermal.kind) return { cls: "warn", text: "Calm, swirling" };   // with thermals the air still has a direction
     const down = (localFrom(s.lon, s.lat, w.from) + 180) % 360;
+    if (typeof s.facing !== "number") return { cls: "", text: `Scent goes ${Geo.compassName(down)}` };   // no shooting direction set
     const d = Geo.angleDiff(down, s.facing);
     if (d <= s.width / 2 + 15) return { cls: "bad", text: "Scent into sector" };
     if (d <= 100) return { cls: "warn", text: "Side wind" };
@@ -616,7 +617,7 @@
         const timeOk = xh === null || Math.min(Math.abs(xh - hour), 24 - Math.abs(xh - hour)) <= 2;
         if (timeOk && (!xw || near8.has(xw))) similar += x.count || 1;
       }
-      const score = (ws.cls === "good" ? 3 : ws.cls === "warn" ? 1 : -3) + Math.min(similar, 10) * 0.6 + Math.min(seen, 10) * 0.1;
+      const score = (ws.cls === "good" ? 3 : ws.cls === "warn" ? 1 : ws.cls === "bad" ? -3 : 1) + Math.min(similar, 10) * 0.6 + Math.min(seen, 10) * 0.1;   // no direction set: neutral
       return { st, ws, seen, similar, score };
     }).sort((a, b) => b.score - a.score);
   }
@@ -720,7 +721,7 @@
   function renderStandGeometry() {
     if (!map.getSource("sectors")) return;
     const stands = allStands();
-    map.getSource("sectors").setData(FC(stands.map((s) => ({
+    map.getSource("sectors").setData(FC(stands.filter((s) => typeof s.facing === "number").map((s) => ({
       type: "Feature", properties: { color: STATUS_COLORS[standStatus(s).cls] },
       geometry: { type: "Polygon", coordinates: [Geo.wedge([s.lon, s.lat], s.facing, s.width / 2, s.range)] },
     }))));
@@ -749,7 +750,7 @@
   }
 
   function newStandAt(lngLat) {
-    draftStand = { id: newId("st"), name: "", type: "tower", height: 3, facing: Math.round(prefs.wind.from / 5) * 5 % 360, width: 90, range: 120, winds: [], notes: "",
+    draftStand = { id: newId("st"), name: "", type: "ground", height: 1, facing: null, width: 360, range: 150, winds: [], notes: "",
       lon: lngLat.lng, lat: lngLat.lat, isNew: true };
     openStandForm();
   }
@@ -786,7 +787,7 @@
   function readStandForm() {
     Object.assign(draftStand, {
       name: $("#sf-name").value.trim(), type: $("#sf-type").value, height: +$("#sf-height").value || 0,
-      facing: +$("#sf-facing").value, width: +$("#sf-width").value, range: +$("#sf-range").value, notes: $("#sf-notes").value.trim(),
+      notes: $("#sf-notes").value.trim(),   // no direction, sector or range to fill in: what you see from the stand counts all round
     });
   }
   function closeStandForm() { draftStand = null; $("#standForm").hidden = true; renderAll(); }
@@ -869,7 +870,7 @@
       const st = standStatus(s);
       return `<li data-id="${esc(s.id)}"><span class="dot" style="background:${STATUS_COLORS[st.cls]}"></span>
         <span class="it-main"><div class="it-name">${esc(s.name || "Unnamed stand")}</div>
-        <div class="it-sub">${esc(STAND_TYPES[s.type] || "")} · faces ${Geo.compassName(s.facing)} · ${s.range} m${whoTag(s)}</div></span>
+        <div class="it-sub">${esc(STAND_TYPES[s.type] || "")}${typeof s.facing === "number" ? ` · faces ${Geo.compassName(s.facing)}` : ""} · ${+s.height || 0} m${whoTag(s)}</div></span>
         <span class="pill ${st.cls}">${st.text}</span></li>`;
     }).join("") : `<li class="empty">No stands yet. Add one with +.</li>`;
 
@@ -1527,7 +1528,7 @@
     const ground = await groundSampler(s.lon, s.lat, radius);
     if (seq !== viewSeq || draftStand !== s) return;
     const res = Viewshed.compute({
-      lon: s.lon, lat: s.lat, eye: (+s.height || 0) + 1.1, target, radius, range: s.range, facing: s.facing, width: s.width,
+      lon: s.lon, lat: s.lat, eye: (+s.height || 0) + 1.1, target, radius, range: s.range || 150, facing: typeof s.facing === "number" ? s.facing : 0, width: typeof s.facing === "number" ? s.width : 360,
       sample: (lo, la) => { const v = vegetation(lo, la); return { z: ground(lo, la), veg: v.veg, rate: v.rate }; },
     });
     if (seq !== viewSeq) return;
@@ -2228,6 +2229,22 @@
         <div class="lc-row"><b>Ingen gräns</b><span>Övrigt vilt, t.ex. vildsvin och räv.</span></div>
         <div class="lc-sun">Sol upp ${hm(sun.up)} · ned ${hm(sun.down)}</div>`;
     }
+    // what may be shot today, per kind of animal (bock, get, kid, tjur, ko, kalv, hjort, hind…)
+    const day = now.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+    const big = J.SPECIES.filter((sp) => sp.cats).map((sp) => {
+      const chips = sp.cats.map((c) => {
+        const st = J.catStatus(c, now), star = c.area ? "*" : "";
+        if (!st.open) return `<span class="td-cat no"><s>${esc(c.n)}${star}</s><small>från ${esc(J.label(st.next))}</small></span>`;
+        return `<span class="td-cat ${st.only ? "sv" : "ok"}">${esc(c.n)}${star}<small>${st.only ? "smyg/vakt · " : ""}t.o.m. ${esc(J.label(st.until))}</small></span>`;
+      }).join("");
+      const notes = [sp.today, ...sp.cats.filter((c) => c.note && J.catStatus(c, now).open).map((c) => `${c.n}: ${c.note}`)].filter(Boolean);
+      return `<div class="td-sp"><b>${esc(sp.n)}</b><div class="td-cats">${chips}</div>${notes.map((x) => `<div class="td-note">${esc(x)}</div>`).join("")}</div>`;
+    }).join("");
+    const small = J.SPECIES.filter((sp) => !sp.cats && J.status(sp, now).open && !/hela året/i.test((sp.p[0] && J.periodText(sp.p[0])) || ""));
+    $("#todayCard").innerHTML = `<h2 class="eyebrow">Får jagas i dag · ${esc(day)}</h2>${big}
+      ${small.length ? `<div class="td-sp"><b>Småvilt och fågel</b><div class="td-cats">${small.map((sp) => `<span class="td-cat ok">${esc(sp.n)}</span>`).join("")}</div></div>` : ""}
+      <div class="td-legend"><span class="td-cat ok">Öppet</span><span class="td-cat sv">Bara smyg- eller vaktjakt</span><span class="td-cat no">Stängt</span>${big.includes("*") ? "<span>* inom kronhjortsskötselområde</span>" : ""}</div>`;
+
     const q = $("#seasonSearch").value.trim().toLowerCase(), onlyOpen = $("#seasonOpen").checked;
     const rows = J.SPECIES.map((sp) => ({ sp, st: J.status(sp, now) }))
       // match the start of any word in the name, English name or group ("råd" finds rådjur, not "område")
@@ -2393,6 +2410,7 @@
     // A person inside a shooting sector (stand facing ± half the width, out to SAFETY_RANGE): warn both sides.
     inSector(stand, ll) {
       const d = Geo.distance([stand.lon, stand.lat], ll);
+      if (typeof stand.facing !== "number") return false;   // no shooting direction set for this stand
       return d > 8 && d < SAFETY_RANGE && Geo.angleDiff(Geo.bearing([stand.lon, stand.lat], ll), stand.facing) <= (stand.width || 90) / 2;
     },
     checkSafety() {
