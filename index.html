@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "ac308e79ae";</script>
-<script src="firebase-config.js?v=ac308e79ae"></script>
-<script type="module" src="fb.js?v=ac308e79ae"></script>
+<script>window.APP_VERSION = "706d4532d9";</script>
+<script src="firebase-config.js?v=706d4532d9"></script>
+<script type="module" src="fb.js?v=706d4532d9"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=ac308e79ae">
-<link rel="stylesheet" href="app.css?v=ac308e79ae">
+<link rel="stylesheet" href="maplibre-gl.css?v=706d4532d9">
+<link rel="stylesheet" href="app.css?v=706d4532d9">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -237,7 +237,7 @@
             <button class="btn danger" type="button" id="sf-delete">Delete</button>
           </div>
         </form>
-        <h2 class="eyebrow">Stands</h2>
+        <div class="row-head"><h2 class="eyebrow">Stands</h2><button class="btn primary small" type="button" id="placeStandBtn">Place a stand</button></div>
         <ul class="items" id="standList"></ul>
         <h2 class="eyebrow">Stalk routes</h2>
         <ul class="items" id="routeList"></ul>
@@ -455,8 +455,8 @@
       <b id="mapLegendTitle">What you can see from the stand</b>
       <span><i class="vl-ok"></i>No colour: you can see it, a miss hits the ground</span>
       <span><i class="vl-open"></i>Yellow stripes: you can see it, but a miss flies on</span>
-      <span><i class="vl-dead"></i>Purple stripes: hidden behind a hill or in a hollow</span>
-      <span><i class="vl-veg"></i>Dark: hidden by thick forest</span>
+      <span><i class="vl-dead"></i>Purple: hidden behind a hill or in a hollow</span>
+      <span><i class="vl-veg"></i>Grey-purple: hidden by thick forest</span>
     </div>
     <div id="readout" class="readout" aria-live="polite"></div>
     <div id="toast" class="toast" role="status" hidden></div>
@@ -497,12 +497,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=ac308e79ae"></script>
-<script src="geo.js?v=ac308e79ae"></script>
-<script src="view.js?v=ac308e79ae"></script>
-<script src="wind.js?v=ac308e79ae"></script>
-<script src="jakt.js?v=ac308e79ae"></script>
-<script src="app.js?v=ac308e79ae"></script>
+<script src="i18n.js?v=706d4532d9"></script>
+<script src="geo.js?v=706d4532d9"></script>
+<script src="view.js?v=706d4532d9"></script>
+<script src="wind.js?v=706d4532d9"></script>
+<script src="jakt.js?v=706d4532d9"></script>
+<script src="app.js?v=706d4532d9"></script>
 
 </body>
 </html>

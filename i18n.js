@@ -69,7 +69,7 @@
     "Show what I can see from here": "Visa vad jag ser härifrån", "Looking for": "Letar efter", "roe deer, boar": "rådjur, vildsvin", "fallow, red deer": "dovhjort, kronhjort",
     "moose": "älg", "No colour: you can see it, a miss hits the ground": "Ingen färg: syns, en bom tas av marken",
     "Yellow stripes: you can see it, but a miss flies on": "Gula ränder: syns, men en bom flyger vidare",
-    "Purple stripes: hidden behind a hill or in a hollow": "Lila ränder: dolt bakom en höjd eller i en sänka", "Dark: hidden by thick forest": "Mörkt: dolt av tät skog",
+    "Purple: hidden behind a hill or in a hollow": "Lila: dolt bakom en höjd eller i en sänka", "Grey-purple: hidden by thick forest": "Gråljuslila: dolt av tät skog",
     "Notes": "Anteckningar",
     "Approach from the track, sit before 16:00…": "Gå in från traktorvägen, sitt på plats före 16:00…", "Save stand": "Spara pass",
     "Stalk routes": "Smygrutter", "Stalk route": "Smygrutt",

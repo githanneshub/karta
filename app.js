@@ -453,11 +453,18 @@
     map.addLayer({ id: "routes-label", type: "symbol", source: "routes", filter: ["has", "label"], minzoom: 14,
       layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "symbol-spacing": 300, "text-max-angle": 35, "text-offset": [0, -1.1] },
       paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
-    map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
-      paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
+    map.addLayer({ id: "goto-case", type: "line", source: "goto", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#10160f", "line-width": 6, "line-opacity": .6 } });
+    map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
     // hunt day: the way each person walks to their stand (their colour), and the suggestions while choosing one
+    map.addLayer({ id: "dayroutes-case", type: "line", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#10160f", "line-width": 5.5, "line-opacity": .55 } });
     map.addLayer({ id: "dayroutes", type: "line", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["get", "color"], "line-width": 2.5, "line-opacity": .85, "line-dasharray": [2, 1.2] } });
+      paint: { "line-color": ["get", "color"], "line-width": 3, "line-dasharray": [2, 1.2] } });
+    map.addLayer({ id: "dayroutes-label", type: "symbol", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"],
+      layout: { "symbol-placement": "line", "symbol-spacing": 220, "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "text-offset": [0, -1] },
+      paint: { "text-color": "#fff", "text-halo-color": ["get", "color"], "text-halo-width": 2 } });
     map.addLayer({ id: "dayspots", type: "circle", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
       paint: { "circle-radius": 9, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
     map.addLayer({ id: "dayspots-label", type: "symbol", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
@@ -469,7 +476,7 @@
       paint: { "line-color": ["get", "color"], "line-width": ["case", ["get", "sel"], 5.5, 3.5] } });
     map.addLayer({ id: "routeopts-label", type: "symbol", source: "routeopts",
       layout: { "symbol-placement": "line-center", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 13, "text-allow-overlap": true },
-      paint: { "text-color": "#fff", "text-halo-color": ["get", "color"], "text-halo-width": 2.2 } });
+      paint: { "text-color": ["case", ["==", ["get", "color"], "#ffffff"], "#10160f", "#fff"], "text-halo-color": ["case", ["==", ["get", "color"], "#ffffff"], "#fff", ["get", "color"]], "text-halo-width": 2.2 } });
     // recorded tracks and blood-tracking marks
     map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
@@ -1519,7 +1526,8 @@
   async function updateView() {
     const s = draftStand;
     if (!s || !prefs.view || !info || !map.getSource("sectors")) { hideView(); return; }
-    const radius = clamp(Math.round(s.range * 1.6), 150, 320), target = prefs.target;
+    // how far you can sensibly see from it grows with the seat height: ~100 m from the ground, up to 200 m from a tower
+    const radius = clamp(Math.round(75 + (+s.height || 0) * 25), 100, 200), target = prefs.target;
     const key = [s.lon, s.lat, s.height, s.range, s.facing, s.width, target].join("|");
     if (key === viewKey) return;
     viewKey = key;
@@ -1829,6 +1837,8 @@
       closePopups(); hmenu.hidden = !open; $("#huntBtn").setAttribute("aria-expanded", String(open));
       if (open && isPhone()) setSheet("peek");   // one thing at a time on a small screen
     });
+    // Pass tab: place a new stand straight from the list (same as + → Placera pass)
+    $("#placeStandBtn").addEventListener("click", () => { closePopups(); setTool("stand"); if (isPhone()) setSheet("peek"); });
     $("#pushBox").addEventListener("click", (e) => {
       const b = e.target.closest("[data-push]"); if (!b) return;
       if (b.dataset.push === "copy") Ntfy.copy(); else Ntfy.test();
@@ -2234,6 +2244,7 @@
     const big = J.SPECIES.filter((sp) => sp.cats).map((sp) => {
       const chips = sp.cats.map((c) => {
         const st = J.catStatus(c, now), star = c.area ? "*" : "";
+        if (c.never) return `<span class="td-cat no"><s>${esc(c.n)}</s><small>${esc(c.never)}</small></span>`;
         if (!st.open) return `<span class="td-cat no"><s>${esc(c.n)}${star}</s><small>från ${esc(J.label(st.next))}</small></span>`;
         return `<span class="td-cat ${st.only ? "sv" : "ok"}">${esc(c.n)}${star}<small>${st.only ? "smyg/vakt · " : ""}t.o.m. ${esc(J.label(st.until))}</small></span>`;
       }).join("");
@@ -2750,8 +2761,10 @@
     rec(0, pts.length - 1);
     return pts.filter((_, i) => keep[i]).map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]);
   }
-  const ROUTE_LOOK = { fast: ["A", "#4dabf7", "Easiest"], quiet: ["B", "#51cf66", "Quietest"], wind: ["C", "#b197fc", "Scent-safe"], other: ["D", "#ffa94d", "Another way"],
-    via: ["V", "#ffd43b", "Via the chosen road"] };
+  // colours chosen to stand apart from each other and from what's already orange or yellow on the map
+  // (roads, the hunting boundary, feeding zones): blue, green, violet, cyan and white
+  const ROUTE_LOOK = { fast: ["A", "#339af0", "Easiest"], quiet: ["B", "#40c057", "Quietest"], wind: ["C", "#9775fa", "Scent-safe"], other: ["D", "#15aabf", "Another way"],
+    via: ["V", "#ffffff", "Via the chosen road"] };
   // where a walk to a stand starts, in this order: the parking (the default), where they are now, entrances,
   // then any other named place (each group nearest the stand first)
   function routeStarts(email, st) {
@@ -2855,7 +2868,7 @@
     const r = FAMILY && Day.active() && Day.doc.routes ? Day.doc.routes : {};
     const me = Family.user && Family.user.email.toLowerCase(), act = FAMILY && Day.active();
     const lines = Object.entries(r).filter(([email, v]) => v && v.pts && v.pts.length >= 4 && Day.placeOf(email) && email !== me)
-      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }));
+      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email), label: Family.nameFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }));
     const spots = act ? Object.entries(Day.doc.spots || {}).filter(([email, sp]) => sp && sp.length === 2 && !(Day.doc.assign || {})[email])
       .map(([email, sp]) => ({ type: "Feature", properties: { color: Family.colorFor(email), label: Family.nameFor(email) }, geometry: { type: "Point", coordinates: sp } })) : [];
     src.setData(FC([...lines, ...spots]));

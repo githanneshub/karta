@@ -46,7 +46,7 @@
     const canvas = document.createElement("canvas"); canvas.width = canvas.height = W;
     const g = canvas.getContext("2d"), img = g.createImageData(W, W), d = img.data;
     // visible ground with a backstop stays clear; everything else is marked
-    const COL = { 4: [22, 26, 22, 150] };
+    const COL = { 4: [120, 90, 160, 70] };   // hidden by thick forest: a light grey-purple
     const stats = { cells: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
     const half = width / 2;
     for (let y = 0; y < W; y++) {
@@ -56,11 +56,10 @@
         const brg = (Math.atan2(dx, dy) / rad + 360) % 360;
         const st = state[(Math.round(brg / (360 / RAYS)) % RAYS) * (n + 1) + Math.min(n, Math.round(dist / STEP))];
         const o = (y * W + x) * 4;
-        if (st === DEAD_GROUND) {
-          const stripe = (x + y) % 6 < 2;
-          d[o] = 92; d[o + 1] = 28; d[o + 2] = 140; d[o + 3] = stripe ? 190 : 95;
-        } else if (st === VISIBLE_OPEN) {
-          if ((x - y + 600) % 5 < 2) { d[o] = 255; d[o + 1] = 196; d[o + 2] = 0; d[o + 3] = 210; }
+        if (st === DEAD_GROUND) {   // hidden behind a hill or in a hollow: a soft purple, no stripes
+          d[o] = 130; d[o + 1] = 60; d[o + 2] = 200; d[o + 3] = 85;
+        } else if (st === VISIBLE_OPEN) {   // seen, but a miss flies on: thin yellow lines
+          if ((x - y + 600) % 7 < 1) { d[o] = 255; d[o + 1] = 196; d[o + 2] = 0; d[o + 3] = 170; }
         } else if (st === VEG_HIDDEN) {
           const c = COL[4]; d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = c[3];
         }

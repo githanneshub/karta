@@ -7,10 +7,12 @@
   const HOOF = "hoof", FOWL = "fowl";
   const SPECIES = [
     // klövvilt
-    { n: "Älg", en: "moose elk", g: "Klövvilt", light: HOOF, p: [["10-08", "01-31"]],
-      cats: [{ n: "Tjur", p: [["10-08", "01-31"]] }, { n: "Ko", p: [["10-08", "01-31"]] }, { n: "Kalv", p: [["10-08", "01-31"]] }],
-      today: "Bara enligt tilldelning i licens- eller älgskötselområde.",
-      note: "Jakt på vuxna djur kräver licens- eller älgskötselområde med tilldelning. Utanför sådana områden: bara kalv, i fem dagar från 8 okt." },
+    // Our ground has no licence area or älgskötselområde: only calf, five days from the start (bilaga 2: "jakt som sker
+    // utanför licens- och älgskötselområden och som endast avser älgkalv ska jakttiden vara fem dagar", start 8 okt)
+    { n: "Älg", en: "moose elk", g: "Klövvilt", light: HOOF, p: [["10-08", "10-12"]],
+      cats: [{ n: "Kalv", p: [["10-08", "10-12"]] }, { n: "Tjur", p: [], never: "kräver licensområde" }, { n: "Ko", p: [], never: "kräver licensområde" }],
+      today: "Ni har inget licens- eller älgskötselområde: bara kalv, fem dagar 8–12 okt.",
+      note: "Utan licens- eller älgskötselområde: bara kalv, fem dagar från 8 okt. Vuxna djur kräver licens- eller älgskötselområde med tilldelning (då 8 okt – 31 jan)." },
     { n: "Rådjur", en: "roe deer", g: "Klövvilt", light: HOOF, p: [["10-01", "01-31"]],
       cats: [{ n: "Bock", p: [["10-01", "01-31"], ["08-16", "09-30", SV], ["05-01", "06-15", SV]] }, { n: "Get", p: [["10-01", "01-31"]] },
         { n: "Kid", p: [["10-01", "01-31"], ["09-01", "09-30", SV]] }], sub: [
