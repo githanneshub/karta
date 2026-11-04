@@ -1132,7 +1132,7 @@
     $("#dial").setAttribute("aria-valuenow", String(w.from));
     $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
-    $("#windSpeedNow").textContent = `${w.speed} m/s` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "");   // gusts in brackets, like the compass
+    $("#windSpeedNow").textContent = `${w.speed}` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "") + " m/s";   // gusts in brackets, like the compass
     const wx = wxHour();
     $("#wxIcon").innerHTML = wx ? wxSvg(wx) : "";
     $("#wxTemp").textContent = wx && typeof wx.temp === "number" ? `${Math.round(wx.temp)}°` : "";
@@ -1677,7 +1677,7 @@
       renderHud.key = hudKey;
       // gusts from the SMHI forecast in brackets, like the SMHI app: "N 1.5 m/s (3)"
       const gust = wx && prefs.windMode !== "manual" && typeof wx.gust === "number" ? ` (${Math.round(wx.gust)})` : "";
-      $("#hudWindText").innerHTML = (wx ? wxSvg(wx) : "") + `<span>${w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed} m/s${gust}`}</span>`
+      $("#hudWindText").innerHTML = (wx ? wxSvg(wx) : "") + `<span>${w.speed < 1 ? "Calm" : `${Geo.compassName(w.from)} ${w.speed}${gust} m/s`}</span>`
         + (wx && typeof wx.temp === "number" ? `<span class="hud-temp">${Math.round(wx.temp)}°</span>` : "");
     }
     const hasHead = Heading.on && Heading.deg !== null;
@@ -2059,16 +2059,6 @@
       savePrefs(); renderAll();
     });
 
-    // language (Swedish by default); switching reloads so every text is redrawn in the new language
-    const lang = (window.I18N && window.I18N.lang) || "en";
-    $$('input[name="lang"]').forEach((r) => {
-      r.checked = r.value === lang;
-      r.addEventListener("change", () => {
-        prefs.lang = r.value;
-        try { localStorage.setItem("alnaryd-prefs", JSON.stringify(prefs)); } catch { /* ignore */ }
-        location.reload();
-      });
-    });
 
     // wind
     buildDial();

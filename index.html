@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "d237bdb476";</script>
-<script src="firebase-config.js?v=d237bdb476"></script>
-<script type="module" src="fb.js?v=d237bdb476"></script>
+<script>window.APP_VERSION = "cd0a0bae8b";</script>
+<script src="firebase-config.js?v=cd0a0bae8b"></script>
+<script type="module" src="fb.js?v=cd0a0bae8b"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=d237bdb476">
-<link rel="stylesheet" href="app.css?v=d237bdb476">
+<link rel="stylesheet" href="maplibre-gl.css?v=cd0a0bae8b">
+<link rel="stylesheet" href="app.css?v=cd0a0bae8b">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -130,19 +130,12 @@
             <button class="btn danger" type="button" id="ff-delete">Delete</button>
           </div>
         </form>
+        <label class="slider" for="exag">3D height exaggeration <output id="exagOut">1.6×</output></label>
+        <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
         </details>
 
         <details class="sect" id="settingsSect">
           <summary>Settings</summary>
-        <h2 class="eyebrow">Language</h2>
-        <div class="seg seg2" role="radiogroup" aria-label="Language">
-          <label><input type="radio" name="lang" id="lang-sv" value="sv"><span translate="no">Svenska</span></label>
-          <label><input type="radio" name="lang" id="lang-en" value="en"><span translate="no">English</span></label>
-        </div>
-
-        <label class="slider" for="exag">3D height exaggeration <output id="exagOut">1.6×</output></label>
-        <input type="range" id="exag" min="1" max="4" step="0.1" value="1.6">
-
         <h2 class="eyebrow">Sources</h2>
         <p class="note small">Elevation: Lantmäteriet 1 m laser model (CC0) via Mapterhorn. Land cover: Naturvårdsverket NMD 2023 (CC0). Tree height: Meta &amp; WRI canopy model (CC BY 4.0), imagery about 2018–2020. Roads: © OpenStreetMap contributors. Reserve: Naturvårdsverket.</p>
         <p class="note small">App version: <span id="appVersion" translate="no"></span></p>
@@ -498,12 +491,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=d237bdb476"></script>
-<script src="geo.js?v=d237bdb476"></script>
-<script src="view.js?v=d237bdb476"></script>
-<script src="wind.js?v=d237bdb476"></script>
-<script src="jakt.js?v=d237bdb476"></script>
-<script src="app.js?v=d237bdb476"></script>
+<script src="i18n.js?v=cd0a0bae8b"></script>
+<script src="geo.js?v=cd0a0bae8b"></script>
+<script src="view.js?v=cd0a0bae8b"></script>
+<script src="wind.js?v=cd0a0bae8b"></script>
+<script src="jakt.js?v=cd0a0bae8b"></script>
+<script src="app.js?v=cd0a0bae8b"></script>
 
 </body>
 </html>

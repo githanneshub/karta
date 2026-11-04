@@ -5,7 +5,7 @@
 (function (root) {
   "use strict";
   let lang = "sv";
-  try { const p = JSON.parse(localStorage.getItem("alnaryd-prefs") || "null"); if (p && p.lang) lang = p.lang; } catch { /* default */ }
+  // always Swedish now (the language choice was removed); tests can still ask for ?lang=en
   if (location.search.includes("shot=") && !location.search.includes("lang=sv")) lang = location.search.includes("lang=en") ? "en" : lang;
 
   const COMPASS = { N: "N", NNE: "NNÖ", NE: "NÖ", ENE: "ÖNÖ", E: "Ö", ESE: "ÖSÖ", SE: "SÖ", SSE: "SSÖ", S: "S", SSW: "SSV", SW: "SV",
@@ -278,7 +278,7 @@
     [/^Copied (.+)'s coordinates$/, (m, a) => `${/[sxz]$/i.test(a) ? a : a + "s"} koordinater kopierade`],
     [/^Position from (.+) ago$/, (m, a) => `Positionen är ${a.replace(" h", " tim")} gammal`],
     [/^Scent drifts toward ([A-Z]{1,3})$/, (m, a) => `Vittringen driver mot ${C(a)}`],
-    [/^([A-Z]{1,3}) ([\d.]+) m\/s( \(\d+\))?\.?$/, (m, a, b, g) => `${C(a)} ${b} m/s${g || ""}`],
+    [/^([A-Z]{1,3}) ([\d.]+)( \(\d+\))? m\/s\.?$/, (m, a, b, g) => `${C(a)} ${b}${g || ""} m/s`],
     [/^Facing ([A-Z]{1,3}) (\d+)°$/, (m, a, b) => `Du tittar mot ${C(a)} ${b}°`],
     [/^Your scent carries about (\d+) m toward ([A-Z]{1,3})\.$/, (m, a, b) => `Din vittring bär cirka ${a} m mot ${C(b)}.`],
     [/^Hunting boundary: ([\d.]+) ha, (\d+) points\.$/, (m, a, b) => `Jaktgräns: ${a} ha, ${b} punkter.`],
