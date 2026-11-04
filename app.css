@@ -642,8 +642,8 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .route-from { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
 .route-from select { flex: 1; min-width: 0; }
 .route-opts { display: flex; flex-direction: column; gap: 6px; }
-.route-opt { justify-content: flex-start; border-left: 6px solid var(--rc); text-align: left; }
-.route-opt b { color: var(--rc); }
+.route-opt { justify-content: flex-start; gap: 8px; text-align: left; border: 2px solid var(--rc); background: color-mix(in srgb, var(--rc) 16%, transparent); }
+.route-opt b { flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--rc); color: #10160f; font-size: 13px; }
 .route-via { align-self: flex-start; }
 .day-place { font-size: 13px; color: var(--muted); }
 .day-assign li > .btn { white-space: nowrap; }

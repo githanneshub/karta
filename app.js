@@ -2761,10 +2761,11 @@
     rec(0, pts.length - 1);
     return pts.filter((_, i) => keep[i]).map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]);
   }
-  // colours chosen to stand apart from each other and from what's already orange or yellow on the map
-  // (roads, the hunting boundary, feeding zones): blue, green, violet, cyan and white
-  const ROUTE_LOOK = { fast: ["A", "#339af0", "Easiest"], quiet: ["B", "#40c057", "Quietest"], wind: ["C", "#9775fa", "Scent-safe"], other: ["D", "#15aabf", "Another way"],
-    via: ["V", "#ffffff", "Via the chosen road"] };
+  // Each suggestion gets its own letter and colour by its place in the list (two "another way" must not look the
+  // same): blue, green, pink, white. Far apart in hue and not orange or yellow like roads, the boundary and feeding.
+  const ROUTE_COLORS = ["#228be6", "#40c057", "#f06595", "#ffffff", "#be4bdb"];
+  const ROUTE_NAMES = { fast: "Easiest", quiet: "Quietest", wind: "Scent-safe", other: "Another way", via: "Via the chosen road" };
+  const routeLook = (i, kind) => ["ABCDE"[i] || "?", ROUTE_COLORS[i % ROUTE_COLORS.length], ROUTE_NAMES[kind] || "Another way"];
   // where a walk to a stand starts, in this order: the parking (the default), where they are now, entrances,
   // then any other named place (each group nearest the stand first)
   function routeStarts(email, st) {
@@ -2804,7 +2805,7 @@
     },
     draw() {
       const src = map.getSource("routeopts"); if (!src) return;
-      src.setData(FC(this.opts.map((o, i) => { const [l, color] = ROUTE_LOOK[o.kind];
+      src.setData(FC(this.opts.map((o, i) => { const [l, color] = routeLook(i, o.kind);
         return { type: "Feature", properties: { i, color, sel: i === this.sel, label: `${l} · ${Math.round(o.len)} m` }, geometry: { type: "LineString", coordinates: o.coords } }; })));
     },
     close(quiet) { this.email = null; this.opts = []; const src = map.getSource("routeopts"); if (src) src.setData(FC()); if (!quiet) Day.render(); },
@@ -2854,7 +2855,7 @@
         + `<option value="__pick">${esc(tr("Tap the start on the map…"))}</option>`;
       return `<div class="route-pick">
           <label class="route-from"><span>From</span> <select data-route-from="${esc(email)}">${startOpts}</select></label>
-          <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = ROUTE_LOOK[o.kind];
+          <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = routeLook(i, o.kind);
             return `<button type="button" class="btn small route-opt" data-route-pick="${i}" style="--rc:${color}"><b>${l}</b> <span>${esc(tr(name))}</span> · ${Math.round(o.len)} m</button>`; }).join("")}</div>
           <button type="button" class="btn small route-via" data-route-via>${esc(tr("Via a road or track…"))}</button>
           <p class="note small">Tap the way ${esc(Family.nameFor(email))} says they will walk. The lines are on the map.</p>
