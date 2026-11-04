@@ -2838,12 +2838,12 @@
       if (this.email !== email) return "";
       const starts = routeStarts(email, Day.placeOf(email) || {}); if (this.custom && this.custom.email === email) starts.unshift(this.custom);
       const startOpts = starts.map((s) => `<option value="${esc(s.id)}"${s.id === this.start.id ? " selected" : ""}>${esc(s.name)}</option>`).join("")
-        + `<option value="__pick">📍 ${esc(tr("Tap the start on the map…"))}</option>`;
+        + `<option value="__pick">${esc(tr("Tap the start on the map…"))}</option>`;
       return `<div class="route-pick">
           <label class="route-from"><span>From</span> <select data-route-from="${esc(email)}">${startOpts}</select></label>
           <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = ROUTE_LOOK[o.kind];
             return `<button type="button" class="btn small route-opt" data-route-pick="${i}" style="--rc:${color}"><b>${l}</b> <span>${esc(tr(name))}</span> · ${Math.round(o.len)} m</button>`; }).join("")}</div>
-          <button type="button" class="btn small route-via" data-route-via>↪ ${esc(tr("Via a road or track…"))}</button>
+          <button type="button" class="btn small route-via" data-route-via>${esc(tr("Via a road or track…"))}</button>
           <p class="note small">Tap the way ${esc(Family.nameFor(email))} says they will walk. The lines are on the map.</p>
           <div class="row gap"><button type="button" class="btn small ghost" data-route-none="${esc(email)}">No route</button><button type="button" class="btn small ghost" data-route-close>Close</button></div>
         </div>`;
@@ -2952,13 +2952,13 @@
         h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
           const cur = (d.assign || {})[m.email] || "", spot = !cur && (d.spots || {})[m.email], place = this.placeOf(m.email);
           const opts = `<option value="">${esc(tr("Choose stand"))}</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("")
-            + (spot ? `<option value="__spot" selected>📍 ${esc(tr("Placed on the map"))}</option>` : "") + `<option value="__place">📍 ${esc(tr("Place on the map…"))}</option>`;
+            + (spot ? `<option value="__spot" selected>${esc(tr("Placed on the map"))}</option>` : "") + `<option value="__place">${esc(tr("Place on the map…"))}</option>`;
           const rt = (d.routes || {})[m.email], hasRoute = place && rt && rt.pts;
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
             <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
               <div class="it-sub">${place ? (hasRoute ? esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`)) : esc(tr("No route yet"))) : esc(tr("No stand yet"))}</div></span>
             ${lead ? (stands.length ? `<select data-assign="${esc(m.email)}" aria-label="Stand">${opts}</select>` : "")
-                + `<button type="button" class="btn small${place ? " ghost" : " primary"}" data-spot="${esc(m.email)}">📍 <span>${place ? "Move" : "Place stand"}</span></button>`
+                + `<button type="button" class="btn small${place ? " ghost" : " primary"}" data-spot="${esc(m.email)}"><span>${place ? "Move" : "Place stand"}</span></button>`
                 + (place ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : "")
               : (place ? `<span class="day-place">${esc(place.name || "Stand")}</span>` : "")}
             ${RoutePick.html(m.email)}</li>`;
