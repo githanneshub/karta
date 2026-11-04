@@ -745,7 +745,7 @@
     const pos = myPos();
     if (!prefs.myCone || !pos) { src.setData(FC()); return; }
     const w = prefs.wind;
-    const ring = w.speed < 1 ? Geo.circle(pos.ll, 60) : coneGeom({ lon: pos.ll[0], lat: pos.ll[1] });
+    const ring = w.speed < 1 && !thermal.kind ? Geo.circle(pos.ll, 60) : coneGeom({ lon: pos.ll[0], lat: pos.ll[1] });   // dead calm and no thermals: scent spreads all round
     src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [ring] } }]));
   }
 
