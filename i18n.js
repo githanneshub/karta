@@ -184,7 +184,7 @@
     "Blood tracking started. Mark what you find as you go.": "Eftersök startat. Markera det du hittar längs vägen.", "Recording your track. Keep the screen on.": "Spelar in ditt spår. Håll skärmen tänd.",
     "Track": "Spår", "Blood tracking": "Eftersök", "Recording": "Spelar in", "live": "pågår", "· live": "· pågår", "Back online.": "Uppkopplad igen.",
     "No coverage. The map still works; positions and messages are sent when you're back online.": "Ingen täckning. Kartan fungerar ändå; positioner och meddelanden skickas när du har täckning igen.", "Seasons": "Jakttid", "No stands yet. Add one with +.": "Inga pass än. Lägg till med +.", "No stalk routes yet.": "Inga smygrutter än.", "Message the team": "Meddela laget", "On my stand": "På pass", "Leaving my stand": "Lämnar passet",
-    "Shot fired": "Skott", "Need help!": "Behöver hjälp!", "Started the hunt day": "Startade jaktdagen", "The hunt is over": "Jakten är slut", "Animal down": "Djur skjutet", "Need help": "Behöver hjälp", "Today's messages": "Dagens meddelanden", "No messages today.": "Inga meddelanden i dag.",
+    "Shot fired": "Skott", "Need help!": "Behöver hjälp!", "Tap the map where the animal is": "Tryck på kartan där djuret är", "Started the hunt day": "Startade jaktdagen", "The hunt is over": "Jakten är slut", "Animal down": "Djur skjutet", "Need help": "Behöver hjälp", "Today's messages": "Dagens meddelanden", "No messages today.": "Inga meddelanden i dag.",
     "Waiting for your position. Try again in a moment.": "Väntar på din position. Försök igen om en stund.", "No stand within 150 m of you.": "Inget pass inom 150 m från dig.",
     "Couldn't send. The owner needs to publish the new Firebase rules.": "Kunde inte skicka. Ägaren behöver publicera de nya Firebase-reglerna.", "Letter on the map": "Bokstav på kartan", "Name on the map": "Namn på kartan", "Colour": "Färg", "Wind lines in the terrain": "Vindlinjer i terrängen", "in 3D": "i 3D", "Position not working?": "Fungerar inte positionen?",
     "Still no GPS position. If no question about location appeared, location is blocked for Safari. See Family → Position not working?":
@@ -251,6 +251,8 @@
     [/^gusts (\d+)$/, (m, a) => `byar ${a}`],
     [/^([\d.]+) mm in 24 h$/, (m, a) => `${a.replace(".", ",")} mm regn senaste dygnet`],
     [/^Shot fired toward ([A-Z]{1,3})$/, (m, a) => `Skott mot ${C(a)}`],
+    [/^Animal (\d+) m ([A-Z]{1,3}) of me$/, (m, a, b) => `Djur ${a} m ${C(b)} om mig`],
+    [/^(.+): animal (\d+) m ([A-Z]{1,3}) of me$/, (m, a, b, c) => `${a}: djur ${b} m ${C(c)} om mig`],
     [/^Animal near me toward ([A-Z]{1,3})$/, (m, a) => `Djur nära mig, mot ${C(a)}`],
     [/^at (.+)$/, (m, a) => `vid ${a}`],
     [/^(\d+) m ([A-Z]{1,3}) of you$/, (m, a, b) => `${a} m ${C(b)} om dig`],

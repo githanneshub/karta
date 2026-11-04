@@ -1196,7 +1196,7 @@
     $("#hintUndo").hidden = !multi || !pts.length;
     $("#hintDone").hidden = !multi || pts.length < (tool === "boundary" ? 3 : 2);
     $("#hintDone").textContent = tool === "measure" ? "Clear" : "Finish";
-    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
+    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
       newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go" }[tool];
     if (pts.length >= 2 && tool !== "boundary") {
       let d = 0; for (let i = 1; i < pts.length; i++) d += Geo.distance(pts[i - 1], pts[i]);
@@ -1262,6 +1262,7 @@
     }
     if (tool === "stand") { newStandAt(e.lngLat); setTool(null); return; }
     if (tool === "sighting") { newSightingAt(e.lngLat); setTool(null); return; }
+    if (tool === "animal") { setTool(null); Hunt.send("animal", [e.lngLat.lng, e.lngLat.lat]); return; }
     if (tool) { pts.push([e.lngLat.lng, e.lngLat.lat]); updateHint(); updateDraft(); return; }
     if (isPhone() && $("#app").dataset.sheet === "open") { setSheet("peek"); return; }
     const hit = map.queryRenderedFeatures(e.point, { layers: ["sightings"] })[0];
@@ -1816,7 +1817,9 @@
     hmenu.addEventListener("click", (e) => {
       if (e.target.closest("[data-day]")) { closeHunt(); if (Day.active()) showTab("family", true); else Day.begin(); return; }
       const b = e.target.closest("[data-ev]"); if (!b) return;
-      closeHunt(); Hunt.send(b.dataset.ev);
+      closeHunt();
+      if (b.dataset.ev === "animal") { setTool("animal"); return; }   // first tap where the animal is
+      Hunt.send(b.dataset.ev);
     });
     document.addEventListener("click", (e) => { if (!hmenu.hidden && !e.target.closest("#huntMenu")) closeHunt(); });
     document.addEventListener("click", (e) => {
@@ -2195,7 +2198,9 @@
     shot: (e) => `${who(e)}: shot fired` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
     down: (e) => `${who(e)}: animal down`,
     help: (e) => `${who(e)} needs help`,
-    animal: (e) => `${who(e)}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
+    animal: (e) => Array.isArray(e.from)
+      ? `${who(e)}: animal ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
+      : `${who(e)}: animal near me` + (typeof e.heading === "number" ? ` toward ${Geo.compassName(e.heading)}` : ""),
   };
   const EVENT_ICON = { onstand: "◉", offstand: "○", shot: "✛", down: "✔", help: "!", animal: "◎" };
   const PIN_HOURS = { shot: 12, down: 12, help: 12, animal: 2 };   // how long each kind stays on the map
@@ -2244,12 +2249,14 @@
       const id = newId("ev");
       try { await window.FB.db.doc(`events/${id}`).set(e); Ntfy.announce(id, e); } catch { /* rules not published yet */ }
     },
-    async send(type) {
+    // at: a spot tapped on the map (where the animal is); otherwise the message is placed where I am
+    async send(type, at = null) {
       const pos = myPos();
-      if (!pos) { startGPS(); toast("Waiting for your position. Try again in a moment."); return; }
+      if (!pos && !at) { startGPS(); toast("Waiting for your position. Try again in a moment."); return; }
       const e = { type, email: Family.user.email.toLowerCase(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0],
-        lon: pos.ll[0], lat: pos.ll[1], tc: Date.now() };
-      if (Heading.on && Heading.deg !== null) e.heading = Math.round(Heading.deg);
+        lon: at ? at[0] : pos.ll[0], lat: at ? at[1] : pos.ll[1], tc: Date.now() };
+      if (at && pos) e.from = pos.ll;   // where I was, so others see how far the animal is from me
+      if (!at && Heading.on && Heading.deg !== null) e.heading = Math.round(Heading.deg);
       if (type === "onstand") {
         let best = null, bd = 150;
         for (const st of Store.data.stands) { const d = Geo.distance(pos.ll, [st.lon, st.lat]); if (d < bd) { bd = d; best = st; } }
@@ -2475,7 +2482,8 @@
       const [priority, tag] = NTFY_LOOK[e.type];
       const dir = typeof e.heading === "number" ? Geo.compassName(e.heading) : "";
       const what = { shot: dir ? `Shot fired toward ${dir}` : "Shot fired", down: "Animal down", help: "Need help!",
-        animal: dir ? `Animal near me toward ${dir}` : "Animal near me", daystart: "Started the hunt day", dayend: "The hunt is over" }[e.type];
+        animal: Array.isArray(e.from) ? `Animal ${Math.round(Geo.distance(e.from, [e.lon, e.lat]) / 10) * 10} m ${Geo.compassName(Geo.bearing(e.from, [e.lon, e.lat]))} of me`
+          : dir ? `Animal near me toward ${dir}` : "Animal near me", daystart: "Started the hunt day", dayend: "The hunt is over" }[e.type];
       const at = e.standName ? `at ${e.standName}` : "";
       for (const [email, topic] of Object.entries(this.topics)) {
         if (email === this.me() || !topic) continue;
