@@ -2503,7 +2503,7 @@
   // Each person subscribes in the ntfy app to their own secret channel (kept in map/ntfy, readable only by
   // members). A hunt message is sent straight from the map to everyone else's channel, so your own phone stays
   // quiet. ntfy.sh is a free outside service: only the short message text passes through it.
-  const PUSH_TYPES = ["shot", "down", "help", "animal", "sound", "dayend"];   // starting a hunt day only shows in the map, no notification
+  const PUSH_TYPES = ["shot", "down", "help", "animal", "sound"];   // starting and ending a hunt day only show in the map, no notification
   const NTFY = "https://ntfy.sh/";
   const NTFY_LOOK = { shot: [4, "boom"], down: [4, "white_check_mark"], help: [5, "rotating_light"], animal: [4, "deer"], sound: [3, "ear"],
     daystart: [3, "evergreen_tree"], dayend: [3, "checkered_flag"] };
