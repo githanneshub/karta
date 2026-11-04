@@ -2043,16 +2043,17 @@
   const MARKS = { blood: { n: "Blood", c: "#e03131" }, sign: { n: "Tracks", c: "#f08c00" }, bed: { n: "Bed", c: "#7048e8" },
     hair: { n: "Hair", c: "#adb5bd" }, found: { n: "Animal found", c: "#2b8a3e" } };
   const Rec = {
-    on: null, lastSave: 0, wake: null, timer: 0,
+    on: null, lastSave: 0, timer: 0,
     start(kind, from) {
       if (this.on) { toast("Already recording."); return; }
       if (watchId === null) startGPS();
       const here = myPos(), pts = from ? [from.lon, from.lat] : here ? [...here.ll] : [];
       this.on = { id: newId("tk"), kind, pts, ts: pts.length ? [Date.now()] : [], marks: [], start: Date.now(), from: from ? from.label || "" : "" };
-      try { navigator.wakeLock && navigator.wakeLock.request("screen").then((w) => { this.wake = w; }).catch(() => {}); } catch { /* no wake lock */ }
+      // no screen wake lock: the phone may lock in the pocket (the screen is the biggest battery drain);
+      // OwnTracks keeps sending and the gaps are filled from it when the map is opened again
       this.timer = setInterval(() => this.renderBar(), 15000);
       this.renderBar(); renderTracks(); this.save();
-      toast(kind === "search" ? "Blood tracking started. Mark what you find as you go." : "Recording your track. Keep the screen on.");
+      toast(kind === "search" ? "Blood tracking started. Mark what you find as you go." : "Recording your track. You can lock the phone; OwnTracks fills in the gaps.");
     },
     onFix(ll, acc) {
       const r = this.on; if (!r || acc > 40) return;
@@ -2106,7 +2107,6 @@
       const old = Store.data.tracks.find((x) => x.id === r.id) || {};
       Store.put("tracks", { ...old, id: r.id, kind: r.kind, pts: r.pts, ts: r.ts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: false });
       this.on = null; clearInterval(this.timer);
-      if (this.wake) { this.wake.release().catch(() => {}); this.wake = null; }
       this.renderBar(); renderTracks();
       toast(`Saved: ${trackLen(r.pts)}`);
     },
