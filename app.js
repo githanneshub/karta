@@ -2466,13 +2466,30 @@
       }
       return false;
     },
+    // Short enough to read on a locked phone: the name in bold, then what happened, where, and how far from you.
+    //   Pappa
+    //   Skott mot NO · vid Järntornet · 350 m SV om dig · 05:25
     announce(id, e) {
       if (!PUSH_TYPES.includes(e.type)) return;
       const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
       const [priority, tag] = NTFY_LOOK[e.type];
-      const msg = { title: tr(EVENT_TEXT[e.type](e)), message: [t, e.standName, tr("Tap to see it on the map")].filter(Boolean).join(" · "),
-        priority, tags: [tag], click: `${location.origin}${location.pathname}?ev=${encodeURIComponent(id)}` };
-      for (const [email, topic] of Object.entries(this.topics)) if (email !== this.me() && topic) this.publish(topic, msg);
+      const dir = typeof e.heading === "number" ? Geo.compassName(e.heading) : "";
+      const what = { shot: dir ? `Shot fired toward ${dir}` : "Shot fired", down: "Animal down", help: "Need help!",
+        animal: dir ? `Animal near me toward ${dir}` : "Animal near me", daystart: "Started the hunt day", dayend: "The hunt is over" }[e.type];
+      const at = e.standName ? `at ${e.standName}` : "";
+      for (const [email, topic] of Object.entries(this.topics)) {
+        if (email === this.me() || !topic) continue;
+        // how far and which way from the person reading it, when we know where they are
+        let far = "";
+        const w = typeof e.lon === "number" && Family.whereIs(email);
+        if (w && w.ll) {
+          const d = Geo.distance(w.ll, [e.lon, e.lat]), b = Geo.compassName(Geo.bearing(w.ll, [e.lon, e.lat]));
+          far = d < 1000 ? `${Math.round(d / 10) * 10} m ${b} of you` : `${(d / 1000).toFixed(1)} km ${b} of you`;
+        }
+        const message = [what, at, far, t].filter(Boolean).map((x) => tr(x)).join(" · ");
+        this.publish(topic, { title: Family.nameFor(e.email, e.name), message, priority, tags: [tag],
+          click: `${location.origin}${location.pathname}?ev=${encodeURIComponent(id)}` });
+      }
     },
     async test() {
       const ok = await this.publish(this.mine(), { title: tr("Test from the hunting map"), message: tr("Notifications work on this phone."), tags: ["evergreen_tree"] });
