@@ -8,7 +8,7 @@
   const SPECIES = [
     // klövvilt
     { n: "Älg", en: "moose elk", g: "Klövvilt", light: HOOF, p: [["10-08", "01-31"]],
-      note: "Jaktstart och tilldelning beslutas av Länsstyrelsen i Blekinge för varje älgförvaltningsområde. Utanför licens- och älgskötselområden: kalv i fem dagar." },
+      note: "Jakt på vuxna djur kräver licens- eller älgskötselområde med tilldelning. Utanför sådana områden: bara kalv, i fem dagar från 8 okt." },
     { n: "Rådjur", en: "roe deer", g: "Klövvilt", light: HOOF, p: [["10-01", "01-31"]], sub: [
       { n: "bock (hornbärande)", p: [["08-16", "09-30", SV], ["05-01", "06-15", SV]] },
       { n: "kid", p: [["09-01", "09-30", SV]] }] },
