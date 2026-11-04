@@ -289,7 +289,7 @@
     maxPitch: 75,
     attributionControl: false,   // sources are listed under Settings → Sources
   });
-  if (location.search.includes("shot=")) window.__map = map;  // test hook for screenshot mode
+  if (/[?&](shot|test)=/.test(location.search)) window.__map = map;  // test hook for screenshot mode and tests
 
   let manifests = [];   // one per area
   const loadedImageSets = new Set();
@@ -456,8 +456,13 @@
     map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round" },
       paint: { "line-color": "#ff7a2e", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
     // hunt day: the way each person walks to their stand (their colour), and the suggestions while choosing one
-    map.addLayer({ id: "dayroutes", type: "line", source: "dayroutes", layout: { "line-cap": "round", "line-join": "round" },
+    map.addLayer({ id: "dayroutes", type: "line", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": ["get", "color"], "line-width": 2.5, "line-opacity": .85, "line-dasharray": [2, 1.2] } });
+    map.addLayer({ id: "dayspots", type: "circle", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
+      paint: { "circle-radius": 9, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
+    map.addLayer({ id: "dayspots-label", type: "symbol", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
+      layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
+      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     map.addLayer({ id: "routeopts-case", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
       paint: { "line-color": "#10160f", "line-width": ["case", ["get", "sel"], 9, 6], "line-opacity": .55 } });
     map.addLayer({ id: "routeopts", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
@@ -1228,7 +1233,8 @@
     $("#hintUndo").hidden = !multi || !pts.length;
     $("#hintDone").hidden = !multi || pts.length < (tool === "boundary" ? 3 : 2);
     $("#hintDone").textContent = tool === "measure" ? "Clear" : "Finish";
-    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", sound: "Tap roughly where the sound came from", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
+    let text = { daySpot: "Tap the map where they will sit", routeVia: "Tap the road, track or spot they will walk via", routeFrom: "Tap where they start walking",
+      stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", sound: "Tap roughly where the sound came from", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
       newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go" }[tool];
     if (pts.length >= 2 && tool !== "boundary") {
       let d = 0; for (let i = 1; i < pts.length; i++) d += Geo.distance(pts[i - 1], pts[i]);
@@ -1276,6 +1282,13 @@
   }
 
   map.on("click", (e) => {
+    if (tool === "daySpot") { const email = Day.spotFor; setTool(null); if (email) Day.setSpot(email, [e.lngLat.lng, e.lngLat.lat]); return; }
+    if (tool === "routeVia") { setTool(null); RoutePick.via([e.lngLat.lng, e.lngLat.lat]); return; }
+    if (tool === "routeFrom") { setTool(null); RoutePick.fromPoint([e.lngLat.lng, e.lngLat.lat]); return; }
+    if (!tool && RoutePick.email && map.getLayer("routeopts")) {   // tap a suggested way on the map to choose it
+      const f = map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["routeopts"] })[0];
+      if (f) { RoutePick.choose(+f.properties.i); return; }
+    }
     if (tool === "layout") {
       const id = trailAt(e.point);
       if (id) { setTool("editTrail", { trailId: id }); openFeatForm("trail", id); }
@@ -1841,10 +1854,14 @@
       }
     });
     $("#dayCard").addEventListener("change", (e) => {
-      const s = e.target.closest("[data-assign]"); if (s) Day.assign(s.dataset.assign, s.value);
-      const f = e.target.closest("[data-route-from]"); if (f) RoutePick.open(f.dataset.routeFrom, f.value);
+      const s = e.target.closest("[data-assign]");
+      if (s) { if (s.value === "__place") Day.startSpot(s.dataset.assign); else if (s.value !== "__spot") Day.assign(s.dataset.assign, s.value); }
+      const f = e.target.closest("[data-route-from]");
+      if (f) { if (f.value === "__pick") RoutePick.pickStart(); else RoutePick.open(f.dataset.routeFrom, f.value); }
     });
     $("#dayCard").addEventListener("click", async (e) => {
+      const sp = e.target.closest("[data-spot]"); if (sp) { Day.startSpot(sp.dataset.spot); return; }
+      if (e.target.closest("[data-route-via]")) { RoutePick.pickVia(); return; }
       const r = e.target.closest("[data-route]"); if (r) { RoutePick.email === r.dataset.route ? RoutePick.close() : RoutePick.open(r.dataset.route); return; }
       const p = e.target.closest("[data-route-pick]"); if (p) { RoutePick.choose(+p.dataset.routePick); return; }
       const n = e.target.closest("[data-route-none]");
@@ -1852,7 +1869,7 @@
       if (e.target.closest("[data-route-close]")) RoutePick.close();
     });
     $("#myStandChip").addEventListener("click", () => {
-      const st = Store.data.stands.find((x) => x.id === $("#myStandChip").dataset.id); if (!st) return;
+      const st = Day.myPlace(); if (!st) return;
       const pos = myPos();
       if (pos) map.fitBounds([[Math.min(pos.ll[0], st.lon), Math.min(pos.ll[1], st.lat)], [Math.max(pos.ll[0], st.lon), Math.max(pos.ll[1], st.lat)]], { padding: 90, maxZoom: 17 });
       else map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 16) });
@@ -2630,6 +2647,7 @@
     // extra cost for the scent-safe kind: cells whose scent drifts into the stand's sector, and the sector itself
     windCost(st) {
       const g = this.grid, W = g.width, H = g.height, out = new Float32Array(W * H);
+      if (typeof st.facing !== "number") return out;   // a spot placed on the map has no shooting direction
       const [sE, sN] = Geo.toSweref(st.lon, st.lat), down = ((localFrom(st.lon, st.lat) + 180) % 360) * Math.PI / 180;
       const dx = Math.sin(down), dy = Math.cos(down), face = (st.facing || 0) * Math.PI / 180, half = ((st.width || 90) / 2 + 10) * Math.PI / 180;
       const inSec = (E, N) => {
@@ -2714,7 +2732,8 @@
     rec(0, pts.length - 1);
     return pts.filter((_, i) => keep[i]).map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]);
   }
-  const ROUTE_LOOK = { fast: ["A", "#4dabf7", "Easiest"], quiet: ["B", "#51cf66", "Quietest"], wind: ["C", "#b197fc", "Scent-safe"], other: ["D", "#ffa94d", "Another way"] };
+  const ROUTE_LOOK = { fast: ["A", "#4dabf7", "Easiest"], quiet: ["B", "#51cf66", "Quietest"], wind: ["C", "#b197fc", "Scent-safe"], other: ["D", "#ffa94d", "Another way"],
+    via: ["V", "#ffd43b", "Via the chosen road"] };
   // where a walk to a stand starts: the parking or an entrance nearest the stand, or any named place, or where they are
   function routeStarts(email, st) {
     const out = [];
@@ -2728,10 +2747,13 @@
   // the chooser in the hunt-day card: one person at a time
   const RoutePick = {
     email: null, start: null, opts: [], sel: -1,
+    custom: null,
     open(email, startId) {
-      const sid = (Day.doc.assign || {})[email], st = Store.data.stands.find((x) => x.id === sid);
+      const st = Day.placeOf(email);
       if (!st) return;
+      if (this.custom && this.custom.email !== email) this.custom = null;
       const starts = routeStarts(email, st);
+      if (this.custom) starts.unshift(this.custom);
       if (!starts.length) { toast("Add a place first (e.g. Parkering) to start the walk from."); return; }
       this.email = email; this.start = starts.find((x) => x.id === startId) || (startId === undefined && starts.find((x) => x.id !== "here")) || starts[0];
       this.opts = Router.suggest(this.start.ll, st) || [];
@@ -2749,26 +2771,58 @@
     draw() {
       const src = map.getSource("routeopts"); if (!src) return;
       src.setData(FC(this.opts.map((o, i) => { const [l, color] = ROUTE_LOOK[o.kind];
-        return { type: "Feature", properties: { color, sel: i === this.sel, label: `${l} · ${Math.round(o.len)} m` }, geometry: { type: "LineString", coordinates: o.coords } }; })));
+        return { type: "Feature", properties: { i, color, sel: i === this.sel, label: `${l} · ${Math.round(o.len)} m` }, geometry: { type: "LineString", coordinates: o.coords } }; })));
     },
-    close() { this.email = null; this.opts = []; const src = map.getSource("routeopts"); if (src) src.setData(FC()); Day.render(); },
+    close(quiet) { this.email = null; this.opts = []; const src = map.getSource("routeopts"); if (src) src.setData(FC()); if (!quiet) Day.render(); },
+    // the person will walk via a certain road or track: one tap on it, the way through there is saved
+    pickVia() { this.pending = this.email; setTool("routeVia"); if (isPhone()) setSheet("peek"); },
+    pickStart() { this.pending = this.email; setTool("routeFrom"); if (isPhone()) setSheet("peek"); },
+    fromPoint(ll) {
+      const email = this.pending || this.email; if (!email) return;
+      this.custom = { id: "custom", name: tr("Chosen start"), ll, email };
+      showTab("family", true); this.open(email, "custom");
+    },
+    via(ll) {
+      const email = this.pending || this.email, st = email && Day.placeOf(email);
+      if (!st || !this.start || (!Router.base && !Router.build())) return;
+      // snap to the nearest trail, track or road within ~30 m (that's what they meant to walk on)
+      const g = Router.grid, W = g.width;
+      let v = Router.cell(ll), best = Infinity;
+      if (v >= 0) for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+        const c = (v % W) + dx, r = Math.floor(v / W) + dy, i = r * W + c;
+        if (c < 0 || r < 0 || c >= W || r >= g.height || Router.base[i] > 0.5) continue;
+        const d = dx * dx + dy * dy; if (d < best) { best = d; v = i; }
+      }
+      const a = Router.cell(this.start.ll), b = Router.cell([st.lon, st.lat]);
+      if (a < 0 || b < 0 || v < 0) return;
+      const cost = (i) => Router.base[i], p1 = Router.path(a, v, cost), p2 = Router.path(v, b, cost);
+      if (!p1 || !p2) { toast("Couldn't find a way there from that start."); return; }
+      const cells = [...p1, ...p2.slice(1)], coords = Router.toCoords(cells, this.start.ll, [st.lon, st.lat]);
+      let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
+      this.email = email; this.opts.push({ kind: "via", cells, coords, len });
+      showTab("family", true);
+      this.choose(this.opts.length - 1);
+    },
     async choose(i) {
       const o = this.opts[i], email = this.email; if (!o) return;
       this.sel = i; this.draw();
       // not awaited: offline the save waits for signal, but shows on this phone right away
-      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name, stand: (Day.doc.assign || {})[email] || "" } } })
+      const pl = Day.placeOf(email) || {};
+      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name, stand: (Day.doc.assign || {})[email] || "", at: [pl.lon, pl.lat] } } })
         .catch(() => toast("Couldn't save. Check your connection."));
       toast(tr(`Route saved for ${Family.nameFor(email)}`));
       this.close();
     },
     html(email) {
       if (this.email !== email) return "";
-      const startOpts = routeStarts(email, Store.data.stands.find((x) => x.id === (Day.doc.assign || {})[email]) || {}).map((s) =>
-        `<option value="${esc(s.id)}"${s.id === this.start.id ? " selected" : ""}>${esc(s.name)}</option>`).join("");
+      const starts = routeStarts(email, Day.placeOf(email) || {}); if (this.custom && this.custom.email === email) starts.unshift(this.custom);
+      const startOpts = starts.map((s) => `<option value="${esc(s.id)}"${s.id === this.start.id ? " selected" : ""}>${esc(s.name)}</option>`).join("")
+        + `<option value="__pick">📍 ${esc(tr("Tap the start on the map…"))}</option>`;
       return `<div class="route-pick">
           <label class="route-from"><span>From</span> <select data-route-from="${esc(email)}">${startOpts}</select></label>
           <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = ROUTE_LOOK[o.kind];
             return `<button type="button" class="btn small route-opt" data-route-pick="${i}" style="--rc:${color}"><b>${l}</b> <span>${esc(tr(name))}</span> · ${Math.round(o.len)} m</button>`; }).join("")}</div>
+          <button type="button" class="btn small route-via" data-route-via>↪ ${esc(tr("Via a road or track…"))}</button>
           <p class="note small">Tap the way ${esc(Family.nameFor(email))} says they will walk. The lines are on the map.</p>
           <div class="row gap"><button type="button" class="btn small ghost" data-route-none="${esc(email)}">No route</button><button type="button" class="btn small ghost" data-route-close>Close</button></div>
         </div>`;
@@ -2778,8 +2832,12 @@
   function renderDayRoutes() {
     const src = map.getSource("dayroutes"); if (!src) return;
     const r = FAMILY && Day.active() && Day.doc.routes ? Day.doc.routes : {};
-    src.setData(FC(Object.entries(r).filter(([email, v]) => v && v.pts && v.pts.length >= 4 && (Day.doc.assign || {})[email] && email !== (Family.user && Family.user.email.toLowerCase()))
-      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }))));
+    const me = Family.user && Family.user.email.toLowerCase(), act = FAMILY && Day.active();
+    const lines = Object.entries(r).filter(([email, v]) => v && v.pts && v.pts.length >= 4 && Day.placeOf(email) && email !== me)
+      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }));
+    const spots = act ? Object.entries(Day.doc.spots || {}).filter(([email, sp]) => sp && sp.length === 2 && !(Day.doc.assign || {})[email])
+      .map(([email, sp]) => ({ type: "Feature", properties: { color: Family.colorFor(email), label: Family.nameFor(email) }, geometry: { type: "Point", coordinates: sp } })) : [];
+    src.setData(FC([...lines, ...spots]));
   }
 
   // ---------- hunt day: leader, who sits where, start and end, summary ----------
@@ -2805,6 +2863,26 @@
     active() { return !!(this.doc && this.doc.active && Date.now() - (this.doc.started || 0) < 14 * 3600e3); },
     me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
     myStand() { return this.active() ? (this.doc.assign || {})[this.me()] || null : null; },
+    // a saved stand, or a spot the leader tapped on the map: { lon, lat, name, (facing, width) }
+    placeOf(email) {
+      if (!this.doc) return null;
+      const sid = (this.doc.assign || {})[email], st = sid && Store.data.stands.find((x) => x.id === sid);
+      if (st) return st;
+      const sp = (this.doc.spots || {})[email];
+      return sp && sp.length === 2 ? { id: "", lon: sp[0], lat: sp[1], name: tr(`${Family.nameFor(email)}'s stand`) } : null;
+    },
+    myPlace() { return this.active() ? this.placeOf(this.me()) : null; },
+    spotFor: null,
+    startSpot(email) {
+      this.spotFor = email; RoutePick.close(true);
+      setTool("daySpot");
+      if (isPhone()) setSheet("peek");
+    },
+    setSpot(email, ll) {
+      const at = [+ll[0].toFixed(6), +ll[1].toFixed(6)];
+      window.FB.db.doc("map/huntday").update({ spots: { [email]: at }, assign: { [email]: "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
+      setTimeout(() => { showTab("family", true); RoutePick.open(email); }, 250);   // straight on to the way there
+    },
     whoOn(standId) {
       if (!this.active()) return null;
       for (const [email, sid] of Object.entries(this.doc.assign || {})) if (sid === standId) return email;
@@ -2824,22 +2902,26 @@
           if (m && st) last[m.email] = st.id;
         }
       }
-      const assign = {}, routes = {};
+      const assign = {}, routes = {}, spots = {};
       for (const [email, sid] of Object.entries(last)) if (sid && members.has(email) && stands.has(sid)) {
         assign[email] = sid;
         const r = (prev.lastRoutes || {})[email]; if (r && r.stand === sid) routes[email] = r;
       }
+      for (const [email, sp] of Object.entries(prev.lastSpots || {})) if (sp && sp.length === 2 && members.has(email) && !assign[email]) {
+        spots[email] = sp;
+        const r = (prev.lastRoutes || {})[email]; if (r && !r.stand && r.at && Geo.distance(r.at, sp) < 5) routes[email] = r;
+      }
       for (const [sid, email] of Hunt.sitting()) { if (assign[email] !== sid) delete routes[email]; assign[email] = sid; }   // already sitting
       window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
-        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, routes, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
+        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, spots, routes, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
         .catch(() => toast("Couldn't save. Check your connection."));
-      if (Object.keys(assign).length) toast("Stands from last time are filled in. Change what differs today.", 6000);
+      if (Object.keys(assign).length || Object.keys(spots).length) toast("Stands from last time are filled in. Change what differs today.", 6000);
       Hunt.post("daystart");
       showTab("family", true);
     },
     async assign(email, standId) {
       // a new stand means the old route no longer fits
-      window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
+      window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" }, spots: { [email]: null }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
       if (standId && this.canLead()) setTimeout(() => RoutePick.open(email), 200);   // straight on to choosing the way there
     },
     async end() {
@@ -2848,7 +2930,7 @@
       const ev = Hunt.events.filter((e) => e.tc >= since);
       const summary = {
         started: since, ended: Date.now(), leaderName: d.leaderName || "", wind: d.wind || "",
-        sat: Object.entries(d.assign || {}).filter(([, sid]) => sid).map(([e, sid]) => ({ name: name(e), stand: (Store.data.stands.find((x) => x.id === sid) || {}).name || "?" })),
+        sat: Family.members.map((m) => [m.email, this.placeOf(m.email)]).filter(([, pl]) => pl).map(([e, pl]) => ({ name: name(e), stand: pl.name || "?" })),
         shots: ev.filter((e) => e.type === "shot").map((e) => ({ name: e.name, t: e.tc, dir: typeof e.heading === "number" ? Geo.compassName(e.heading) : "" })),
         downs: ev.filter((e) => e.type === "down").map((e) => ({ name: e.name, t: e.tc })),
         tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
@@ -2856,8 +2938,8 @@
       await window.FB.db.doc(`days/${since}`).set(summary).catch(() => {});
       // keep who sat where (and their routes) for next time
       const lastRoutes = {};
-      for (const [email, r] of Object.entries(d.routes || {})) if (r && (d.assign || {})[email]) lastRoutes[email] = { ...r, stand: d.assign[email] };
-      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now(), lastAssign: d.assign || {}, lastRoutes }).catch(() => toast("Couldn't save. Check your connection."));
+      for (const [email, r] of Object.entries(d.routes || {})) if (r && this.placeOf(email)) lastRoutes[email] = { ...r, stand: (d.assign || {})[email] || "" };
+      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now(), lastAssign: d.assign || {}, lastSpots: d.spots || {}, lastRoutes }).catch(() => toast("Couldn't save. Check your connection."));
       Hunt.post("dayend");
     },
     render() {
@@ -2869,14 +2951,17 @@
         const d = this.doc, lead = this.canLead();
         h += `<h2 class="eyebrow">Hunt day in progress</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
         h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
-          const cur = (d.assign || {})[m.email] || "";
-          const opts = `<option value="">${esc(tr("Choose stand"))}</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
-          const rt = (d.routes || {})[m.email], hasRoute = cur && rt && rt.pts;
+          const cur = (d.assign || {})[m.email] || "", spot = !cur && (d.spots || {})[m.email], place = this.placeOf(m.email);
+          const opts = `<option value="">${esc(tr("Choose stand"))}</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("")
+            + (spot ? `<option value="__spot" selected>📍 ${esc(tr("Placed on the map"))}</option>` : "") + `<option value="__place">📍 ${esc(tr("Place on the map…"))}</option>`;
+          const rt = (d.routes || {})[m.email], hasRoute = place && rt && rt.pts;
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
             <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
-              ${hasRoute ? `<div class="it-sub">${esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`))}</div>` : ""}</span>
-            <select data-assign="${esc(m.email)}"${lead ? "" : " disabled"} aria-label="Stand">${opts}</select>
-            ${lead && cur ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : ""}
+              <div class="it-sub">${place ? (hasRoute ? esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`)) : esc(tr("No route yet"))) : esc(tr("No stand yet"))}</div></span>
+            ${lead ? (stands.length ? `<select data-assign="${esc(m.email)}" aria-label="Stand">${opts}</select>` : "")
+                + `<button type="button" class="btn small${place ? " ghost" : " primary"}" data-spot="${esc(m.email)}">📍 <span>${place ? "Move" : "Place stand"}</span></button>`
+                + (place ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : "")
+              : (place ? `<span class="day-place">${esc(place.name || "Stand")}</span>` : "")}
             ${RoutePick.html(m.email)}</li>`;
         }).join("") + `</ul>`;
         if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
@@ -2903,7 +2988,7 @@
   // the stand you were given today: a chip on the map and a line from you to it
   function renderGoto() {
     const src = map.getSource("goto"), chip = $("#myStandChip");
-    const sid = FAMILY ? Day.myStand() : null, st = sid && Store.data.stands.find((x) => x.id === sid);
+    const st = FAMILY ? Day.myPlace() : null;
     if (!st) { chip.hidden = true; if (src) src.setData(FC()); return; }
     chip.hidden = false;
     const pos = myPos(), near = pos && Geo.distance(pos.ll, [st.lon, st.lat]);

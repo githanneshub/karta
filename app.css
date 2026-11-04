@@ -644,4 +644,7 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .route-opts { display: flex; flex-direction: column; gap: 6px; }
 .route-opt { justify-content: flex-start; border-left: 6px solid var(--rc); text-align: left; }
 .route-opt b { color: var(--rc); }
+.route-via { align-self: flex-start; }
+.day-place { font-size: 13px; color: var(--muted); }
+.day-assign li > .btn { white-space: nowrap; }
 
