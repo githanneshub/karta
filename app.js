@@ -2756,7 +2756,7 @@
       const o = this.opts[i], email = this.email; if (!o) return;
       this.sel = i; this.draw();
       // not awaited: offline the save waits for signal, but shows on this phone right away
-      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name } } })
+      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name, stand: (Day.doc.assign || {})[email] || "" } } })
         .catch(() => toast("Couldn't save. Check your connection."));
       toast(tr(`Route saved for ${Family.nameFor(email)}`));
       this.close();
@@ -2811,11 +2811,29 @@
       return null;
     },
     canLead() { return this.active() && (this.doc.leader === this.me() || (Family.member && Family.member.role === "owner")); },
+    // Start from last time's stands and routes (the same people usually sit the same stands), then whoever is
+    // already checked in; the leader only changes what differs today.
     async begin() {
-      const assign = {};
-      for (const [sid, email] of Hunt.sitting()) assign[email] = sid;   // already sitting
-      await window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
-        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` });
+      const prev = this.doc || {}, members = new Set(Family.members.map((m) => m.email)), stands = new Set(Store.data.stands.map((s) => s.id));
+      let last = prev.lastAssign || {};
+      if (!Object.keys(last).length && this.past.length) {   // older days kept only names: match them back
+        last = {};
+        for (const x of this.past[0].sat || []) {
+          const m = Family.members.find((mm) => [mm.name, Family.nameFor(mm.email), mm.email.split("@")[0]].includes(x.name));
+          const st = Store.data.stands.find((s) => (s.name || "?") === x.stand);
+          if (m && st) last[m.email] = st.id;
+        }
+      }
+      const assign = {}, routes = {};
+      for (const [email, sid] of Object.entries(last)) if (sid && members.has(email) && stands.has(sid)) {
+        assign[email] = sid;
+        const r = (prev.lastRoutes || {})[email]; if (r && r.stand === sid) routes[email] = r;
+      }
+      for (const [sid, email] of Hunt.sitting()) { if (assign[email] !== sid) delete routes[email]; assign[email] = sid; }   // already sitting
+      window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
+        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign, routes, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
+        .catch(() => toast("Couldn't save. Check your connection."));
+      if (Object.keys(assign).length) toast("Stands from last time are filled in. Change what differs today.", 6000);
       Hunt.post("daystart");
       showTab("family", true);
     },
@@ -2836,7 +2854,10 @@
         tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
       };
       await window.FB.db.doc(`days/${since}`).set(summary).catch(() => {});
-      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now() }).catch(() => toast("Couldn't save. Check your connection."));
+      // keep who sat where (and their routes) for next time
+      const lastRoutes = {};
+      for (const [email, r] of Object.entries(d.routes || {})) if (r && (d.assign || {})[email]) lastRoutes[email] = { ...r, stand: d.assign[email] };
+      await window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now(), lastAssign: d.assign || {}, lastRoutes }).catch(() => toast("Couldn't save. Check your connection."));
       Hunt.post("dayend");
     },
     render() {
@@ -2849,7 +2870,7 @@
         h += `<h2 class="eyebrow">Hunt day in progress</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
         h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
           const cur = (d.assign || {})[m.email] || "";
-          const opts = `<option value="">–</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
+          const opts = `<option value="">${esc(tr("Choose stand"))}</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("");
           const rt = (d.routes || {})[m.email], hasRoute = cur && rt && rt.pts;
           return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
             <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
