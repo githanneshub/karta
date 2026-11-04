@@ -2241,7 +2241,9 @@
     }
     // what may be shot today, per kind of animal (bock, get, kid, tjur, ko, kalv, hjort, hind…)
     const day = now.toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
-    const big = J.SPECIES.filter((sp) => sp.cats).map((sp) => {
+    // species with something open today first; closed ones (like älg most of the year) below
+    const anyOpen = (sp) => sp.cats.some((c) => !c.never && J.catStatus(c, now).open);
+    const big = J.SPECIES.filter((sp) => sp.cats).sort((a, b) => anyOpen(b) - anyOpen(a)).map((sp) => {
       const chips = sp.cats.map((c) => {
         const st = J.catStatus(c, now), star = c.area ? "*" : "";
         if (c.never) return `<span class="td-cat no"><s>${esc(c.n)}</s><small>${esc(c.never)}</small></span>`;
@@ -2617,8 +2619,9 @@
   };
 
   // ---------- route planner: suggested ways to walk to a stand ----------
-  // Least-cost paths on the 5 m terrain grid. Walking cost per cell comes from the slope, the land (fields,
-  // mires, regrowth, thickets, water) and gets much cheaper on our own trails and on tracks and paths. Three kinds:
+  // Least-cost paths on the 5 m terrain grid, along roads, tracks, paths and our own trails (cross-country only to
+  // reach them from the start and to get from the last one to the stand). Walking cost per cell comes from the slope
+  // and the land (fields, mires, regrowth, thickets, water). Three kinds:
   //   fast   the easiest way: least climbing and rough ground, trails and tracks where they help
   //   quiet  avoids loud ground: dry broadleaf litter, regrowth and dense undergrowth
   //   wind   keeps your scent out of the stand's sector in the current wind, and doesn't cross the sector itself
@@ -2629,7 +2632,7 @@
       const g = window.TerrainWind && window.TerrainWind.slopes[0];
       if (!g) return false;
       const inf = info && info.find((x) => x.origin[0] === g.origin[0] && x.origin[1] === g.origin[1] && x.cell === g.cell);
-      const W = g.width, H = g.height, n = W * H, base = new Float32Array(n), quiet = new Float32Array(n);
+      const W = g.width, H = g.height, n = W * H, base = new Float32Array(n), quiet = new Float32Array(n), net = new Uint8Array(n);
       for (let i = 0; i < n; i++) {
         const sl = g.slope[i];
         let c = 1 + (sl / 12) ** 2 + (sl > 35 ? 25 : 0), q = 0;
@@ -2655,7 +2658,7 @@
             const E = a[0] + (b[0] - a[0]) * t / steps, N = a[1] + (b[1] - a[1]) * t / steps;
             const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
             if (c < 0 || r < 0 || c >= W || r >= H) continue;
-            const i = r * W + c; if (base[i] < 1e3) { base[i] = Math.min(base[i], cost); quiet[i] = 0; }
+            const i = r * W + c; if (base[i] < 1e3) { base[i] = Math.min(base[i], cost); quiet[i] = 0; net[i] = 1; }
           }
         }
       };
@@ -2665,7 +2668,7 @@
         burn(f.geometry.coordinates, kind === "track" || kind === "path" ? 0.4 : 0.5);
       }
       for (const t of Store.data.trails) burn(pairs(t.pts), 0.35);
-      this.grid = g; this.base = base; this.quiet = quiet;
+      this.grid = g; this.base = base; this.quiet = quiet; this.net = net;
       return true;
     },
     cell(ll) {
@@ -2729,7 +2732,10 @@
       const a = this.cell(from), b = this.cell([st.lon, st.lat]);
       if (a < 0 || b < 0) return null;
       const base = this.base, quiet = this.quiet, wind = this.windCost(st), used = new Float32Array(base.length);
-      const kinds = [["fast", (i) => base[i]], ["quiet", (i) => base[i] + 1.6 * quiet[i]], ["wind", (i) => base[i] + wind[i]]];
+      // stay on roads, tracks and our trails: going cross-country costs 25 times as much, so the only off-road bits
+      // are the short ways from the start to the nearest road or trail and from the last one to the stand
+      const net = this.net, walk = (i) => (net[i] ? base[i] : base[i] * 25);
+      const kinds = [["fast", walk], ["quiet", (i) => walk(i) + 1.6 * quiet[i]], ["wind", (i) => walk(i) + wind[i]]];
       const out = [];
       for (const [kind, cost] of kinds) {
         let cells = this.path(a, b, (i) => cost(i) + used[i]);
@@ -2830,7 +2836,7 @@
       }
       const a = Router.cell(this.start.ll), b = Router.cell([st.lon, st.lat]);
       if (a < 0 || b < 0 || v < 0) return;
-      const cost = (i) => Router.base[i], p1 = Router.path(a, v, cost), p2 = Router.path(v, b, cost);
+      const cost = (i) => (Router.net[i] ? Router.base[i] : Router.base[i] * 25), p1 = Router.path(a, v, cost), p2 = Router.path(v, b, cost);
       if (!p1 || !p2) { toast("Couldn't find a way there from that start."); return; }
       const cells = [...p1, ...p2.slice(1)], coords = Router.toCoords(cells, this.start.ll, [st.lon, st.lat]);
       let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
