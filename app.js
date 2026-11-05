@@ -906,7 +906,8 @@
       return `<li data-id="${esc(r.id)}"><span class="it-main"><div class="it-name">${esc(r.name || "Stalk route")}</div>
         <div class="it-sub">${Math.round(st.len)} m · ${st.intoPct}% into the wind now${whoTag(r)}</div></span>
         <button class="btn small ghost" data-del-route="${esc(r.id)}" type="button">Delete</button></li>`;
-    }).join("") : `<li class="empty">No stalk routes yet.</li>`;
+    }).join("") : "";
+    $("#routeHead").hidden = !plans("routes").length;
 
     const filter = $("#logFilter").value;
     const logs = plans("sightings").filter((x) => !filter || x.species === filter).sort((a, b) => (b.when || "").localeCompare(a.when || ""));
@@ -1268,6 +1269,8 @@
       text = `${d < 1000 ? Math.round(d) + " m" : (d / 1000).toFixed(2) + " km"}` + (tool === "measure" ? ` · bearing ${Math.round(Geo.bearing(pts[pts.length - 2], pts[pts.length - 1]))}°` : "");
     }
     if (tool === "boundary" && pts.length >= 3) text = `${Geo.areaHa(pts).toFixed(1)} ha · ${pts.length} corners`;
+    if (tool === "daySpot" && Day.spotFor) text = `Tap the map where ${Family.nameFor(Day.spotFor)} will sit`;
+    if (tool === "routeVia" && RoutePick.pending) text = `Tap the road or track ${Family.nameFor(RoutePick.pending)} will walk on`;
     $("#hintText").textContent = text;
   }
   function updateDraft() {
@@ -2228,7 +2231,8 @@
         <div class="it-sub">${trackLen(t.pts || [])}${(t.marks || []).length ? ` · ${(t.marks || []).length} marks` : ""}${whoTag(t)}</div></span>
         ${!FAMILY || !t.by || (Family.user && t.by === Family.user.email.toLowerCase()) || (Family.member && Family.member.role === "owner")
           ? `<button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button>` : ""}</li>`;
-    }).join("") : `<li class="empty">No recorded tracks yet. Start one with +.</li>`;
+    }).join("") : "";
+    $("#trackHead").hidden = !tl.innerHTML;
   }
 
   function myPos() {
@@ -2956,7 +2960,10 @@
       const at = [+ll[0].toFixed(6), +ll[1].toFixed(6)];
       if (this.placeOf(email)) this.tell(email, "Your stand has been moved. Tap to see it on the map.");
       window.FB.db.doc("map/huntday").update({ spots: { [email]: at }, assign: { [email]: "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
-      setTimeout(() => { showTab("stands", true); RoutePick.open(email); }, 250);   // straight on to the way there
+      // straight on to the way there, as soon as the new spot shows (it can take a moment)
+      let tries = 0;
+      const go = () => { if (this.placeOf(email)) { showTab("stands", true); RoutePick.open(email); } else if (++tries < 20) setTimeout(go, 150); };
+      setTimeout(go, 150);
     },
     whoOn(standId) {
       if (!this.active()) return null;
@@ -3046,7 +3053,7 @@
         }).join("") + `</ul>`;
         if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
       } else {
-        h += `<h2 class="eyebrow">Hunt day</h2><p class="note small">Start a hunt day to give everyone a stand. Given stands count for the shooting-sector warning right away.</p>
+        h += `<h2 class="eyebrow">Hunt day</h2><p class="note small">Start a hunt day, then place everyone's stand on the map and choose their way there.</p>
           <button class="btn primary" type="button" data-day="start">Start hunt day</button>`;
       }
       card.innerHTML = h;
@@ -3098,6 +3105,8 @@
       this.editing = email;
       const f = $("#lookForm");
       $("#lookName").textContent = m.name || email;
+      const rm = $("#lookRemove"), owner = this.member && this.member.role === "owner";
+      rm.hidden = !owner || m.role === "owner"; rm.dataset.remove = email; rm.dataset.confirm = ""; rm.textContent = tr("Remove from the family");
       $("#lookShort").value = (this.looks[email] && this.looks[email].name) || "";
       $("#lookShort").placeholder = m.name || email.split("@")[0];
       $("#lookLetter").value = (this.looks[email] && this.looks[email].letter) || "";
@@ -3269,7 +3278,7 @@
           <div class="it-sub">${esc(this.statusFor(m.email))}</div>${this.readyChips(m.email)}</span>
           ${this.whereIs(m.email) ? `<button class="btn small ghost" type="button" data-coords="${esc(m.email)}">Coordinates</button>` : ""}
           <button class="btn small ghost" type="button" data-look="${esc(m.email)}">Edit</button>
-          ${owner && m.role !== "owner" ? `<button class="btn small ghost" type="button" data-remove="${esc(m.email)}">Remove</button>` : ""}</li>`).join("")
+</li>`).join("")
         : `<li class="empty">Nobody added yet.</li>`;
       // markers for everyone else who has shared
       const keep = new Set();
@@ -3445,6 +3454,12 @@
     });
     $("#lookForm").addEventListener("submit", (e) => { e.preventDefault(); Family.saveLook(); });
     $("#lookCancel").addEventListener("click", () => { $("#lookForm").hidden = true; Family.editing = null; });
+    $("#lookRemove").addEventListener("click", async (e) => {
+      const b = e.currentTarget;
+      if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Tap again to remove"); setTimeout(() => { b.dataset.confirm = ""; b.textContent = tr("Remove from the family"); }, 3000); return; }
+      await window.FB.db.doc(`members/${b.dataset.remove}`).delete().catch(() => toast("Couldn't remove. Try again."));
+      $("#lookForm").hidden = true; Family.editing = null;
+    });
     setMode("signin");
   }
 
