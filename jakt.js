@@ -29,8 +29,8 @@
       { n: "hind och kalv", p: [["10-21", "11-15"], ["03-01", "03-31", SV]] }] },
     { n: "Kronhjort", en: "red deer", g: "Klövvilt", light: HOOF, p: [], note: "Utanför kronhjortsskötselområde bara årskalv. Vuxna djur: inom kronhjortsskötselområde.",
       cats: [{ n: "Årskalv", p: [["08-16", "09-30", SV], ["10-01", "01-31"]] },
-        { n: "Hjort", p: [["10-08", "01-31"]], area: true }, { n: "Hind", p: [["08-16", "09-30", SV], ["10-01", "01-31"], ["02-01", "02-29", SV]], area: true }],
-      today: "Hjort och hind bara inom kronhjortsskötselområde.", sub: [
+        { n: "Hjort", p: [], never: "kräver skötselområde" }, { n: "Hind", p: [], never: "kräver skötselområde" }],
+      today: "Ni har inget kronhjortsskötselområde: bara årskalv.", sub: [
       { n: "årskalv", p: [["08-16", "09-30", SV], ["10-01", "01-31"]] },
       { n: "hjort, i kronhjortsskötselområde", p: [["10-08", "01-31"]] },
       { n: "hind och årskalv, i kronhjortsskötselområde", p: [["08-16", "09-30", SV], ["10-01", "01-31"], ["02-01", "02-29", SV]] }] },
