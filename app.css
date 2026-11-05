@@ -689,4 +689,5 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 #familyList li > .btn { margin-left: 0; }
 #familyList li > .btn:first-of-type { margin-left: 36px; }
 .ready-chip { white-space: nowrap; }
+.sw-cuts { border: 2px dashed #fff; background: rgb(255 255 255 / .12); border-radius: 3px; }
 

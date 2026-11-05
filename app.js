@@ -78,7 +78,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false }, quietMode: "auto",
+    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false, cuts: true }, quietMode: "auto",
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -366,7 +366,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "routeopts", "dayroutes", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "clearcuts", "routeopts", "dayroutes", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -385,6 +385,13 @@
       paint: { "line-color": "#1f6fb5", "line-opacity": .8, "line-width": ["interpolate", ["linear"], ["get", "ha"], 1.5, .8, 20, 2.2, 200, 3.4] } });
     map.addLayer({ id: "drainage-arrows", type: "symbol", source: "drainage", minzoom: 14.5,
       layout: { "symbol-placement": "line", "symbol-spacing": 70, "icon-image": "arrow-blue", "icon-size": .55, "icon-allow-overlap": true, "icon-ignore-placement": true } });
+    // clearcuts newer than the forest data, found in satellite images: a dashed white edge and how big
+    map.addLayer({ id: "cuts-fill", type: "fill", source: "clearcuts", paint: { "fill-color": "#ffffff", "fill-opacity": .08 } });
+    map.addLayer({ id: "cuts-line", type: "line", source: "clearcuts", layout: { "line-join": "round" },
+      paint: { "line-color": "#ffffff", "line-width": 2, "line-dasharray": [3, 2], "line-opacity": .9 } });
+    map.addLayer({ id: "cuts-label", type: "symbol", source: "clearcuts", minzoom: 14,
+      layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12 },
+      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
     // game model: bedding (solid blue) and feeding (dashed yellow) outlines with a faint tint
     const ZONE = ["match", ["get", "k"], "bed", "#5ec8ff", "#ffe14d"];
     map.addLayer({ id: "gamezones-fill", type: "fill", source: "gamezones", paint: { "fill-color": ZONE, "fill-opacity": .1 } });
@@ -513,7 +520,7 @@
     // data
     addImageSet(prefs.base, "anchor-base");
     // vector layers: one file per area, merged into one map source each
-    for (const k of ["osm", "reserves", "drainage", "contours", "gamezones"]) {
+    for (const k of ["osm", "reserves", "drainage", "contours", "gamezones", "clearcuts"]) {
       Promise.all(manifests.map((m) => getFresh(`data/${m.id}/${k}.geojson`).catch(() => FC())))
         .then((parts) => { vectors[k] = parts.flatMap((d) => d.features); map.getSource(k).setData(FC(vectors[k])); if (k === "osm") Router.base = null; });
     }
@@ -537,12 +544,13 @@
     sightings: ["sightings", "sightings-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
+    cuts: ["cuts-fill", "cuts-line", "cuts-label"],
     game: ["gamezones-fill", "gamezones-case", "gamezones-bed", "gamezones-food"],
     trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
   };
   function applyLayers() {
     if (!manifests.length) return;
-    for (const b of ["forest", "relief", "height"]) setImageSetVisible(b, prefs.base === b);
+    for (const b of ["forest", "relief", "height", "sat"]) setImageSetVisible(b, prefs.base === b);
     for (const [k, ids] of Object.entries(OV_LAYERS)) ids.forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, "visibility", prefs.ov[k] ? "visible" : "none"));
     setImageSetVisible("wet", prefs.ov.wet);
     setImageSetVisible("steep", prefs.ov.steep);
@@ -564,6 +572,9 @@
     } else if (prefs.base === "height") {
       el.innerHTML = `<i class="ramp" style="background:${HEIGHT_RAMP}"></i><div class="ramp-labels"><span>0 m</span><span>5</span><span>10</span><span>16</span><span>22</span><span>30 m</span></div>
         <div class="note small" style="grid-column:1/-1">Pale patches are open ground or young plantings; dark is tall, old forest.</div>`;
+    } else if (prefs.base === "sat") {
+      const d = manifests.map((m) => m.satDate).find(Boolean);
+      el.innerHTML = `<div class="note small" style="grid-column:1/-1">${esc(tr("Sentinel-2 satellite image, 10 m"))}${d ? ` · ${esc(new Date(d).toLocaleDateString("sv-SE", { day: "numeric", month: "short", year: "numeric" }))}` : ""}. ${esc(tr("Shows the ground as it is now: new clearcuts, felled and wind-thrown areas."))}</div>`;
     } else {
       el.innerHTML = `<div class="note small" style="grid-column:1/-1">Laser-scanned ground with the trees removed, lit from the northwest. Ditches, stone walls, boulders and old tracks stand out.</div>`;
     }
