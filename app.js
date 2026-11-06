@@ -2487,7 +2487,10 @@
       db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
       // why phones were refused, written by the receiver (otlog/<email>, otlog/_other for addresses outside the family)
       db.collection("otlog").onSnapshot((snap) => {
-        this.log = new Map(snap.docs.map((d) => [d.id === "_other" ? "_other" : d.data().email || d.id, d.data()]));
+        const docs = snap.docs.filter((d) => !d.id.startsWith("hit_"));
+        this.log = new Map(docs.map((d) => [d.id === "_other" ? "_other" : d.data().email || d.id, d.data()]));
+        // every request from each phone, whatever happened to it (otlog/hit_<email>)
+        this.hits = new Map(snap.docs.filter((d) => d.id.startsWith("hit_")).map((d) => [d.data().email, d.data()]));
         Family.render(); this.render();
       }, () => {});
       db.doc(`ottokens/${this.me()}`).onSnapshot((snap) => {
@@ -2535,6 +2538,18 @@
       if (l && lt > vt) { const w = OT_WHY[l.why] || [l.why, l.why]; return { ok: false, at: lt, short: w[0], long: w[1] }; }
       return v ? { ok: true, at: vt, v } : null;
     },
+    // what the receiver last heard from this person's phone, in words
+    hitLine(email) {
+      const h = this.hits && this.hits.get(email);
+      if (!h || !h.at || !h.at.toMillis) return "Telefonen har inte hörts av sedan loggen startade.";
+      const what = h.what === "saved" ? "position sparad"
+        : h.what === "older" ? `gammal position från ${h.pos && h.pos.toMillis ? new Date(h.pos.toMillis()).toLocaleString("sv-SE", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" }) : "?"} (bara historik)`
+        : h.what === "wrong-code" ? "nekad, fel kod"
+        : h.what === "save-failed" ? "kunde inte spara"
+        : h.what.startsWith("other:") ? `annat meddelande (${h.what.slice(6)}), ingen position`
+        : h.what;
+      return `Telefonen hördes ${this.clock(h.at.toMillis())}: ${what}.`;
+    },
     clock(ms) {
       const min = Math.max(0, Math.round((Date.now() - ms) / 60000));
       const ago = min < 1 ? "nyss" : min < 60 ? `${min} min sedan` : min < 48 * 60 ? `${Math.round(min / 60)} h sedan` : `${Math.round(min / 1440)} dagar sedan`;
@@ -2579,6 +2594,7 @@
         else if (g !== 200) fix = `Google svarar med fel ${esc(String(g))}. Försök igen om en stund.`;
         else if (!rec) fix = "Google-skriptet är en gammal version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
         else if (rec.firestore !== 200) fix = "Google-skriptet kommer inte åt databasen. Välj testAccess i Apps Script och tryck Kör en gång.";
+        else if (String(rec.receiver) < "2026-11-06b") fix = "Google-skriptet är en äldre version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
       }
       const st = this.statusOf(this.me());
       // set up OwnTracks on this phone, right here: one button and three steps
@@ -3446,7 +3462,8 @@
       const chip = (ok, text) => `<span class="ready-chip ${ok ? "ok" : ""}">${ok ? "✓" : "–"} ${esc(text)}</span>`;
       // a refused phone says why, right next to the name
       const ot = st && !st.ok ? `<span class="ready-chip low" translate="no">✗ OwnTracks: ${esc(st.short)} ${esc(OT.clock(st.at))}</span>` : chip(otOk, tr("OwnTracks") + mode);
-      return `<div class="ready">${ot}${chip(nt, tr("Notifications"))}${batt !== null ? `<span class="ready-chip${batt <= 20 ? " low" : " ok"}">🔋 ${batt}%</span>` : ""}</div>`;
+      return `<div class="ready">${ot}${chip(nt, tr("Notifications"))}${batt !== null ? `<span class="ready-chip${batt <= 20 ? " low" : " ok"}">🔋 ${batt}%</span>` : ""}</div>` +
+        `<div class="hit-line" translate="no">${esc(OT.hitLine(email))}</div>`;
     },
     // where someone is: their latest position (my own: the map's GPS or my OwnTracks)
     whereIs(email) {
