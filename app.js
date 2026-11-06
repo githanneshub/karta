@@ -78,7 +78,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false, cuts: true }, quietMode: "auto",
+    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false, cuts: true, places: true }, quietMode: "auto", maskAlpha: 32,
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -547,7 +547,8 @@
     drainage: ["drainage", "drainage-arrows"],
     cuts: ["cuts-fill", "cuts-line", "cuts-label"],
     game: ["gamezones-fill", "gamezones-case", "gamezones-bed", "gamezones-food"],
-    trails: ["trails-case", "trails", "trails-label", "places-dot", "places-label"],
+    trails: ["trails-case", "trails", "trails-label"],
+    places: ["places-dot", "places-label"],
   };
   function applyLayers() {
     if (!manifests.length) return;
@@ -563,6 +564,9 @@
     $("#quietLegend").hidden = !prefs.ov.quiet;
     Ground.render();
     for (const id of ["cones", "cones-line"]) map.setLayoutProperty(id, "visibility", prefs.cones ? "visible" : "none");
+    // how dark the ground outside the hunting boundary is (0 = not at all)
+    if (map.getLayer("mask")) map.setPaintProperty("mask", "fill-opacity", prefs.maskAlpha / 100);
+    $("#maskRow").hidden = !prefs.ov.boundary;
   }
 
   function renderLegend() {
@@ -1822,6 +1826,8 @@
       c.addEventListener("change", () => { prefs.ov[c.dataset.ov] = c.checked; savePrefs(); applyLayers(); if (prefs.ov.quiet) Ground.load(); });
     });
     $$("[data-quiet]").forEach((b) => b.addEventListener("click", () => { prefs.quietMode = b.dataset.quiet; savePrefs(); applyLayers(); }));
+    $("#maskAlpha").value = prefs.maskAlpha; $("#maskOut").textContent = prefs.maskAlpha + " %";
+    $("#maskAlpha").addEventListener("input", (e) => { prefs.maskAlpha = +e.target.value; $("#maskOut").textContent = prefs.maskAlpha + " %"; savePrefs(); applyLayers(); });
     $("#tilt").addEventListener("click", () => set3D(!is3D));
     $("#exag").value = prefs.exag; $("#exagOut").textContent = prefs.exag + "×";
     $("#exag").addEventListener("input", (e) => {
@@ -3246,9 +3252,23 @@
       if (!m) { this.gate("noaccess"); return; }
       this.member = m;
       $("#gate").hidden = true;
-      if (!this.ready) this.start();
+      if (!this.ready) { this.start(); this.offerBoundary(); window.addEventListener("hashchange", () => this.offerBoundary()); }
       this.ready = true;
       this.render();
+    },
+    // A new hunting boundary handed to the owner as a link (…/karta/#grans=<base64 JSON {pts, ha}>). The part after #
+    // never leaves the phone, so the boundary isn't published anywhere; the owner confirms, and it's saved for everyone.
+    offerBoundary() {
+      const m = location.hash.match(/^#grans=([A-Za-z0-9_-]+)$/); if (!m) return;
+      history.replaceState(null, "", location.pathname + location.search);
+      if (!(this.member && this.member.role === "owner")) { toast("Bara kartans ägare kan byta jaktgränsen."); return; }
+      let d;
+      try { d = JSON.parse(atob(m[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch { d = null; }
+      if (!d || !Array.isArray(d.pts) || d.pts.length < 6 || d.pts.some((v) => typeof v !== "number")) { toast("Länken till den nya gränsen är trasig."); return; }
+      setTimeout(() => {
+        if (!confirm(`Byta jaktgränsen till den nya från Lantmäteriets karta (${String(d.ha).replace(".", ",")} ha)? Den gamla ersätts för alla.`)) return;
+        Store.setBoundary(d.pts).then(() => toast("Jaktgränsen är uppdaterad."));
+      }, 1500);
     },
     gate(view) {
       $("#gate").hidden = false;

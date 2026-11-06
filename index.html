@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "674817ee03";</script>
-<script src="firebase-config.js?v=674817ee03"></script>
-<script type="module" src="fb.js?v=674817ee03"></script>
+<script>window.APP_VERSION = "bfea4bc1c7";</script>
+<script src="firebase-config.js?v=bfea4bc1c7"></script>
+<script type="module" src="fb.js?v=bfea4bc1c7"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=674817ee03">
-<link rel="stylesheet" href="app.css?v=674817ee03">
+<link rel="stylesheet" href="maplibre-gl.css?v=bfea4bc1c7">
+<link rel="stylesheet" href="app.css?v=bfea4bc1c7">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -62,7 +62,8 @@
 
         <h2 class="eyebrow">Layers</h2>
         <ul class="toggles">
-          <li><label><input type="checkbox" id="ov-trails" data-ov="trails" checked><span class="sw sw-trail"></span>Our trails &amp; places</label></li>
+          <li><label><input type="checkbox" id="ov-trails" data-ov="trails" checked><span class="sw sw-trail"></span>Our trails</label></li>
+          <li><label><input type="checkbox" id="ov-places" data-ov="places" checked><span class="sw sw-place"></span>Place names <small>entrances, parking</small></label></li>
           <li><label><input type="checkbox" id="ov-contours" data-ov="contours" checked><span class="sw sw-contour"></span>Contours <small>1 m · 5 m</small></label></li>
           <li><label><input type="checkbox" id="ov-roads" data-ov="roads" checked><span class="sw sw-road"></span>Roads, tracks &amp; paths</label></li>
           <li><label><input type="checkbox" id="ov-sightings" data-ov="sightings" checked><span class="sw sw-sight"></span>Sightings</label></li>
@@ -82,7 +83,8 @@
               <div class="seg" role="group" aria-label="Dry or wet"><button type="button" data-quiet="auto">Auto</button><button type="button" data-quiet="dry">Dry</button><button type="button" data-quiet="wet">Wet</button></div>
               <small>After rain the leaves are much quieter. Auto picks from SMHI's measured rain. Built from forest data, not walked.</small>
             </div></li>
-          <li><label><input type="checkbox" id="ov-boundary" data-ov="boundary" checked><span class="sw sw-boundary"></span>Your hunting boundary</label></li>
+          <li><label><input type="checkbox" id="ov-boundary" data-ov="boundary" checked><span class="sw sw-boundary"></span>Your hunting boundary</label>
+            <div class="mask-row" id="maskRow" translate="no"><span>Mörka utanför</span><input type="range" id="maskAlpha" min="0" max="85" step="1" aria-label="Hur mörkt utanför jaktgränsen"><output id="maskOut"></output></div></li>
         </ul>
         <details class="sect more-layers">
           <summary>More layers</summary>
@@ -476,12 +478,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=674817ee03"></script>
-<script src="geo.js?v=674817ee03"></script>
-<script src="view.js?v=674817ee03"></script>
-<script src="wind.js?v=674817ee03"></script>
-<script src="jakt.js?v=674817ee03"></script>
-<script src="app.js?v=674817ee03"></script>
+<script src="i18n.js?v=bfea4bc1c7"></script>
+<script src="geo.js?v=bfea4bc1c7"></script>
+<script src="view.js?v=bfea4bc1c7"></script>
+<script src="wind.js?v=bfea4bc1c7"></script>
+<script src="jakt.js?v=bfea4bc1c7"></script>
+<script src="app.js?v=bfea4bc1c7"></script>
 
 </body>
 </html>

@@ -703,3 +703,7 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 #lookOtBox { margin-top: 10px; }
 #lookOtBox .note { margin: 4px 0 0; }
 .hit-line { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.mask-row { display: flex; align-items: center; gap: 10px; margin: 4px 0 2px 32px; font-size: 13px; color: var(--muted); }
+.mask-row input { flex: 1; min-width: 0; }
+.mask-row output { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.sw-place { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #1b1f18; }
