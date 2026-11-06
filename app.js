@@ -2542,7 +2542,8 @@
     hitLine(email) {
       const h = this.hits && this.hits.get(email);
       if (!h || !h.at || !h.at.toMillis) return "Telefonen har inte hörts av sedan loggen startade.";
-      const what = h.what === "saved" ? "position sparad"
+      const posAt = h.pos && h.pos.toMillis ? new Date(h.pos.toMillis()).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }) : "";
+      const what = h.what === "saved" ? `position sparad${posAt ? `, tagen ${posAt}` : ""}`
         : h.what === "older" ? `gammal position från ${h.pos && h.pos.toMillis ? new Date(h.pos.toMillis()).toLocaleString("sv-SE", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" }) : "?"} (bara historik)`
         : h.what === "wrong-code" ? "nekad, fel kod"
         : h.what === "save-failed" ? "kunde inte spara"
