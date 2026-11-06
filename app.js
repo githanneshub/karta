@@ -2542,7 +2542,11 @@
     hitLine(email) {
       const h = this.hits && this.hits.get(email);
       if (!h || !h.at || !h.at.toMillis) return "Telefonen har inte hörts av sedan loggen startade.";
-      const posAt = h.pos && h.pos.toMillis ? new Date(h.pos.toMillis()).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }) : "";
+      const pm = h.pos && h.pos.toMillis ? h.pos.toMillis() : 0;
+      const posAt = !pm ? "" : new Date(pm).toDateString() === new Date().toDateString()
+        ? new Date(pm).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })
+        : new Date(pm).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+      if (h.what === "old-skipped") return `Telefonen tömmer sin kö (${this.clock(h.at.toMillis())}): hoppar över gamla positioner, nu vid ${posAt}. Strax syns den live.`;
       const what = h.what === "saved" ? `position sparad${posAt ? `, tagen ${posAt}` : ""}`
         : h.what === "older" ? `gammal position från ${h.pos && h.pos.toMillis ? new Date(h.pos.toMillis()).toLocaleString("sv-SE", { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" }) : "?"} (bara historik)`
         : h.what === "wrong-code" ? "nekad, fel kod"
@@ -2595,7 +2599,7 @@
         else if (g !== 200) fix = `Google svarar med fel ${esc(String(g))}. Försök igen om en stund.`;
         else if (!rec) fix = "Google-skriptet är en gammal version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
         else if (rec.firestore !== 200) fix = "Google-skriptet kommer inte åt databasen. Välj testAccess i Apps Script och tryck Kör en gång.";
-        else if (String(rec.receiver) < "2026-11-06b") fix = "Google-skriptet är en äldre version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
+        else if (String(rec.receiver) < "2026-11-06c") fix = "Google-skriptet är en äldre version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
       }
       const st = this.statusOf(this.me());
       // set up OwnTracks on this phone, right here: one button and three steps
