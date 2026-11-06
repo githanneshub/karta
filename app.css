@@ -691,3 +691,14 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .ready-chip { white-space: nowrap; }
 .sw-cuts { border: 2px dashed #fff; background: rgb(255 255 255 / .12); border-radius: 3px; }
 
+/* OwnTracks connection check in the Familj tab */
+.ot-check { margin: 8px 0 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--raise); }
+.ot-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ot-chain .btn { margin-left: auto; }
+.ot-link { font-size: 12.5px; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.ot-link.ok { border-color: var(--good); color: var(--good); font-weight: 600; }
+.ot-link.bad { border-color: var(--bad); color: var(--bad); font-weight: 600; }
+.ot-fix { margin: 8px 0 4px; padding: 7px 10px; border-radius: 8px; background: color-mix(in srgb, var(--bad) 22%, var(--raise)); font-size: 13.5px; }
+.ot-check .note { margin: 6px 0 0; }
+#lookOtBox { margin-top: 10px; }
+#lookOtBox .note { margin: 4px 0 0; }

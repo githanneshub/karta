@@ -260,6 +260,7 @@
   function showTab(name, expand) {
     prefs.tab = name; savePrefs();
     if (name === "seasons") renderSeasons();
+    if (name === "family") { try { OT.check(); } catch { /* not started yet */ } }
     $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
     $$(".pane").forEach((p) => { p.hidden = p.id !== "pane-" + name; });
     if (expand && isPhone()) setSheet("open");
@@ -2476,10 +2477,19 @@
   // OwnTracks posts to the family's Apps Script receiver (tools/owntracks), which writes positions/ot_<email>.
   // The receiver's address lives in map/config (the owner sets it); each person's code in ottokens/<email>,
   // which only they can read (made here on first use, never replaced: OwnTracks keeps the address it was given).
+  const OT_WHY = {
+    "wrong-code": ["fel kod", "Adressen i OwnTracks har fel kod. Kopiera adressen igen och klistra in den i OwnTracks."],
+    "save-failed": ["kunde inte spara", "Mottagaren kom inte åt databasen. Kör testAccess i Apps Script en gång."],
+  };
   const OT = {
-    url: "", code: "", codeLoaded: false,
+    url: "", code: "", codeLoaded: false, log: new Map(), chk: null, chkAt: 0, addr: {},
     start(db) {
       db.doc("map/config").onSnapshot((snap) => { this.url = (snap.exists && snap.data().otUrl) || ""; this.render(); }, () => {});
+      // why phones were refused, written by the receiver (otlog/<email>, otlog/_other for addresses outside the family)
+      db.collection("otlog").onSnapshot((snap) => {
+        this.log = new Map(snap.docs.map((d) => [d.id === "_other" ? "_other" : d.data().email || d.id, d.data()]));
+        Family.render(); this.render();
+      }, () => {});
       db.doc(`ottokens/${this.me()}`).onSnapshot((snap) => {
         if (snap.metadata && snap.metadata.fromCache && !snap.exists) return;   // wait for the server before deciding there's no code
         this.code = (snap.exists && snap.data().code) || ""; this.codeLoaded = true; this.render();
@@ -2491,21 +2501,99 @@
       this.making = true;
       // an older version kept everyone's codes in one shared record: carry mine over so OwnTracks keeps working
       const old = await window.FB.db.doc("map/ot_tokens").get().catch(() => null);
-      let tok = old && old.exists ? old.data()[this.me()] || "" : "";
-      if (!tok) {
-        const a = new Uint8Array(15); crypto.getRandomValues(a);
-        tok = btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
-      }
+      const tok = (old && old.exists ? old.data()[this.me()] || "" : "") || this.newCode();
       // re-read first: another of my devices may have made one a moment ago
       const cur = await window.FB.db.doc(`ottokens/${this.me()}`).get().catch(() => null);
       if (!(cur && cur.exists && cur.data().code)) await window.FB.db.doc(`ottokens/${this.me()}`).set({ code: tok }).catch(() => {});
       this.making = false;
     },
+    newCode() {
+      const a = new Uint8Array(15); crypto.getRandomValues(a);
+      return btoa(String.fromCharCode(...a)).replace(/[^A-Za-z0-9]/g, "").slice(0, 18);
+    },
+    build(email, code) { return `${this.url}${this.url.includes("?") ? "&" : "?"}u=${encodeURIComponent(email)}&k=${code}`; },
     personalUrl() {
       const t = this.code; if (!this.url || !t) return "";
-      return `${this.url}${this.url.includes("?") ? "&" : "?"}u=${encodeURIComponent(this.me())}&k=${t}`;
+      return this.build(this.me(), t);
+    },
+    // the owner sets up a phone for someone who can't sign in themselves: their address with their own code
+    // (made now if they have none; a phone that already works keeps working, the receiver accepts the old code too)
+    async addressFor(email) {
+      if (email === this.me()) { await this.ensureToken(); return this.personalUrl(); }
+      if (this.addr[email]) return this.addr[email];
+      const ref = window.FB.db.doc(`ottokens/${email}`);
+      const d = await ref.get().catch(() => null);
+      if (!d) return "";   // not allowed: the new security rules aren't published yet
+      let code = d.exists && d.data().code;
+      if (!code) { code = this.newCode(); if (await ref.set({ code }).then(() => false, () => true)) return ""; }
+      return (this.addr[email] = this.build(email, code));
+    },
+    // OwnTracks for one person: ok (positions arrive) or refused (why), whichever happened last; null = nothing yet
+    statusOf(email) {
+      const v = Family.otBy && Family.otBy.get(email), l = this.log.get(email);
+      const vt = v ? Family.posTime(v) : 0, lt = l && l.at && l.at.toMillis ? l.at.toMillis() : 0;
+      if (l && lt > vt) { const w = OT_WHY[l.why] || [l.why, l.why]; return { ok: false, at: lt, short: w[0], long: w[1] }; }
+      return v ? { ok: true, at: vt, v } : null;
+    },
+    clock(ms) {
+      const min = Math.max(0, Math.round((Date.now() - ms) / 60000));
+      const ago = min < 1 ? "nyss" : min < 60 ? `${min} min sedan` : min < 48 * 60 ? `${Math.round(min / 60)} h sedan` : `${Math.round(min / 1440)} dagar sedan`;
+      return `${new Date(ms).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })} (${ago})`;
+    },
+    // the chain the positions travel: Cloudflare forwarder → Google receiver → database
+    async check(force) {
+      if (!this.url || this.checking || (!force && Date.now() - this.chkAt < 5 * 60000)) return;
+      this.checking = true; this.renderCheck();
+      let c;
+      try {
+        const u = new URL(this.url); u.searchParams.set("check", "1");
+        const r = await fetch(u.toString(), { cache: "no-store" });
+        const text = await r.text();
+        try { c = JSON.parse(text); } catch { c = { worker: true, oldWorker: text.startsWith("Alnaryd") }; }
+      } catch {
+        // an old forwarder doesn't allow the map to read its answer, but it does answer
+        const alive = await fetch(this.url, { mode: "no-cors", cache: "no-store" }).then(() => true, () => false);
+        c = alive ? { worker: true, oldWorker: true } : { worker: false };
+      }
+      this.chk = c; this.chkAt = Date.now(); this.checking = false; this.renderCheck();
+    },
+    renderCheck() {
+      const box = $("#otCheck"); if (!box) return;
+      box.hidden = !this.url || !Family.user;
+      if (box.hidden) return;
+      if (!$("#pane-family").hidden && !this.chk && !this.checking) this.check();
+      const c = this.chk, owner = Family.member && Family.member.role === "owner";
+      const chip = (state, text) => `<span class="ot-link ${state}">${state === "ok" ? "✓" : state === "bad" ? "✗" : "…"} ${text}</span>`;
+      let links, fix = "";
+      if (!c) links = chip("wait", "Cloudflare") + chip("wait", "Google") + chip("wait", "Databasen");
+      else {
+        const g = c.google, rec = c.receiver;
+        const cf = c.worker ? (c.oldWorker ? "bad" : "ok") : "bad";
+        const gs = c.worker && !c.oldWorker ? (g === 200 && rec ? "ok" : "bad") : "wait";
+        const db = rec ? (rec.firestore === 200 ? "ok" : "bad") : "wait";
+        links = chip(cf, "Cloudflare") + chip(gs, "Google") + chip(db, "Databasen");
+        if (!c.worker) fix = "Cloudflare svarar inte. Är adressen rätt (Ändra mottagaradress längre ner)?";
+        else if (c.oldWorker) fix = "Cloudflare kör en gammal version av vidarebefordraren. Lägg in nya worker.js (tools/owntracks).";
+        else if (g === "not-set" || g === 404) fix = "Adressen till Google-skriptet i Cloudflare är fel. Den ska vara Webbapp-adressen som slutar på /exec (Apps Script → Driftsätt → Hantera driftsättningar).";
+        else if (g === 401 || g === 403) fix = "Google-skriptet är inte öppet. Apps Script → Driftsätt → Hantera driftsättningar → pennan → Åtkomst: Alla → Driftsätt.";
+        else if (g !== 200) fix = `Google svarar med fel ${esc(String(g))}. Försök igen om en stund.`;
+        else if (!rec) fix = "Google-skriptet är en gammal version. Klistra in nya Code.gs → Hantera driftsättningar → pennan → Version: Ny version → Driftsätt.";
+        else if (rec.firestore !== 200) fix = "Google-skriptet kommer inte åt databasen. Välj testAccess i Apps Script och tryck Kör en gång.";
+      }
+      const st = this.statusOf(this.me());
+      const mine = !st ? `<p class="ot-last"><b>Din telefon:</b> inget har kommit från din OwnTracks än.</p>`
+        : st.ok ? `<p class="ot-last ok"><b>Din telefon:</b> ✓ senast ${esc(this.clock(st.at))}${OT_MODES[st.v.mode] ? ` · ${OT_MODES[st.v.mode]}` : ""}</p>`
+        : `<p class="ot-last"><b>Din telefon:</b> ✗ nekad ${esc(this.clock(st.at))}. ${esc(st.long)}</p>`;
+      // addresses that aren't in the family (only the owner can do something about those)
+      const o = this.log.get("_other"), ot = o && o.at && o.at.toMillis ? o.at.toMillis() : 0;
+      const other = owner && o && Date.now() - ot < 24 * 3600e3
+        ? `<p class="ot-last">✗ ${esc(this.clock(ot))}: ${o.why === "not-member" ? `<b>${esc(o.email || "?")}</b> är inte med i familjen. Lägg till hen med exakt den adressen, eller kopiera rätt adress till telefonen.` : o.why === "no-code" ? "en telefon skickade en adress utan kod. Kopiera adressen igen." : "fel i mottagaren: " + esc(o.email || "")}</p>` : "";
+      box.innerHTML = `<div class="ot-chain">${links}<button class="btn small ghost" type="button" data-ot="check"${this.checking ? " disabled" : ""}>${this.checking ? "Kontrollerar…" : "Kontrollera"}</button></div>
+        ${fix ? `<p class="ot-fix">${fix}</p>` : ""}${mine}${other}
+        <p class="note small">Testa en telefon: öppna OwnTracks och tryck på pilen uppe till höger. Raden här och bocken vid namnet uppdateras inom några sekunder.</p>`;
     },
     render() {
+      this.renderCheck();
       const box = $("#otBox"); if (!box || !Family.user) return;
       const owner = Family.member && Family.member.role === "owner";
       if (!this.url) {
@@ -2530,15 +2618,16 @@
             <li><b translate="no">URL</b>: <span>paste your address</span></li></ul></li>
           <li><span>Further down in Settings, under Expert Mode:</span><ul>
             <li><b translate="no">locatorDisplacement</b>: 15</li>
-            <li><b translate="no">locatorInterval</b>: 60</li></ul></li>
-          <li><span>Settings → Remote Control: turn on</span> <b translate="no">cmd</b> <span>and</span> <b translate="no">remote configuration</b>. <span>Then OwnTracks switches between Move and battery-saving by itself.</span></li>
+            <li><b translate="no">locatorInterval</b>: 60</li>
+            <li translate="no"><b>downgrade</b>: 0 <span>(annars byter den till Significant av sig själv när batteriet är lågt)</span></li></ul></li>
           <li><span>iPhone settings → OwnTracks → Location:</span> <b>Always</b>, <span>and Precise Location on. Also: General → Background App Refresh → OwnTracks on.</span></li>
-          <li><span>Within a minute the line above turns green. Done.</span></li>
+          <li translate="no">Tryck på pilen uppe till höger i OwnTracks. Inom några sekunder blir raden "Din telefon" ovan grön. Klart.</li>
         </ol>
-        <h3 class="ot-h">Every hunt</h3>
-        <p class="note small"><span>When you leave for the hunt: set OwnTracks to</span> <b translate="no">Significant</b>. <span>It switches to</span> <b translate="no">Move</b> <span>by itself at the hunting ground or when a hunt day starts.</span><br>
-          <span>When you're home again: set it to</span> <b translate="no">Quiet</b> <span>(nothing is shared). Switch at home, not at the hunting ground, or you'll look like you're still there.</span><br>
-          <span>Don't swipe OwnTracks away, and avoid Low Power Mode during the hunt.</span></p>
+        <h3 class="ot-h" translate="no">Varje jakt</h3>
+        <p class="note small" translate="no">Du väljer läget själv, inget byts automatiskt:<br>
+          <b>Move</b> när du åker på jakt: en position i minuten, alla ser dig hela tiden.<br>
+          <b>Quiet</b> när du är hemma igen: inget delas. Byt hemma, inte på marken, annars ser det ut som att du är kvar.<br>
+          Svep inte bort OwnTracks och undvik Energisparläge under jakten.</p>
         ${owner ? `<p class="note small"><button class="btn small ghost" type="button" data-ot="reset">Change receiver address</button></p>` : ""}`
         : `<p class="note small">Making your personal code…</p>`;
     },
@@ -3107,6 +3196,9 @@
       $("#lookName").textContent = m.name || email;
       const rm = $("#lookRemove"), owner = this.member && this.member.role === "owner";
       rm.hidden = !owner || m.role === "owner"; rm.dataset.remove = email; rm.dataset.confirm = ""; rm.textContent = tr("Remove from the family");
+      // the owner can hand someone their OwnTracks address (fetched now, so sharing works straight from the tap)
+      $("#lookOtBox").hidden = !owner || !OT.url || email === OT.me();
+      if (owner && OT.url && email !== OT.me()) OT.addressFor(email);
       $("#lookShort").value = (this.looks[email] && this.looks[email].name) || "";
       $("#lookShort").placeholder = m.name || email.split("@")[0];
       $("#lookLetter").value = (this.looks[email] && this.looks[email].letter) || "";
@@ -3168,10 +3260,11 @@
       db.collection("positions").onSnapshot((snap) => {
         if (!this.user) return;   // signing out: one last cached update can still arrive
         const best = new Map(), me = this.user.email.toLowerCase();
-        this.otMine = null;
+        this.otMine = null; this.otBy = new Map();   // each person's OwnTracks position, even when the map's GPS is newer
         for (const d of snap.docs) {
           const v = d.data(), k = v.email || d.id, t = this.posTime(v), cur = best.get(k);
           if (v.src === "owntracks" && v.email === me) this.otMine = v;
+          if (v.src === "owntracks" && v.email) this.otBy.set(v.email, v);
           if (!cur || t > cur.t) best.set(k, { id: d.id, v, t });
         }
         // my own entry is keyed by my uid so the map never draws me as someone else
@@ -3335,12 +3428,14 @@
     },
     // ready for the hunt: OwnTracks sending (and in which mode), notifications tested, battery
     readyChips(email) {
-      const v = [...this.positions.values()].find((x) => x.email === email && x.src === "owntracks");
-      const otOk = v && this.ageMin(v) !== null && this.ageMin(v) < 24 * 60;
+      const v = this.otBy && this.otBy.get(email), st = OT.statusOf(email);
+      const otOk = st && st.ok && this.ageMin(v) !== null && this.ageMin(v) < 24 * 60;
       const mode = otOk && typeof v.mode === "number" && OT_MODES[v.mode] ? ` (${OT_MODES[v.mode]})` : "";
       const nt = !!Ntfy.ok[email], batt = v && typeof v.batt === "number" ? v.batt : null;
       const chip = (ok, text) => `<span class="ready-chip ${ok ? "ok" : ""}">${ok ? "✓" : "–"} ${esc(text)}</span>`;
-      return `<div class="ready">${chip(otOk, tr("OwnTracks") + mode)}${chip(nt, tr("Notifications"))}${batt !== null ? `<span class="ready-chip${batt <= 20 ? " low" : " ok"}">🔋 ${batt}%</span>` : ""}</div>`;
+      // a refused phone says why, right next to the name
+      const ot = st && !st.ok ? `<span class="ready-chip low" translate="no">✗ OwnTracks: ${esc(st.short)} ${esc(OT.clock(st.at))}</span>` : chip(otOk, tr("OwnTracks") + mode);
+      return `<div class="ready">${ot}${chip(nt, tr("Notifications"))}${batt !== null ? `<span class="ready-chip${batt <= 20 ? " low" : " ok"}">🔋 ${batt}%</span>` : ""}</div>`;
     },
     // where someone is: their latest position (my own: the map's GPS or my OwnTracks)
     whereIs(email) {
@@ -3454,6 +3549,17 @@
     });
     $("#lookForm").addEventListener("submit", (e) => { e.preventDefault(); Family.saveLook(); });
     $("#lookCancel").addEventListener("click", () => { $("#lookForm").hidden = true; Family.editing = null; });
+    $("#lookOt").addEventListener("click", async () => {
+      const email = Family.editing; if (!email) return;
+      const name = Family.nameFor(email), url = OT.addr[email] || await OT.addressFor(email);
+      if (!url) { toast("Kunde inte hämta koden. Publicera de nya säkerhetsreglerna i Firebase och försök igen.", 6000); return; }
+      if (navigator.share) {
+        try { await navigator.share({ text: url }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+      }
+      try { await navigator.clipboard.writeText(url); toast(`${name}s adress kopierad. Klistra in den under URL i OwnTracks på ${name}s telefon.`, 6000); }
+      catch { prompt(`${name}s OwnTracks-adress:`, url); }
+    });
+    $("#otCheck").addEventListener("click", (e) => { if (e.target.closest('[data-ot="check"]')) OT.check(true); });
     $("#lookRemove").addEventListener("click", async (e) => {
       const b = e.currentTarget;
       if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Tap again to remove"); setTimeout(() => { b.dataset.confirm = ""; b.textContent = tr("Remove from the family"); }, 3000); return; }

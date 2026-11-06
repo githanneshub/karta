@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "dd1460df1f";</script>
-<script src="firebase-config.js?v=dd1460df1f"></script>
-<script type="module" src="fb.js?v=dd1460df1f"></script>
+<script>window.APP_VERSION = "55f22fdc3a";</script>
+<script src="firebase-config.js?v=55f22fdc3a"></script>
+<script type="module" src="fb.js?v=55f22fdc3a"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=dd1460df1f">
-<link rel="stylesheet" href="app.css?v=dd1460df1f">
+<link rel="stylesheet" href="maplibre-gl.css?v=55f22fdc3a">
+<link rel="stylesheet" href="app.css?v=55f22fdc3a">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -306,6 +306,7 @@
       <section class="pane" id="pane-family" role="tabpanel" aria-labelledby="tab-family" hidden>
         <h2 class="eyebrow">Family</h2>
         <ul class="items" id="familyList"></ul>
+        <div class="ot-check" id="otCheck" translate="no" hidden></div>
         <form id="lookForm" class="editor" hidden autocomplete="off">
           <h2 class="eyebrow"><span id="lookName"></span></h2>
           <label for="lookShort">Name on the map</label>
@@ -315,6 +316,10 @@
           <label>Colour</label>
           <div class="swatches" id="lookColors"></div>
           <div class="row gap"><button class="btn primary" type="submit">Save</button><button class="btn ghost" type="button" id="lookCancel">Cancel</button></div>
+          <div id="lookOtBox" translate="no" hidden>
+            <button class="btn small" type="button" id="lookOt">Skicka OwnTracks-adress</button>
+            <p class="note small">Hens egen adress, för den som inte kan logga in. Skicka den till hens telefon och klistra in under URL i OwnTracks.</p>
+          </div>
           <button class="btn small danger" type="button" id="lookRemove" hidden>Remove from the family</button>
         </form>
         <div id="whoBox" hidden>
@@ -491,12 +496,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=dd1460df1f"></script>
-<script src="geo.js?v=dd1460df1f"></script>
-<script src="view.js?v=dd1460df1f"></script>
-<script src="wind.js?v=dd1460df1f"></script>
-<script src="jakt.js?v=dd1460df1f"></script>
-<script src="app.js?v=dd1460df1f"></script>
+<script src="i18n.js?v=55f22fdc3a"></script>
+<script src="geo.js?v=55f22fdc3a"></script>
+<script src="view.js?v=55f22fdc3a"></script>
+<script src="wind.js?v=55f22fdc3a"></script>
+<script src="jakt.js?v=55f22fdc3a"></script>
+<script src="app.js?v=55f22fdc3a"></script>
 
 </body>
 </html>
