@@ -92,7 +92,7 @@
     "They open the map, tap “First time? Create your password” and use this email.": "De öppnar kartan, trycker på ”Första gången? Skapa ditt lösenord” och använder den här e-posten.",
     "Add to family": "Lägg till i familjen", "Import map data": "Importera kartdata", "Load stands, trails, place names and the boundary from an export file.": "Läs in pass, stigar, platsnamn och gräns från en exportfil.",
     "Your account": "Ditt konto", "Sign out": "Logga ut", "Nobody added yet.": "Ingen tillagd än.", "owner": "ägare", "You": "Du", "sharing now": "delar nu",
-    "waiting for GPS…": "väntar på GPS…", "not sharing": "delar inte", "Hasn't shared yet": "Har inte delat än", "Sharing": "Delar", "now": "nu", "Signed in": "Inloggad",
+    "waiting for GPS…": "väntar på GPS…", "not sharing": "delar inte", "no OwnTracks yet": "ingen OwnTracks än", "Hasn't shared yet": "Har inte delat än", "Sharing": "Delar", "now": "nu", "Signed in": "Inloggad",
     "That email address doesn't look right.": "E-postadressen ser inte rätt ut.", "Couldn't add them. Check your connection.": "Kunde inte lägga till. Kontrollera anslutningen.",
     "That file isn't a map export.": "Filen är ingen kartexport.", "Import failed. Only the owner can import.": "Importen misslyckades. Bara ägaren kan importera.",
     "Couldn't remove. Try again.": "Kunde inte ta bort. Försök igen.",

@@ -2581,16 +2581,21 @@
         else if (rec.firestore !== 200) fix = "Google-skriptet kommer inte åt databasen. Välj testAccess i Apps Script och tryck Kör en gång.";
       }
       const st = this.statusOf(this.me());
-      const mine = !st ? `<p class="ot-last"><b>Din telefon:</b> inget har kommit från din OwnTracks än.</p>`
+      // set up OwnTracks on this phone, right here: one button and three steps
+      const setup = `<div class="ot-setup"><button class="btn primary small" type="button" data-ot="copy">Kopiera min adress</button>
+        <ol><li>Öppna <b>OwnTracks</b> → Inställningar (kugghjulet).</li>
+        <li><b>Mode</b>: HTTP. <b>URL</b>: radera det som står och klistra in.</li>
+        <li>Tillbaka till kartan i OwnTracks och tryck på <b>pilen</b> uppe till höger.</li></ol></div>`;
+      const mine = !st ? `<p class="ot-last"><b>Din telefon:</b> inget har kommit från din OwnTracks än.</p>${setup}`
         : st.ok ? `<p class="ot-last ok"><b>Din telefon:</b> ✓ senast ${esc(this.clock(st.at))}${OT_MODES[st.v.mode] ? ` · ${OT_MODES[st.v.mode]}` : ""}</p>`
-        : `<p class="ot-last"><b>Din telefon:</b> ✗ nekad ${esc(this.clock(st.at))}. ${esc(st.long)}</p>`;
+        : `<p class="ot-last"><b>Din telefon:</b> ✗ nekad ${esc(this.clock(st.at))}. ${esc(st.long)}</p>${setup}`;
       // addresses that aren't in the family (only the owner can do something about those)
       const o = this.log.get("_other"), ot = o && o.at && o.at.toMillis ? o.at.toMillis() : 0;
       const other = owner && o && Date.now() - ot < 24 * 3600e3
         ? `<p class="ot-last">✗ ${esc(this.clock(ot))}: ${o.why === "not-member" ? `<b>${esc(o.email || "?")}</b> är inte med i familjen. Lägg till hen med exakt den adressen, eller kopiera rätt adress till telefonen.` : o.why === "no-code" ? "en telefon skickade en adress utan kod. Kopiera adressen igen." : "fel i mottagaren: " + esc(o.email || "")}</p>` : "";
       box.innerHTML = `<div class="ot-chain">${links}<button class="btn small ghost" type="button" data-ot="check"${this.checking ? " disabled" : ""}>${this.checking ? "Kontrollerar…" : "Kontrollera"}</button></div>
         ${fix ? `<p class="ot-fix">${fix}</p>` : ""}${mine}${other}
-        <p class="note small">Testa en telefon: öppna OwnTracks och tryck på pilen uppe till höger. Raden här och bocken vid namnet uppdateras inom några sekunder.</p>`;
+        ${st && st.ok ? `<p class="note small">Testa: tryck på pilen uppe till höger i OwnTracks. Raden här och bocken vid namnet uppdateras inom några sekunder.</p>` : ""}`;
     },
     render() {
       this.renderCheck();
@@ -3286,9 +3291,15 @@
         stopGPS(); startGPS();   // iPhones can pause GPS while the app is in the background
         this.lastWrite = null;
       });
-      if (prefs.share) this.setSharing(true);
+      // positions reach the family only through OwnTracks now; the map's own GPS just shows you your dot and
+      // which way you face. Phones that shared from the map before stop doing so (and their old dot goes stale).
+      if (prefs.share) {
+        prefs.share = false; savePrefs();
+        window.FB.db.doc(`positions/${this.user.uid}`).update({ sharing: false }).catch(() => {});
+      }
     },
     setSharing(on) {
+      on = false;   // see above: never share from the map
       this.sharing = on; prefs.share = on; savePrefs();
       $("#shareMe").checked = on;
       if (on) {
@@ -3339,7 +3350,7 @@
         if (this.sharing) return myFix ? "You · sharing now" : "You · waiting for GPS…";
         const ot = this.positions.get(this.user.uid), oa = ot && ot.src === "owntracks" ? this.ageMin(ot) : null;
         const ob = ot && typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "";
-        return oa === null ? "You · not sharing" : `You · OwnTracks${otMode(ot)} · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}${ob}`;
+        return oa === null ? "You · no OwnTracks yet" : `You · OwnTracks${otMode(ot)} · ${oa < 1 ? "now" : oa < 60 ? oa + " min ago" : Math.round(oa / 60) + " h ago"}${ob}`;
       }
       if (!pos) return "Hasn't shared yet";
       const [, v] = pos, age = this.ageMin(v);
@@ -3559,7 +3570,15 @@
       try { await navigator.clipboard.writeText(url); toast(`${name}s adress kopierad. Klistra in den under URL i OwnTracks på ${name}s telefon.`, 6000); }
       catch { prompt(`${name}s OwnTracks-adress:`, url); }
     });
-    $("#otCheck").addEventListener("click", (e) => { if (e.target.closest('[data-ot="check"]')) OT.check(true); });
+    $("#otCheck").addEventListener("click", async (e) => {
+      if (e.target.closest('[data-ot="check"]')) OT.check(true);
+      if (e.target.closest('[data-ot="copy"]')) {
+        await OT.ensureToken();
+        const u = OT.personalUrl();
+        if (!u) { toast("Vänta ett par sekunder och försök igen."); return; }
+        try { await navigator.clipboard.writeText(u); toast("Kopierad. Klistra in den under URL i OwnTracks.", 5000); } catch { prompt("Din OwnTracks-adress:", u); }
+      }
+    });
     $("#lookRemove").addEventListener("click", async (e) => {
       const b = e.currentTarget;
       if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Tap again to remove"); setTimeout(() => { b.dataset.confirm = ""; b.textContent = tr("Remove from the family"); }, 3000); return; }
