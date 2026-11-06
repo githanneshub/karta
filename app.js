@@ -1596,7 +1596,7 @@
     prefs.gpsOn = true; savePrefs();
     clearTimeout(startGPS.slow);
     startGPS.slow = setTimeout(() => {
-      if (watchId !== null && !myFix) toast("Still no GPS position. If no question about location appeared, location is blocked for Safari. See Family → Position not working?", 9000);
+      if (watchId !== null && !myFix) toast("Ingen GPS-position än. Kontrollera att Safari får använda platsen: aA → Webbplatsinställningar → Plats → Tillåt.", 9000);
     }, 20000);
     watchId = navigator.geolocation.watchPosition((p) => {
       const ll = [p.coords.longitude, p.coords.latitude];
@@ -1625,8 +1625,7 @@
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       clearTimeout(startGPS.slow);
-      toast("Location is blocked for this site. See Family → Position not working?", 9000);
-      if (FAMILY) { showTab("family"); $("#gpsHelp").open = true; }
+      toast("Platsen är blockerad för kartan i Safari: aA → Webbplatsinställningar → Plats → Tillåt.", 9000);
       stopGPS();
     }, { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
     renderPosBtn();
@@ -1648,15 +1647,9 @@
   function posState() { return Follow.on ? "follow" : watchId !== null ? "on" : "off"; }
   function renderPosBtn() {
     const st = posState(), b = $("#locate");
+    if (!b) return;
     b.dataset.state = st; b.setAttribute("aria-pressed", String(st !== "off"));
     b.title = POS_TITLES[st]; b.setAttribute("aria-label", POS_TITLES[st]);
-  }
-  function cyclePosition() {
-    const st = posState();
-    if (st === "off") startGPS();
-    else if (st === "on") setFollow(true);
-    else { setFollow(false); stopGPS(); }
-    renderPosBtn();
   }
 
   // ---------- compass (top left): north, wind, and which way the phone faces ----------
@@ -1841,7 +1834,6 @@
     // moving the map by hand ends follow mode
     map.on("rotate", renderHud);
     $("#home").addEventListener("click", goHome);
-    $("#locate").addEventListener("click", cyclePosition);
 
     // boundary
     $("#drawBoundary").addEventListener("click", () => { setTool("boundary", { draw: true }); });
@@ -2091,7 +2083,7 @@
     setInterval(loadForecast, 30 * 60e3);
     document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Date.now() - Forecast.fetched > 30 * 60e3) loadForecast(); if (document.visibilityState === "visible" && prefs.ov.quiet) Ground.load(); });
     $("#showMyCone").checked = prefs.myCone;
-    $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); if (prefs.myCone) startGPS(); renderMyCone(); renderHud(); });
+    $("#showMyCone").addEventListener("change", (e) => { prefs.myCone = e.target.checked; savePrefs(); renderMyCone(); renderHud(); });
     $("#seasonSearch").addEventListener("input", renderSeasons);
     $("#seasonOpen").addEventListener("change", renderSeasons);
     $("#showCones").checked = prefs.cones;
@@ -3621,7 +3613,8 @@
   checkForUpdate();
   setInterval(() => { if (document.visibilityState === "visible") checkForUpdate(); }, 5 * 60000);
   $("#appVersion").textContent = window.APP_VERSION || "dev";
-  if (prefs.gpsOn && !location.search.includes("shot=")) map.once("load", () => startGPS());
+  // no position button any more: your dot comes from OwnTracks; the phone's GPS only runs while recording a track
+  if (prefs.gpsOn) { prefs.gpsOn = false; savePrefs(); }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();
 })();
