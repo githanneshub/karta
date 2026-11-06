@@ -3631,7 +3631,7 @@
       let last = 0;
       try { last = +(localStorage.getItem("alnaryd-update-try") || 0); localStorage.setItem("alnaryd-update-try", String(Date.now())); } catch { /* ignore */ }
       if (Date.now() - last < 120000) return;
-      location.replace(location.pathname + "?v=" + v + "&r=" + Date.now());
+      location.replace(location.pathname + "?v=" + v + "&r=" + Date.now() + location.hash);   // keep #grans=… through the reload
     } catch { /* offline: keep running this version */ }
   }
   checkForUpdate();
