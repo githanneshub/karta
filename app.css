@@ -702,6 +702,4 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .ot-check .note { margin: 6px 0 0; }
 #lookOtBox { margin-top: 10px; }
 #lookOtBox .note { margin: 4px 0 0; }
-.ot-setup { margin: 6px 0 2px; }
-.ot-setup ol { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; font-size: 14px; }
 .hit-line { font-size: 12px; color: var(--muted); margin-top: 3px; }
