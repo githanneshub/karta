@@ -3422,7 +3422,6 @@
       const owner = this.member && this.member.role === "owner";
       const chips = [];
       if (st && !st.ok) chips.push(`<span class="ready-chip low">✗ OwnTracks: ${esc(st.short)} ${esc(OT.clock(st.at))}</span>`);
-      if (!Ntfy.ok[email]) chips.push(`<span class="ready-chip">Inga aviseringar</span>`);
       if (v && typeof v.batt === "number" && v.batt <= 20) chips.push(`<span class="ready-chip low">Lågt batteri</span>`);
       const hit = owner && OT.hits && OT.hits.has(email) && !(v && this.isCurrent(v, 0)) ?`<div class="hit-line">${esc(OT.hitLine(email))}</div>` : "";
       return (chips.length ? `<div class="ready" translate="no">${chips.join("")}</div>` : "") + (hit ? `<div translate="no">${hit}</div>` : "");
