@@ -61,7 +61,7 @@
     "Set by hand": "Inställd för hand", "The SMHI forecast can't be loaded here. Set the wind with the dial.": "SMHI-prognosen kan inte hämtas här. Ställ in vinden med ratten.",
     
     
-    "Calm": "Stiltje",
+    "Calm": "Vindstilla",
     // stands
     "Place a stand": "Placera pass", "Plan stalk route": "Planera smygrutt", "Stand": "Pass", "New stand": "Nytt pass", "Edit stand": "Ändra pass",
     "e.g. Tornet vid hygget": "t.ex. Tornet vid hygget", "Tower / high seat": "Torn", "Ladder stand": "Stege", "Ground blind": "Markpass", "Drive post (pass)": "Drevpass",
@@ -73,7 +73,7 @@
     "Notes": "Anteckningar",
     "Approach from the track, sit before 16:00…": "Gå in från traktorvägen, sitt på plats före 16:00…", "Save stand": "Spara pass",
     "Stalk routes": "Smygrutter", "Stalk route": "Smygrutt",
-    "Calm, swirling": "Stiltje, virvlar", "Scent into sector": "Vittring i sektorn", "Side wind": "Sidvind", "Good wind": "Bra vind",
+    "Calm, swirling": "Vindstilla, virvlar", "Scent into sector": "Vittring i sektorn", "Side wind": "Sidvind", "Good wind": "Bra vind",
     "Unnamed stand": "Namnlöst pass", 
     "Stand saved": "Passet sparat", "Stand updated": "Passet uppdaterat", "Route saved. Its colours follow the wind you set.": "Rutten sparad. Färgerna följer vinden du ställt in.",
     "Confirm": "Bekräfta",
