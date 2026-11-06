@@ -78,7 +78,7 @@
 
   // ---------- preferences (this device only) ----------
   const prefs = (() => {
-    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false, cuts: true, places: true }, quietMode: "auto", maskAlpha: 32,
+    const defaults = { v: 3, windFlow: true, base: "forest", ov: { trails: true, contours: true, roads: true, reserve: false, boundary: true, sightings: true, wet: false, drainage: false, steep: false, game: false, quiet: false, cuts: true, entries: true }, quietMode: "auto", maskAlpha: 32,
       wind: { from: 225, speed: 4 }, cones: true, exag: 1.6, tab: "map", view: true, target: 1.2, share: false, myCone: true };
     if (location.search.includes("shot=")) return defaults;
     try {
@@ -548,7 +548,6 @@
     cuts: ["cuts-fill", "cuts-line", "cuts-label"],
     game: ["gamezones-fill", "gamezones-case", "gamezones-bed", "gamezones-food"],
     trails: ["trails-case", "trails", "trails-label"],
-    places: ["places-dot", "places-label"],
   };
   function applyLayers() {
     if (!manifests.length) return;
@@ -566,6 +565,11 @@
     for (const id of ["cones", "cones-line"]) map.setLayoutProperty(id, "visibility", prefs.cones ? "visible" : "none");
     // how dark the ground outside the hunting boundary is (0 = not at all)
     if (map.getLayer("mask")) map.setPaintProperty("mask", "fill-opacity", prefs.maskAlpha / 100);
+    // the entrances (names and dots) can be hidden on their own; other place names and road names stay
+    if (map.getLayer("places-label")) {
+      map.setFilter("places-dot", prefs.ov.entries ? ["in", ["get", "kind"], ["literal", ["entry", "parking"]]] : ["==", ["get", "kind"], "parking"]);
+      map.setFilter("places-label", prefs.ov.entries ? null : ["!=", ["get", "kind"], "entry"]);
+    }
     $("#maskRow").hidden = !prefs.ov.boundary;
   }
 

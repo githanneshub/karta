@@ -22,7 +22,7 @@
     "Panel sections": "Panelens delar", "Map": "Karta", "Wind": "Vind", "Stands": "Pass", "Sightings": "Observationer", "Family": "Familj",
     // map tab
     "Ground": "Grundkarta", "Base map": "Grundkarta", "Forest types": "Skogstyper", "Terrain relief": "Terräng", "Tree height": "Trädhöjd",
-    "Layers": "Lager", "Our trails & places": "Våra stigar och platser", "Our trails": "Våra stigar", "Place names": "Platsnamn", "entrances, parking": "ingångar, parkering", "Contours": "Höjdkurvor", "Roads, tracks & paths": "Vägar, traktorvägar och stigar",
+    "Layers": "Lager", "Our trails & places": "Våra stigar och platser", "Our trails": "Våra stigar", "Place names": "Platsnamn", "entrances, parking": "ingångar, parkering", "Entrances": "Ingångar", "names and dots": "namn och prickar", "Contours": "Höjdkurvor", "Roads, tracks & paths": "Vägar, traktorvägar och stigar",
     "Alnaryd nature reserve": "Alnaryds naturreservat", "Your hunting boundary": "Jaktgränsen", "Wet ground": "Blöt mark", "mires, wet hollows": "myrar, blöta sänkor",
     "Drainage & cold-air flow": "Avrinning och kalluftsflöde", "Steep ground": "Brant terräng", 
     "Boundary": "Jaktgräns",
