@@ -3270,7 +3270,7 @@
       try { d = JSON.parse(atob(m[1].replace(/-/g, "+").replace(/_/g, "/"))); } catch { d = null; }
       if (!d || !Array.isArray(d.pts) || d.pts.length < 6 || d.pts.some((v) => typeof v !== "number")) { toast("Länken till den nya gränsen är trasig."); return; }
       setTimeout(() => {
-        if (!confirm(`Byta jaktgränsen till den nya från Lantmäteriets karta (${String(d.ha).replace(".", ",")} ha)? Den gamla ersätts för alla.`)) return;
+        if (!confirm(`Byta jaktgränsen till gränsen i länken (${String(d.ha).replace(".", ",")} ha)? Den nuvarande ersätts för alla.`)) return;
         Store.setBoundary(d.pts).then(() => toast("Jaktgränsen är uppdaterad."));
       }, 1500);
     },
