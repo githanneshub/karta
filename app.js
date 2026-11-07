@@ -3402,10 +3402,10 @@
         const low = typeof v.batt === "number" && v.batt <= 15;
         el.style.setProperty("--c", this.colorFor(v.email));
         el.classList.toggle("stale", !live);
-        el.classList.toggle("batt-low", low);
         el.querySelector("b").textContent = this.letterFor(v.email, v.name);
         el.setAttribute("translate", "no");
-        el.querySelector("span").textContent = `${this.nameFor(v.email, v.name)}${live ? "" : ` · ${age < 60 ? age + " min" : age < 48 * 60 ? Math.round(age / 60) + " h" : Math.round(age / 1440) + " dagar"} sedan`}${typeof v.batt === "number" ? ` · 🔋${v.batt}%` : ""}`;
+        // name only (battery is shown in Familj, not on the map)
+        el.querySelector("span").textContent = `${this.nameFor(v.email, v.name)}${live ? "" : ` · ${age < 60 ? age + " min" : age < 48 * 60 ? Math.round(age / 60) + " h" : Math.round(age / 1440) + " dagar"} sedan`}`;
         // warn once per person and day when their phone is about to die in the forest
         if (low && live) {
           const key = `${v.email}|${new Date().toDateString()}`;
@@ -3426,8 +3426,7 @@
         el.style.setProperty("--c", this.colorFor(me));
         el.querySelector("b").textContent = this.letterFor(me, this.member && this.member.name);
         el.setAttribute("translate", "no");
-        el.querySelector("span").textContent = "Du" + (typeof ot.batt === "number" ? ` · 🔋${ot.batt}%` : "");
-        el.classList.toggle("batt-low", typeof ot.batt === "number" && ot.batt <= 15);
+        el.querySelector("span").textContent = "Du";
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
     },
     // ready for the hunt: OwnTracks sending (and in which mode), notifications tested, battery

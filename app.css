@@ -282,11 +282,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .switch.big { font-size: 17px; font-weight: 600; }
 .switch.big input { width: 22px; height: 22px; }
 .fam-marker { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-.fam-marker b { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--c, #1d7cf2); color: #fff;
+/* people are rounded squares, so they never look like the round sightings, stands or shots */
+.fam-marker b { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--c, #1d7cf2); color: #fff;
   font: 700 14px var(--f-ui); border: 3px solid #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, #1d7cf2) 30%, transparent), 0 2px 6px rgb(0 0 0 / .4); }
 .fam-marker span { margin-top: 3px; font: 600 12px var(--f-ui); color: #1c231b; background: rgb(255 255 255 / .92); padding: 0 6px; border-radius: 4px; white-space: nowrap; }
 .fam-marker.stale { opacity: .55; }
-.fam-marker.batt-low span { color: #c92a2a; }
 .fam-marker.stale b { box-shadow: 0 2px 6px rgb(0 0 0 / .4); }
 .gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg); overflow-y: auto;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
@@ -481,7 +481,7 @@ svg.wx { fill: none; overflow: visible; }
 .wind-flow { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 .wind-flow[hidden] { display: none; }
 
-.fam-dot { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; color: #fff; font: 700 12px var(--f-ui);
+.fam-dot { width: 26px; height: 26px; border-radius: 7px; flex: none; display: grid; place-items: center; color: #fff; font: 700 12px var(--f-ui);
   text-shadow: 0 1px 2px rgb(0 0 0 / .45); box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px rgb(0 0 0 / .25); }
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin: 2px 0 8px; }
 .swatch { width: 32px; height: 32px; border-radius: 50%; border: 2px solid rgb(0 0 0 / .25); cursor: pointer; appearance: none; padding: 0; }
