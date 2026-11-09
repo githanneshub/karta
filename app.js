@@ -2153,15 +2153,40 @@
     },
     // While the phone was locked the map had no GPS, but OwnTracks kept sending: put those points into the
     // track in time order instead of a straight line across the gap.
-    backfill() {
+    // Those points are kept in my own record (map/poshist_<email>), apart from the position everyone's map
+    // listens to. It is fetched only while recording: when OwnTracks has sent something new (at most every 30 s)
+    // and when the map is opened again.
+    hist: null, histFor: 0, histTried: 0, histAt: 0, histBusy: false, histTimer: 0,
+    async backfill(force) {
       const r = this.on, v = FAMILY && Family.otMine;
-      if (!r || !v || !Array.isArray(v.hist)) return;
+      if (!r || !FAMILY || !Family.user) return;
+      const newest = v ? Family.posTime(v) : 0, now = Date.now();
+      if (!this.histBusy && (force ? now - this.histAt > 3000 : newest > this.histFor && now - this.histAt > 30000)) {
+        this.histBusy = true; this.histAt = now;
+        try {
+          const d = await window.FB.db.doc("map/poshist_" + Family.user.email.toLowerCase().replace(/[^a-z0-9]/g, "_")).get();
+          const h = d.exists && d.data().hist;
+          if (Array.isArray(h)) this.hist = h;
+          // The newest position should be in it. If it isn't yet (the two are saved side by side), look once
+          // more; after that settle (it came by the backup route, which keeps its history on the position).
+          const last = this.hist && this.hist.length >= 3 ? this.hist[this.hist.length - 1] * 1000 : 0;
+          if (last >= newest - 999 || this.histTried === newest) this.histFor = newest; else this.histTried = newest;
+        } catch { /* no coverage: tried again below */ }
+        this.histBusy = false;
+        if (this.on !== r) return;
+      }
+      if (newest > this.histFor && !this.histTimer) {
+        this.histTimer = setTimeout(() => { this.histTimer = 0; this.backfill(); }, Math.max(0, 30000 - (Date.now() - this.histAt)) + 300);
+      }
+      // a history on the position itself comes from the backup receiver (or from before the history was moved)
+      const hist = (this.hist || []).concat(v && Array.isArray(v.hist) ? v.hist : []);
+      if (!hist.length) return;
       const have = new Set(r.ts.map((t) => Math.round(t / 1000))), all = [];
       for (let i = 0; i < r.ts.length; i++) all.push([r.pts[2 * i], r.pts[2 * i + 1], r.ts[i]]);
       let added = 0;
-      for (let i = 0; i + 2 < v.hist.length; i += 3) {
-        const t = v.hist[i + 2] * 1000;
-        if (t >= r.start && t <= Date.now() && !have.has(Math.round(t / 1000))) { all.push([v.hist[i], v.hist[i + 1], t]); added++; }
+      for (let i = 0; i + 2 < hist.length; i += 3) {
+        const t = hist[i + 2] * 1000;
+        if (t >= r.start && t <= Date.now() && !have.has(Math.round(t / 1000))) { have.add(Math.round(t / 1000)); all.push([hist[i], hist[i + 1], t]); added++; }
       }
       if (!added) return;
       all.sort((a, b) => a[2] - b[2]);
@@ -3578,7 +3603,7 @@
   renderPosBtn();
 
   // back from a locked screen while recording: fill the gap from OwnTracks once its latest points have arrived
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Rec.on) setTimeout(() => Rec.backfill(), 2500); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Rec.on) setTimeout(() => Rec.backfill(true), 2500); });
   window.addEventListener("offline", () => toast("No coverage. The map still works; positions and messages are sent when you're back online.", 6000));
   window.addEventListener("online", () => toast("Back online."));
 
