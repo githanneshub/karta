@@ -19,7 +19,7 @@
     "Hunting map": "Jaktkarta", "Where your stands and sightings are saved": "Var dina pass och observationer sparas",
     "Saved on this device": "Sparas på den här enheten", "Synced to your account": "Synkat till ditt konto", "Loading saved data…": "Hämtar sparad data…",
     "Can't reach saved data yet": "Når inte sparad data än", "Saved data unavailable": "Sparad data är inte tillgänglig",
-    "Panel sections": "Panelens delar", "Map": "Karta", "Wind": "Vind", "Stands": "Pass", "Sightings": "Observationer", "Family": "Familj",
+    "Panel sections": "Panelens delar", "Map": "Karta", "Weather": "Väder", "Wind": "Vind", "Stands": "Pass", "Sightings": "Observationer", "Family": "Familj",
     // map tab
     "Ground": "Grundkarta", "Base map": "Grundkarta", "Forest types": "Skogstyper", "Terrain relief": "Terräng", "Tree height": "Trädhöjd",
     "Layers": "Lager", "Our trails & places": "Våra stigar och platser", "Our trails": "Våra stigar", "Place names": "Platsnamn", "entrances, parking": "ingångar, parkering", "Entrances": "Ingångar", "names and dots": "namn och prickar", "Contours": "Höjdkurvor", "Roads, tracks & paths": "Vägar, traktorvägar och stigar",
@@ -113,7 +113,7 @@
     "Show my position": "Visa min position", "Back to the hunting ground": "Tillbaka till jaktmarken",
     "Add trail": "Lägg till stig", "Add place": "Lägg till plats", "Undo": "Ångra", "Delete point": "Ta bort punkt", "Finish": "Klar", "Cancel": "Avbryt", "Done": "Klar", "Clear": "Rensa",
     "Tap to turn the map north up": "Tryck för att vrida kartan med norr uppåt", "Compass. Tap to turn the map north up": "Kompass. Tryck för att vrida kartan med norr uppåt",
-    "Open the wind tab": "Öppna vindfliken", "What you can see from the stand": "Det här ser du från passet",
+    "Open the weather tab": "Öppna väderfliken", "What you can see from the stand": "Det här ser du från passet",
     "Loading terrain…": "Laddar terräng…", "Tap the map where the stand is": "Tryck på kartan där passet står", "Tap where you saw it": "Tryck där du såg det",
     "Tap to add points along your stalk": "Tryck för att lägga till punkter längs smygrutten", "Tap points to measure": "Tryck ut punkter för att mäta",
     "Tap the corners of your hunting area": "Tryck ut hörnen på jaktmarken", "Tap points along the new trail": "Tryck ut punkter längs den nya stigen",
