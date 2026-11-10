@@ -1,4 +1,4 @@
-/* Alnaryd hunting map: layers, stands, wind, stalk routes, sightings. */
+/* Alnaryd hunting map: layers, stands, wind, sightings. */
 (function () {
   "use strict";
   // iPhone: pinching anywhere but the map would zoom the whole page and leave the menus too big (the map
@@ -24,7 +24,7 @@
   if (FAMILY && "serviceWorker" in navigator && !location.search.includes("shot=")) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
   }
-  const PLAN_KINDS = ["stands", "routes", "sightings", "tracks"];  // things each person plans; tagged with who made them
+  const PLAN_KINDS = ["stands", "sightings"];  // things each person plans; tagged with who made them
   const tr = (t) => (window.I18N ? window.I18N.tr(t) : t);  // for text drawn into the map canvas (the page text is translated automatically)
   const START = { center: [15.4339, 56.3532], zoom: 14.7 };
   // Areas with map data (Alnaryd, Bergåsa…), loaded from data/areas.json. GPS jumps only go to places near one,
@@ -134,13 +134,11 @@
       if (!db) return;
       this.db = db;
       this.data = { stands: [], sightings: [], routes: [], boundary: null, trails: [], places: [], tracks: [] };
-      // recorded tracks: their own list, so a site whose rules don't allow them yet still syncs the rest
-      db.collection("tracks").onSnapshot((snap) => { this.data.tracks = snap.docs.map((d) => ({ ...d.data(), id: d.id })); this.onChange(); }, () => {});
       setSync("loading");
-      const waiting = new Set(["stands", "sightings", "routes", "trails", "places", "boundary"]);
+      const waiting = new Set(["stands", "sightings", "trails", "places", "boundary"]);
       const timer = setTimeout(() => { if (waiting.size) setSync("slow"); }, 10000);
       const settle = (k, meta) => { if (!meta.fromCache) { waiting.delete(k); if (!waiting.size) { clearTimeout(timer); setSync("shared"); } } };
-      for (const k of ["stands", "sightings", "routes", "trails", "places"]) {
+      for (const k of ["stands", "sightings", "trails", "places"]) {
         db.collection(k).onSnapshot((snap) => {
           this.data[k] = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
           settle(k, snap.metadata); this.onChange();
@@ -367,7 +365,7 @@
     // invisible anchors keep layer groups in order however late images are added
     for (const id of ["anchor-base", "anchor-overlays", "anchor-vectors"]) map.addLayer({ id, type: "background", layout: { visibility: "none" }, paint: { "background-opacity": 0 } });
 
-    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "clearcuts", "routeopts", "dayroutes", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "routes", "tracks", "goto", "draft", "edit", "sightings", "me"]) {
+    for (const id of ["osm", "contours", "reserves", "drainage", "gamezones", "clearcuts", "trails", "places", "boundary", "mask", "sectors", "cones", "mycone", "draft", "edit", "sightings", "me"]) {
       map.addSource(id, { type: "geojson", data: FC() });
     }
 
@@ -454,47 +452,6 @@
     map.addLayer({ id: "mycone-line", type: "line", source: "mycone", paint: { "line-color": "#ff7a2e", "line-width": 2, "line-dasharray": [1.5, 1.5] } });
     map.addLayer({ id: "sectors", type: "fill", source: "sectors", paint: { "fill-color": ["get", "color"], "fill-opacity": .2 } });
     map.addLayer({ id: "sectors-line", type: "line", source: "sectors", paint: { "line-color": ["get", "color"], "line-width": 1.6 } });
-    // routes
-    const notLabel = ["!", ["has", "label"]];
-    map.addLayer({ id: "routes-case", type: "line", source: "routes", filter: notLabel, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 6.5 } });
-    map.addLayer({ id: "routes", type: "line", source: "routes", filter: notLabel, layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "color"], "line-width": 4 } });
-    map.addLayer({ id: "routes-label", type: "symbol", source: "routes", filter: ["has", "label"], minzoom: 14,
-      layout: { "symbol-placement": "line", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "symbol-spacing": 300, "text-max-angle": 35, "text-offset": [0, -1.1] },
-      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
-    map.addLayer({ id: "goto-case", type: "line", source: "goto", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#10160f", "line-width": 6, "line-opacity": .6 } });
-    map.addLayer({ id: "goto", type: "line", source: "goto", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#ffffff", "line-width": 3, "line-dasharray": [1.5, 1.5] } });
-    // hunt day: the way each person walks to their stand (their colour), and the suggestions while choosing one
-    map.addLayer({ id: "dayroutes-case", type: "line", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#10160f", "line-width": 5.5, "line-opacity": .55 } });
-    map.addLayer({ id: "dayroutes", type: "line", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["get", "color"], "line-width": 3, "line-dasharray": [2, 1.2] } });
-    map.addLayer({ id: "dayroutes-label", type: "symbol", source: "dayroutes", filter: ["==", ["geometry-type"], "LineString"],
-      layout: { "symbol-placement": "line", "symbol-spacing": 220, "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "text-offset": [0, -1] },
-      paint: { "text-color": "#fff", "text-halo-color": ["get", "color"], "text-halo-width": 2 } });
-    map.addLayer({ id: "dayspots", type: "circle", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
-      paint: { "circle-radius": 9, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 3 } });
-    map.addLayer({ id: "dayspots-label", type: "symbol", source: "dayroutes", filter: ["==", ["geometry-type"], "Point"],
-      layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 12, "text-offset": [0, 1.4], "text-anchor": "top" },
-      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.6 } });
-    map.addLayer({ id: "routeopts-case", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#10160f", "line-width": ["case", ["get", "sel"], 9, 6], "line-opacity": .55 } });
-    map.addLayer({ id: "routeopts", type: "line", source: "routeopts", layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["get", "color"], "line-width": ["case", ["get", "sel"], 5.5, 3.5] } });
-    map.addLayer({ id: "routeopts-label", type: "symbol", source: "routeopts",
-      layout: { "symbol-placement": "line-center", "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 13, "text-allow-overlap": true },
-      paint: { "text-color": ["case", ["==", ["get", "color"], "#ffffff"], "#10160f", "#fff"], "text-halo-color": ["case", ["==", ["get", "color"], "#ffffff"], "#fff", ["get", "color"]], "text-halo-width": 2.2 } });
-    // recorded tracks and blood-tracking marks
-    map.addLayer({ id: "tracks-case", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": "#fff", "line-width": 5, "line-opacity": .7 } });
-    map.addLayer({ id: "tracks", type: "line", source: "tracks", filter: ["==", ["geometry-type"], "LineString"], layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": ["get", "color"], "line-width": 3 } });
-    map.addLayer({ id: "track-marks", type: "circle", source: "tracks", filter: ["==", ["geometry-type"], "Point"],
-      paint: { "circle-radius": 6, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-    map.addLayer({ id: "track-marks-label", type: "symbol", source: "tracks", filter: ["==", ["geometry-type"], "Point"], minzoom: 15.5,
-      layout: { "text-field": ["get", "label"], "text-font": ["Open Sans Semibold"], "text-size": 11, "text-offset": [0, 1.2], "text-anchor": "top" },
-      paint: { "text-color": "#1b1f18", "text-halo-color": "#fff", "text-halo-width": 1.5 } });
     // sightings
     map.addLayer({ id: "sightings", type: "circle", source: "sightings",
       // heard (not seen): a hollow ring in the species colour
@@ -523,7 +480,7 @@
     // vector layers: one file per area, merged into one map source each
     for (const k of ["osm", "reserves", "drainage", "contours", "gamezones", "clearcuts"]) {
       Promise.all(manifests.map((m) => getFresh(`data/${m.id}/${k}.geojson`).catch(() => FC())))
-        .then((parts) => { vectors[k] = parts.flatMap((d) => d.features); map.getSource(k).setData(FC(vectors[k])); if (k === "osm") Router.base = null; });
+        .then((parts) => { vectors[k] = parts.flatMap((d) => d.features); map.getSource(k).setData(FC(vectors[k])); });
     }
     loadInfoGrid();
 
@@ -628,47 +585,6 @@
     return l ? l.from : from;
   }
 
-  // ---------- best stands: forecast wind at each stand plus what you have seen there before ----------
-  // Score = wind (good 3, side 1, scent into the sector -3) + sightings within 300 m that were logged
-  // in a similar wind (same or neighbouring direction) and at a similar time of day (±2 h).
-  function bestStands(h) {
-    const w = { from: h.from, speed: h.speed }, hour = new Date(h.t).getHours(), d8 = dir8(h.from), i8 = WIND8.indexOf(d8);
-    const near8 = new Set([d8, WIND8[(i8 + 1) % 8], WIND8[(i8 + 7) % 8]]);
-    return plans("stands").map((st) => {
-      const ws = standStatus(st, w);
-      let seen = 0, similar = 0;
-      for (const x of Store.data.sightings) {
-        if (Geo.distance([st.lon, st.lat], [x.lon, x.lat]) > 300) continue;
-        seen++;
-        const xh = x.when ? new Date(x.when).getHours() : null, xw = (x.wind || "").split(" ")[0];
-        const timeOk = xh === null || Math.min(Math.abs(xh - hour), 24 - Math.abs(xh - hour)) <= 2;
-        if (timeOk && (!xw || near8.has(xw))) similar += x.count || 1;
-      }
-      const score = (ws.cls === "good" ? 3 : ws.cls === "warn" ? 1 : ws.cls === "bad" ? -3 : 1) + Math.min(similar, 10) * 0.6 + Math.min(seen, 10) * 0.1;   // no direction set: neutral
-      return { st, ws, seen, similar, score };
-    }).sort((a, b) => b.score - a.score);
-  }
-  function renderBest() {
-    const box = $("#bestStands");
-    if (!Forecast.hours.length || !plans("stands").length) { box.hidden = true; return; }
-    box.hidden = false;
-    const now = Date.now(), tm = new Date(); tm.setDate(tm.getDate() + 1); tm.setMinutes(0, 0, 0);
-    const at = (hr) => { const t = new Date(tm); t.setHours(hr); return Forecast.hours.find((x) => Math.abs(x.t - t.getTime()) < 3600e3); };
-    const slots = [
-      { name: "Now", h: Forecast.hours.find((x) => x.t > now - 3600e3) },
-      { name: "Tomorrow morning", h: at(7) },
-      { name: "Tomorrow evening", h: at(16) },
-    ].filter((x) => x.h);
-    $("#bestList").innerHTML = slots.map(({ name, h }) => {
-      const top = bestStands(h).filter((r) => r.ws.cls !== "bad").slice(0, 3);
-      return `<div class="best-slot"><div class="best-head"><b>${name}</b><span>${Geo.compassName(h.from)} ${Math.round(h.speed)} m/s</span></div>` +
-        (top.length ? top.map((r, i) => `<div class="best-row" data-id="${esc(r.st.id)}"><span class="best-n">${i + 1}</span>
-          <span class="best-name">${esc(r.st.name || "Stand")}</span>
-          <span class="best-why">${r.similar ? `<span>${r.similar} seen in similar wind</span>` : r.seen ? `<span>${r.seen} seen here</span>` : ""}</span>
-          <span class="pill ${r.ws.cls}">${r.ws.text}</span></div>`).join("")
-          : `<div class="note small">No stand has good wind then.</div>`) + `</div>`;
-    }).join("");
-  }
   function renderFlow() {
     if (flow) flow.set({ on: is3D, from: prefs.wind.from, speed: prefs.wind.speed });   // only in 3D: flat they look like snow
   }
@@ -679,13 +595,13 @@
     pass: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg>',
   };
 
-  // Plans (stands, routes, sightings) belong to whoever made them; each person can hide others' plans on their own phone.
-  // Until you choose for yourself: your own plans, the map owner's and today's hunt leader's.
+  // Plans (stands, sightings) belong to whoever made them; each person can hide others' plans on their own phone.
+  // Until you choose for yourself: your own plans and the map owner's.
   function defaultShown(by) {
     if (!FAMILY || !Family.user || !by || by === "?") return true;
     if (by === Family.user.email.toLowerCase()) return true;
     if (Family.members.some((m) => m.email === by && m.role === "owner")) return true;
-    return !!(Day.active() && Day.doc.leader === by);
+    return false;
   }
   function planShown(x) { return prefs.hideBy ? !prefs.hideBy[x.by || "?"] : defaultShown(x.by || "?"); }
   function plans(kind) { return Store.data[kind].filter(planShown); }
@@ -826,20 +742,6 @@
   }
   function closeStandForm() { draftStand = null; $("#standForm").hidden = true; renderAll(); }
 
-  // ---------- routes ----------
-  function segColor(a, b) {
-    const d = Geo.angleDiff(Geo.bearing(a, b), prefs.wind.from);
-    return d <= 60 ? STATUS_COLORS.good : d <= 120 ? STATUS_COLORS.warn : STATUS_COLORS.bad;
-  }
-  function routeStats(pts) {
-    let len = 0, into = 0;
-    for (let i = 1; i < pts.length; i++) {
-      const d = Geo.distance(pts[i - 1], pts[i]); len += d;
-      if (Geo.angleDiff(Geo.bearing(pts[i - 1], pts[i]), prefs.wind.from) <= 60) into += d;
-    }
-    return { len, intoPct: len ? Math.round((into / len) * 100) : 0 };
-  }
-
   // ---------- render ----------
   // Thermals: with little wind, air follows the terrain. After sunset and at night (and the first hour or so after
   // sunrise) cold air runs downhill and along hollows; once the sun is up and warming the slopes, air rises uphill.
@@ -866,15 +768,6 @@
     if (!map.getSource("sectors")) { renderLists(); renderWind(); return; }
     syncMarkers();
     renderStandGeometry();
-    // routes
-    const feats = [];
-    for (const r of plans("routes")) {
-      const pts = pairs(r.pts);
-      for (let i = 1; i < pts.length; i++) feats.push({ type: "Feature", properties: { color: segColor(pts[i - 1], pts[i]), id: r.id }, geometry: { type: "LineString", coordinates: [pts[i - 1], pts[i]] } });
-      if (FAMILY && pts.length >= 2) feats.push({ type: "Feature", properties: { label: tr(`${r.name || "Stalk route"} · ${whoName(r.by)}`) }, geometry: { type: "LineString", coordinates: pts } });
-    }
-    map.getSource("routes").setData(FC(feats));
-    renderTracks();
     renderLayout();
     // sightings
     const filter = $("#logFilter").value;
@@ -908,16 +801,6 @@
         <span class="pill ${st.cls}">${st.text}</span></li>`;
     }).join("") : `<li class="empty">No stands yet.</li>`;
 
-    const rl = $("#routeList");
-    const routes = plans("routes");
-    rl.innerHTML = routes.length ? routes.map((r) => {
-      const st = routeStats(pairs(r.pts));
-      return `<li data-id="${esc(r.id)}"><span class="it-main"><div class="it-name">${esc(r.name || "Stalk route")}</div>
-        <div class="it-sub">${Math.round(st.len)} m · ${st.intoPct}% into the wind now${whoTag(r)}</div></span>
-        <button class="btn small ghost" data-del-route="${esc(r.id)}" type="button">Delete</button></li>`;
-    }).join("") : "";
-    $("#routeHead").hidden = !plans("routes").length;
-
     const filter = $("#logFilter").value;
     const logs = plans("sightings").filter((x) => !filter || x.species === filter).sort((a, b) => (b.when || "").localeCompare(a.when || ""));
     $("#logList").innerHTML = logs.length ? logs.map((x) => {
@@ -937,34 +820,6 @@
       $("#clearBoundary").hidden = true; $("#editBoundary").hidden = true; $("#drawBoundary").textContent = "Draw boundary";
     }
   }
-
-  // ---------- wind ----------
-  function buildDial() {
-    const svg = $("#dial");
-    let h = `<circle class="ring" r="100"/>`;
-    for (let i = 0; i < 16; i++) {
-      const a = i * 22.5 * Math.PI / 180, major = i % 4 === 0, r1 = major ? 84 : 90;
-      h += `<line class="tick${major ? " major" : ""}" x1="${Math.sin(a) * r1}" y1="${-Math.cos(a) * r1}" x2="${Math.sin(a) * 98}" y2="${-Math.cos(a) * 98}"/>`;
-    }
-    ["N", "E", "S", "W"].forEach((t, i) => { const a = i * Math.PI / 2; h += `<text x="${Math.sin(a) * 70}" y="${-Math.cos(a) * 70}">${t}</text>`; });
-    h += `<g id="dialG"><path class="scent" d="M0 0 L-34 92 A98 98 0 0 0 34 92 Z"/><path class="arrow" d="M-11 -96 L11 -96 L5 -30 L16 -30 L0 6 L-16 -30 L-5 -30 Z"/></g>`;
-    svg.innerHTML = h;
-    const setFromPointer = (e) => {
-      const r = svg.getBoundingClientRect();
-      const x = e.clientX - (r.left + r.width / 2), y = e.clientY - (r.top + r.height / 2);
-      setWind((Math.round((Math.atan2(x, -y) * 180 / Math.PI + 360) % 360 / 5) * 5) % 360);
-    };
-    let dragging = false;
-    svg.addEventListener("pointerdown", (e) => { dragging = true; svg.setPointerCapture(e.pointerId); setFromPointer(e); });
-    svg.addEventListener("pointermove", (e) => { if (dragging) setFromPointer(e); });
-    svg.addEventListener("pointerup", () => { dragging = false; });
-    svg.addEventListener("keydown", (e) => {
-      const step = e.shiftKey ? 22.5 : 5;
-      if (e.key === "ArrowRight" || e.key === "ArrowUp") { setWind((prefs.wind.from + step) % 360); e.preventDefault(); }
-      if (e.key === "ArrowLeft" || e.key === "ArrowDown") { setWind((prefs.wind.from - step + 360) % 360); e.preventDefault(); }
-    });
-  }
-  function setWind(from) { prefs.wind.from = Math.round(from) % 360; prefs.windMode = "manual"; savePrefs(); renderAll(); renderForecast(); }
 
   // ---------- SMHI wind forecast (snow1g point forecast, free, no key) ----------
   // On claude.ai the page may not fetch outside data; the map then falls back to the last saved forecast or the dial.
@@ -1117,10 +972,9 @@
   function renderForecast(scroll = false) {
     const has = Forecast.hours.length > 0, manual = prefs.windMode === "manual";
     $("#fcStrip").hidden = !has;
-    $("#fcUse").hidden = !(has && manual);
     if (!has) {
-      $("#fcSource").textContent = "Set by hand";
-      $("#fcNote").textContent = "The SMHI forecast can't be loaded here. Set the wind with the dial.";
+      $("#fcSource").textContent = "No forecast";
+      $("#fcNote").textContent = "The SMHI forecast can't be loaded right now.";
       return;
     }
     const age = Math.round((Date.now() - Forecast.fetched) / 60000);
@@ -1147,10 +1001,7 @@
   }
 
   function renderWind() {
-    renderBest();
     const w = prefs.wind;
-    $("#dialG").setAttribute("transform", `rotate(${w.from})`);
-    $("#dial").setAttribute("aria-valuenow", String(w.from));
     $("#windBig").textContent = w.speed < 1 ? "Calm" : Geo.compassName(w.from);
     const fh = prefs.windMode !== "manual" && Forecast.hours.find((x) => x.t === Forecast.selT);
     $("#windSpeedNow").textContent = `${w.speed}` + (fh && fh.gust ? ` (${Math.round(fh.gust)})` : "") + " m/s";   // gusts in brackets, like the compass
@@ -1160,14 +1011,12 @@
     $("#wxLine").textContent = wx ? wxName(wx) : "";
     const sun = sunTimes(wx ? wx.t : Date.now());
     $("#sunLine").textContent = sun.up && sun.down ? `Sunrise ${fcClock(sun.up)} · Sunset ${fcClock(sun.down)}` : "";
-    $("#windSpeedOut").textContent = `${w.speed} m/s`;
     renderFlow();
-    $("#windSpeed").value = w.speed;
     renderHud();
   }
 
   // ---------- drawing tools ----------
-  let tool = null;          // "stand" | "sighting" | "route" | "measure" | "boundary" | "editBoundary" | "layout" | "editTrail" | "newTrail" | "newPlace"
+  let tool = null;          // "stand" | "sighting" | "measure" | "boundary" | "editBoundary" | "layout" | "editTrail" | "newTrail" | "newPlace"
   let pts = [];
   // shape editing (boundary or a trail): every point can be dragged; dragging a small mid-segment dot inserts a point
   let edit = null;          // { kind: "boundary" | "trail", id, closed, pts, sel, history }
@@ -1266,20 +1115,17 @@
       return;
     }
     $("#hintDelete").hidden = true;
-    const multi = tool === "route" || tool === "measure" || tool === "boundary" || tool === "newTrail";
+    const multi = tool === "measure" || tool === "boundary" || tool === "newTrail";
     $("#hintUndo").hidden = !multi || !pts.length;
     $("#hintDone").hidden = !multi || pts.length < (tool === "boundary" ? 3 : 2);
     $("#hintDone").textContent = tool === "measure" ? "Clear" : "Finish";
-    let text = { daySpot: "Tap the map where they will sit", routeVia: "Tap the road, track or spot they will walk via", routeFrom: "Tap where they start walking",
-      stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", sound: "Tap roughly where the sound came from", route: "Tap to add points along your stalk", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
+    let text = { stand: "Tap the map where the stand is", sighting: "Tap where you saw it", animal: "Tap the map where the animal is", sound: "Tap roughly where the sound came from", measure: "Tap points to measure", boundary: "Tap the corners of your hunting area",
       newTrail: "Tap points along the new trail", newPlace: "Tap where the name should go" }[tool];
     if (pts.length >= 2 && tool !== "boundary") {
       let d = 0; for (let i = 1; i < pts.length; i++) d += Geo.distance(pts[i - 1], pts[i]);
       text = `${d < 1000 ? Math.round(d) + " m" : (d / 1000).toFixed(2) + " km"}` + (tool === "measure" ? ` · bearing ${Math.round(Geo.bearing(pts[pts.length - 2], pts[pts.length - 1]))}°` : "");
     }
     if (tool === "boundary" && pts.length >= 3) text = `${Geo.areaHa(pts).toFixed(1)} ha · ${pts.length} corners`;
-    if (tool === "daySpot" && Day.spotFor) text = `Tap the map where ${Family.nameFor(Day.spotFor)} will sit`;
-    if (tool === "routeVia" && RoutePick.pending) text = `Tap the road or track ${Family.nameFor(RoutePick.pending)} will walk on`;
     $("#hintText").textContent = text;
   }
   function updateDraft() {
@@ -1292,12 +1138,7 @@
     map.getSource("draft").setData(FC(f));
   }
   async function finishTool() {
-    if (tool === "route" && pts.length >= 2) {
-      const n = Store.data.routes.length + 1;
-      await Store.put("routes", { id: newId("rt"), name: `Stalk route ${n}`, pts: flat(pts), created: new Date().toISOString() });
-      toast("Route saved. Its colours follow the wind you set.");
-      showTab("stands", false);
-    } else if (tool === "boundary" && pts.length >= 3) {
+    if (tool === "boundary" && pts.length >= 3) {
       await Store.setBoundary(flat(pts));
       toast(`Boundary saved: ${Geo.areaHa(pts).toFixed(1)} ha`);
     } else if (tool === "editBoundary" && edit && edit.pts.length >= 3) {
@@ -1321,13 +1162,6 @@
   }
 
   map.on("click", (e) => {
-    if (tool === "daySpot") { const email = Day.spotFor; setTool(null); if (email) Day.setSpot(email, [e.lngLat.lng, e.lngLat.lat]); return; }
-    if (tool === "routeVia") { setTool(null); RoutePick.via([e.lngLat.lng, e.lngLat.lat]); return; }
-    if (tool === "routeFrom") { setTool(null); RoutePick.fromPoint([e.lngLat.lng, e.lngLat.lat]); return; }
-    if (!tool && RoutePick.email && map.getLayer("routeopts")) {   // tap a suggested way on the map to choose it
-      const f = map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10], [e.point.x + 10, e.point.y + 10]], { layers: ["routeopts"] })[0];
-      if (f) { RoutePick.choose(+f.properties.i); return; }
-    }
     if (tool === "layout") {
       const id = trailAt(e.point);
       if (id) { setTool("editTrail", { trailId: id }); openFeatForm("trail", id); }
@@ -1628,8 +1462,6 @@
       if (firstFixDone !== watchId) { firstFixDone = watchId; renderPosBtn(); }
       followTick();
       renderMyCone();
-      Rec.onFix(ll, p.coords.accuracy);
-      if (FAMILY) renderGoto();
     }, (err) => {
       if (err.code !== 1) return;  // timeouts and weak signal: keep listening
       clearTimeout(startGPS.slow);
@@ -1882,36 +1714,6 @@
         try { await navigator.clipboard.writeText(u); toast("Kopierad. Klistra in den under URL i OwnTracks.", 5000); } catch { prompt("Din OwnTracks-adress:", u); }
       }
     });
-    $("#dayCard").addEventListener("click", (e) => {
-      const b = e.target.closest("[data-day]"); if (!b) return;
-      if (b.dataset.day === "start") Day.begin();
-      if (b.dataset.day === "end") {
-        if (b.dataset.confirm !== "1") { b.dataset.confirm = "1"; b.textContent = tr("Tap again to end"); setTimeout(() => { if (b.isConnected) { b.dataset.confirm = ""; b.textContent = tr("End the hunt day"); } }, 3000); return; }
-        Day.end();
-      }
-    });
-    $("#dayCard").addEventListener("change", (e) => {
-      const s = e.target.closest("[data-assign]");
-      if (s) { if (s.value === "__place") Day.startSpot(s.dataset.assign); else if (s.value !== "__spot") Day.assign(s.dataset.assign, s.value); }
-      const f = e.target.closest("[data-route-from]");
-      if (f) { if (f.value === "__pick") RoutePick.pickStart(); else RoutePick.open(f.dataset.routeFrom, f.value); }
-    });
-    $("#dayCard").addEventListener("click", async (e) => {
-      const sp = e.target.closest("[data-spot]"); if (sp) { Day.startSpot(sp.dataset.spot); return; }
-      if (e.target.closest("[data-show-way]")) { Day.showWay(); return; }
-      if (e.target.closest("[data-route-via]")) { RoutePick.pickVia(); return; }
-      const r = e.target.closest("[data-route]"); if (r) { RoutePick.email === r.dataset.route ? RoutePick.close() : RoutePick.open(r.dataset.route); return; }
-      const p = e.target.closest("[data-route-pick]"); if (p) { RoutePick.choose(+p.dataset.routePick); return; }
-      const n = e.target.closest("[data-route-none]");
-      if (n) { await window.FB.db.doc("map/huntday").update({ routes: { [n.dataset.routeNone]: null } }).catch(() => {}); RoutePick.close(); return; }
-      if (e.target.closest("[data-route-close]")) RoutePick.close();
-    });
-    $("#myStandChip").addEventListener("click", () => {
-      const st = Day.myPlace(); if (!st) return;
-      const pos = myPos();
-      if (pos) map.fitBounds([[Math.min(pos.ll[0], st.lon), Math.min(pos.ll[1], st.lat)], [Math.max(pos.ll[0], st.lon), Math.max(pos.ll[1], st.lat)]], { padding: 90, maxZoom: 17 });
-      else map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 16) });
-    });
     hmenu.addEventListener("click", (e) => {
       const b = e.target.closest("[data-ev]"); if (!b) return;
       closeHunt();
@@ -1919,12 +1721,6 @@
       Hunt.send(b.dataset.ev);
     });
     document.addEventListener("click", (e) => { if (!hmenu.hidden && !e.target.closest("#huntMenu")) closeHunt(); });
-    document.addEventListener("click", (e) => {
-      const b = e.target.closest("[data-search-from]"); if (!b) return;
-      const ev = Hunt.events.find((x) => x.id === b.dataset.searchFrom); if (!ev) return;
-      document.querySelectorAll(".maplibregl-popup").forEach((p) => p.remove());
-      Rec.start("search", { lon: ev.lon, lat: ev.lat, label: tr(EVENT_TEXT.shot(ev)) });
-    });
     // delete a message: tap Delete, then again within 3 s to confirm (in the list or on its map pin)
     document.addEventListener("click", (e) => {
       const b = e.target.closest("[data-del-ev]"); if (!b) return;
@@ -1951,29 +1747,8 @@
       if (open && isPhone()) setSheet("peek");
     });
     menu.addEventListener("click", (e) => {
-      const r = e.target.closest("[data-rec]");
-      if (r) { closeMenu(); Rec.start(r.dataset.rec); return; }
       const b = e.target.closest("[data-tool]"); if (!b) return;
       closeMenu(); setTool(b.dataset.tool);
-    });
-    $("#recStop").addEventListener("click", () => Rec.stop());
-    $("#bestList").addEventListener("click", (e) => {
-      const r = e.target.closest("[data-id]"); if (!r) return;
-      const st = Store.data.stands.find((x) => x.id === r.dataset.id);
-      if (st) { map.easeTo({ center: [st.lon, st.lat], zoom: Math.max(map.getZoom(), 15.5) }); if (isPhone()) setSheet("peek"); }
-    });
-    $("#recMarks").addEventListener("click", (e) => { const b = e.target.closest("[data-mark]"); if (b) Rec.mark(b.dataset.mark); });
-    $("#trackList").addEventListener("click", async (e) => {
-      const del = e.target.closest("[data-del-track]");
-      if (del) {
-        if (del.dataset.confirm !== "1") { del.dataset.confirm = "1"; del.textContent = "Confirm"; setTimeout(() => { del.dataset.confirm = ""; del.textContent = "Delete"; }, 3000); return; }
-        if (Rec.on && Rec.on.id === del.dataset.delTrack) Rec.stop();
-        await Store.remove("tracks", del.dataset.delTrack); return;
-      }
-      const li = e.target.closest("li[data-id]"); if (!li) return;
-      const t = Store.data.tracks.find((x) => x.id === li.dataset.id); if (!t || !(t.pts || []).length) return;
-      const p = pairs(t.pts), b = p.reduce((a, q) => [Math.min(a[0], q[0]), Math.min(a[1], q[1]), Math.max(a[2], q[0]), Math.max(a[3], q[1])], [180, 90, -180, -90]);
-      map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: 80, maxZoom: 17 });
     });
     document.addEventListener("click", (e) => { if (!menu.hidden && !e.target.closest("#addMenu")) closeMenu(); });
     map.on("movestart", closeMenu);
@@ -2020,7 +1795,7 @@
     $("#hintDone").addEventListener("click", () => { if (tool === "measure") { pts = []; updateHint(); updateDraft(); } else finishTool(); });
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && tool) $("#hintCancel").hidden ? $("#hintDone").click() : $("#hintCancel").click();
-      if (e.key === "Enter" && tool && ["route", "boundary"].includes(tool) && document.activeElement === document.body) finishTool();
+      if (e.key === "Enter" && tool && ["boundary"].includes(tool) && document.activeElement === document.body) finishTool();
     });
     $("#addSighting").addEventListener("click", () => setTool("sighting"));
 
@@ -2056,17 +1831,7 @@
       const s = Store.data.stands.find((x) => x.id === li.dataset.id); if (!s) return;
       map.easeTo({ center: [s.lon, s.lat], zoom: Math.max(map.getZoom(), 16) }); editStand(s.id);
     });
-    $("#routeList").addEventListener("click", async (e) => {
-      const del = e.target.closest("[data-del-route]");
-      if (del) {
-        if (del.dataset.confirm !== "1") { del.dataset.confirm = "1"; del.textContent = "Confirm"; setTimeout(() => { del.dataset.confirm = ""; del.textContent = "Delete"; }, 3000); return; }
-        await Store.remove("routes", del.dataset.delRoute); return;
-      }
-      const li = e.target.closest("li[data-id]"); if (!li) return;
-      const r = Store.data.routes.find((x) => x.id === li.dataset.id); if (!r) return;
-      const p = pairs(r.pts); const xs = p.map((q) => q[0]), ys = p.map((q) => q[1]);
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 17 });
-    });
+
 
     $("#whoList").addEventListener("change", (e) => {
       const k = e.target.dataset.who; if (!k) return;
@@ -2080,14 +1845,7 @@
 
 
     // wind
-    buildDial();
-    $("#windSpeed").value = prefs.wind.speed;
-    $("#windSpeed").addEventListener("input", (e) => { prefs.wind.speed = +e.target.value; prefs.windMode = "manual"; savePrefs(); renderAll(); renderForecast(); });
     $("#fcStrip").addEventListener("click", (e) => { const b = e.target.closest(".fc-h"); if (b) applyForecastHour(+b.dataset.t); });
-    $("#fcUse").addEventListener("click", () => {
-      const now = Date.now(), first = Forecast.hours.find((h) => h.t > now - 3600e3);
-      applyForecastHour(Forecast.selT && Forecast.selT > now - 3600e3 ? Forecast.selT : first && first.t);
-    });
     loadForecast();
     if (prefs.ov.quiet) Ground.load();
     setInterval(loadForecast, 30 * 60e3);
@@ -2125,142 +1883,6 @@
       map.easeTo({ center: [x.lon, x.lat], zoom: Math.max(map.getZoom(), 16) });
       draftSighting = { ...x, isNew: false }; openSightForm();
     });
-  }
-
-  // ---------- recorded tracks and eftersök (blood tracking) ----------
-  const MARKS = { blood: { n: "Blood", c: "#e03131" }, sign: { n: "Tracks", c: "#f08c00" }, bed: { n: "Bed", c: "#7048e8" },
-    hair: { n: "Hair", c: "#adb5bd" }, found: { n: "Animal found", c: "#2b8a3e" } };
-  const Rec = {
-    on: null, lastSave: 0, timer: 0,
-    start(kind, from) {
-      if (this.on) { toast("Already recording."); return; }
-      if (watchId === null) startGPS();
-      const here = myPos(), pts = from ? [from.lon, from.lat] : here ? [...here.ll] : [];
-      this.on = { id: newId("tk"), kind, pts, ts: pts.length ? [Date.now()] : [], marks: [], start: Date.now(), from: from ? from.label || "" : "" };
-      // no screen wake lock: the phone may lock in the pocket (the screen is the biggest battery drain);
-      // OwnTracks keeps sending and the gaps are filled from it when the map is opened again
-      this.timer = setInterval(() => this.renderBar(), 15000);
-      this.renderBar(); renderTracks(); this.save();
-      toast(kind === "search" ? "Blood tracking started. Mark what you find as you go." : "Recording your track. You can lock the phone; OwnTracks fills in the gaps.");
-    },
-    onFix(ll, acc) {
-      const r = this.on; if (!r || acc > 40) return;
-      const n = r.pts.length;
-      if (n >= 2 && Geo.distance([r.pts[n - 2], r.pts[n - 1]], ll) < 4) return;
-      r.pts.push(ll[0], ll[1]); r.ts.push(Date.now());
-      renderTracks(); this.renderBar();
-      if (Date.now() - this.lastSave > 20000) this.save();
-    },
-    // While the phone was locked the map had no GPS, but OwnTracks kept sending: put those points into the
-    // track in time order instead of a straight line across the gap.
-    // Those points are kept in my own record (map/poshist_<email>), apart from the position everyone's map
-    // listens to. It is fetched only while recording: when OwnTracks has sent something new (at most every 30 s)
-    // and when the map is opened again.
-    hist: null, histFor: 0, histTried: 0, histAt: 0, histBusy: false, histTimer: 0,
-    async backfill(force) {
-      const r = this.on, v = FAMILY && Family.otMine;
-      if (!r || !FAMILY || !Family.user) return;
-      const newest = v ? Family.posTime(v) : 0, now = Date.now();
-      if (!this.histBusy && (force ? now - this.histAt > 3000 : newest > this.histFor && now - this.histAt > 30000)) {
-        this.histBusy = true; this.histAt = now;
-        try {
-          const d = await window.FB.db.doc("map/poshist_" + Family.user.email.toLowerCase().replace(/[^a-z0-9]/g, "_")).get();
-          const h = d.exists && d.data().hist;
-          if (Array.isArray(h)) this.hist = h;
-          // The newest position should be in it. If it isn't yet (the two are saved side by side), look once
-          // more; after that settle (it came by the backup route, which keeps its history on the position).
-          const last = this.hist && this.hist.length >= 3 ? this.hist[this.hist.length - 1] * 1000 : 0;
-          if (last >= newest - 999 || this.histTried === newest) this.histFor = newest; else this.histTried = newest;
-        } catch { /* no coverage: tried again below */ }
-        this.histBusy = false;
-        if (this.on !== r) return;
-      }
-      if (newest > this.histFor && !this.histTimer) {
-        this.histTimer = setTimeout(() => { this.histTimer = 0; this.backfill(); }, Math.max(0, 30000 - (Date.now() - this.histAt)) + 300);
-      }
-      // a history on the position itself comes from the backup receiver (or from before the history was moved)
-      const hist = (this.hist || []).concat(v && Array.isArray(v.hist) ? v.hist : []);
-      if (!hist.length) return;
-      const have = new Set(r.ts.map((t) => Math.round(t / 1000))), all = [];
-      for (let i = 0; i < r.ts.length; i++) all.push([r.pts[2 * i], r.pts[2 * i + 1], r.ts[i]]);
-      let added = 0;
-      for (let i = 0; i + 2 < hist.length; i += 3) {
-        const t = hist[i + 2] * 1000;
-        if (t >= r.start && t <= Date.now() && !have.has(Math.round(t / 1000))) { have.add(Math.round(t / 1000)); all.push([hist[i], hist[i + 1], t]); added++; }
-      }
-      if (!added) return;
-      all.sort((a, b) => a[2] - b[2]);
-      const pts = [], ts = [];
-      for (const [lo, la, t] of all) {
-        const n = pts.length;
-        if (n >= 2 && Geo.distance([pts[n - 2], pts[n - 1]], [lo, la]) < 4) continue;
-        pts.push(lo, la); ts.push(t);
-      }
-      r.pts = pts; r.ts = ts;
-      renderTracks(); this.renderBar(); this.save();
-    },
-    mark(kind) {
-      if (!this.on) return;
-      const pos = myPos();
-      if (!pos) { toast("Waiting for your position. Try again in a moment."); return; }
-      this.on.marks.push({ kind, lon: pos.ll[0], lat: pos.ll[1], t: Date.now() });
-      renderTracks(); this.save();
-      toast(`${MARKS[kind].n} ✓`);
-      try { navigator.vibrate && navigator.vibrate(60); } catch { /* none */ }
-    },
-    save() {
-      const r = this.on; if (!r) return;
-      this.lastSave = Date.now();
-      const old = Store.data.tracks.find((x) => x.id === r.id);
-      Store.put("tracks", { ...(old || {}), id: r.id, kind: r.kind, pts: r.pts, ts: r.ts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: true });
-    },
-    stop() {
-      const r = this.on; if (!r) return;
-      this.save();
-      const old = Store.data.tracks.find((x) => x.id === r.id) || {};
-      Store.put("tracks", { ...old, id: r.id, kind: r.kind, pts: r.pts, ts: r.ts, marks: r.marks, start: r.start, end: Date.now(), from: r.from, live: false });
-      this.on = null; clearInterval(this.timer);
-      this.renderBar(); renderTracks();
-      toast(`Saved: ${trackLen(r.pts)}`);
-    },
-    renderBar() {
-      const r = this.on, bar = $("#recBar");
-      bar.hidden = !r; document.documentElement.classList.toggle("recording", !!r);
-      if (!r) return;
-      const min = Math.round((Date.now() - r.start) / 60000);
-      $("#recInfo").textContent = `${r.kind === "search" ? "Blood tracking" : "Recording"} · ${trackLen(r.pts)} · ${min} min`;
-      $("#recMarks").hidden = r.kind !== "search";
-    },
-  };
-  function trackLen(pts) {
-    const p = pairs(pts); let d = 0;
-    for (let i = 1; i < p.length; i++) d += Geo.distance(p[i - 1], p[i]);
-    return d >= 1000 ? `${(d / 1000).toFixed(1)} km` : `${Math.round(d)} m`;
-  }
-  function renderTracks() {
-    const src = map.getSource("tracks"); if (!src) return;
-    const list = plans("tracks").filter((t) => !Rec.on || t.id !== Rec.on.id);
-    if (Rec.on) list.push({ ...Rec.on, by: FAMILY && Family.user ? Family.user.email.toLowerCase() : "" });
-    const feats = [];
-    for (const t of list) {
-      const color = t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e";
-      const p = pairs(t.pts || []);
-      if (p.length >= 2) feats.push({ type: "Feature", properties: { color, id: t.id }, geometry: { type: "LineString", coordinates: p } });
-      for (const m of t.marks || []) feats.push({ type: "Feature", properties: { color: (MARKS[m.kind] || MARKS.sign).c, label: tr((MARKS[m.kind] || MARKS.sign).n) },
-        geometry: { type: "Point", coordinates: [m.lon, m.lat] } });
-    }
-    src.setData(FC(feats));
-    const tl = $("#trackList");
-    const saved = plans("tracks").slice().sort((a, b) => (b.start || 0) - (a.start || 0));
-    tl.innerHTML = saved.length ? saved.map((t) => {
-      const d = new Date(t.start || 0).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" });
-      return `<li data-id="${esc(t.id)}"><span class="dot" style="background:${t.kind === "search" ? "#e03131" : FAMILY && t.by ? Family.colorFor(t.by) : "#ff7a2e"}"></span>
-        <span class="it-main"><div class="it-name"><span>${t.kind === "search" ? "Blood tracking" : "Track"}</span> ${esc(d)}${t.live && Date.now() - (t.end || 0) < 10 * 60e3 ? " <span>· live</span>" : ""}</div>
-        <div class="it-sub">${trackLen(t.pts || [])}${(t.marks || []).length ? ` · ${(t.marks || []).length} marks` : ""}${whoTag(t)}</div></span>
-        ${!FAMILY || !t.by || (Family.user && t.by === Family.user.email.toLowerCase()) || (Family.member && Family.member.role === "owner")
-          ? `<button class="btn small ghost" data-del-track="${esc(t.id)}" type="button">Delete</button>` : ""}</li>`;
-    }).join("") : "";
-    $("#trackHead").hidden = !tl.innerHTML;
   }
 
   function myPos() {
@@ -2364,18 +1986,28 @@
         for (const e of all) if (e.email === me && Date.now() - (e.tc || 0) > 48 * 3600e3) db.doc(`events/${e.id}`).delete().catch(() => {});
       }, () => { this.blocked = true; });
     },
-    // who has checked in where (a check-in lasts until they leave the stand, at most 14 hours)
+    // Who sits where: whoever's latest position (less than 30 minutes old) is within 40 m of a stand. Nobody has
+    // to check in or be given a stand; the shooting-sector warning and the name on the stand follow from this.
     sitting() {
       const out = new Map();
-      for (const [email, c] of Object.entries(this.checkins || {})) if (c && c.stand && Date.now() - (c.t || 0) < 14 * 3600e3) out.set(c.stand, email);
+      if (!FAMILY || !Family.user) return out;
+      const emails = new Set([Family.user.email.toLowerCase(), ...Family.members.map((m) => m.email)]);
+      for (const email of emails) {
+        const w = Family.whereIs(email);
+        if (!w || !w.ll || (w.age || 0) > 30) continue;
+        let best = null, bd = 40;
+        for (const st of Store.data.stands) {
+          const d = Geo.distance(w.ll, [st.lon, st.lat]);
+          if (d <= bd && !out.has(st.id)) { bd = d; best = st; }
+        }
+        if (best) out.set(best.id, email);
+      }
       return out;
     },
     onStand(standId) {
       const who = this.sitting().get(standId);
       if (who) { const m = Family.members.find((x) => x.email === who); return { email: who, name: m ? m.name : who.split("@")[0] }; }
       if (this.stand === standId && Family.user) return { email: Family.user.email.toLowerCase(), name: Family.member && Family.member.name };
-      const planned = Day.whoOn(standId);
-      if (planned) { const m = Family.members.find((x) => x.email === planned); return { email: planned, name: m ? m.name : planned.split("@")[0], planned: true }; }
       return null;
     },
     // post a message that needs no position (hunt day start and end)
@@ -2402,7 +2034,7 @@
       if (type === "offstand") { if (!this.stand) return; this.stand = null; }
       if (type === "onstand" || type === "offstand")
         window.FB.db.doc("map/onstand").update({ [e.email]: { stand: this.stand || "", t: Date.now() } }).catch(() => {});
-      const st = Store.data.stands.find((x) => x.id === (this.stand || Day.myStand()));
+      const st = Store.data.stands.find((x) => x.id === this.stand);
       if (st && !e.standName) e.standName = st.name || "";
       const id = newId("ev");
       try { await window.FB.db.doc(`events/${id}`).set(e); toast(tr(EVENT_TEXT[type](e)) + " ✓"); Ntfy.announce(id, e); }
@@ -2435,7 +2067,6 @@
             const t = new Date(e.tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
             new maplibregl.Popup({ closeButton: false, offset: 14 }).setLngLat([e.lon, e.lat])
               .setHTML(`<div class="pop"><b>${esc(tr(EVENT_TEXT[e.type](e)))}</b><br>${t}` +
-                (e.type === "shot" ? `<br><button class="btn small primary" type="button" data-search-from="${esc(e.id)}">${esc(tr("Start blood tracking here"))}</button>` : "") +
                 (Hunt.canDelete(e) ? `<br><button class="btn small ghost" type="button" data-del-ev="${esc(e.id)}">${esc(tr("Delete"))}</button>` : "") + `</div>`).addTo(map);
           });
           m = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat([e.lon, e.lat]).addTo(map);
@@ -2473,18 +2104,14 @@
       const msgs = [], uid = Family.user.uid;
       const live = [...Family.positions].filter(([id, v]) => id !== uid && typeof v.lon === "number" && Family.isCurrent(v, 5) && Family.goodFix(v));
       const me = Family.user.email.toLowerCase();
-      // my stand counts once I've checked in, or once I'm at the stand I was given today
-      const plannedId = Day.myStand(), planned = plannedId && Store.data.stands.find((x) => x.id === plannedId);
-      const pos = myPos();
-      const mine = (this.stand && Store.data.stands.find((x) => x.id === this.stand)) || (planned && pos && Geo.distance(pos.ll, [planned.lon, planned.lat]) < 50 ? planned : null);
+      // my stand is the one I'm at (within 40 m)
+      const pos = myPos(), sit = this.sitting();
+      let mine = null;
+      for (const [sid, email] of sit) if (email === me) mine = Store.data.stands.find((x) => x.id === sid) || null;
       if (mine) for (const [, v] of live) if (this.inSector(mine, [v.lon, v.lat])) msgs.push({ key: "in:" + v.email, text: `${Family.nameFor(v.email, v.name)} is in your shooting sector` });
       if (pos) {
         const others = new Map(), nameOf = (e) => Family.nameFor(e);
-        for (const [sid, email] of this.sitting()) if (email !== me) others.set(sid, nameOf(email));   // checked in now
-        if (Day.active()) for (const [email, sid] of Object.entries(Day.doc.assign || {})) {
-          if (!sid || email === me || others.has(sid)) continue;
-          others.set(sid, nameOf(email));
-        }
+        for (const [sid, email] of sit) if (email !== me) others.set(sid, nameOf(email));   // at their stand now
         for (const [sid, name] of others) {
           const st = Store.data.stands.find((x) => x.id === sid);
           if (st && st.id !== (mine && mine.id) && this.inSector(st, pos.ll)) msgs.push({ key: "me:" + sid, text: `You're in ${name}'s shooting sector` });
@@ -2769,441 +2396,6 @@
     },
   };
 
-  // ---------- route planner: suggested ways to walk to a stand ----------
-  // Least-cost paths on the 5 m terrain grid, along roads, tracks, paths and our own trails (cross-country only to
-  // reach them from the start and to get from the last one to the stand). Walking cost per cell comes from the slope
-  // and the land (fields, mires, regrowth, thickets, water). Three kinds:
-  //   fast   the easiest way: least climbing and rough ground, trails and tracks where they help
-  //   quiet  avoids loud ground: dry broadleaf litter, regrowth and dense undergrowth
-  //   wind   keeps your scent out of the stand's sector in the current wind, and doesn't cross the sector itself
-  // A suggestion that comes out almost the same as an earlier one is replaced by a clearly different way.
-  const Router = {
-    base: null, quiet: null, grid: null,
-    build() {
-      const g = window.TerrainWind && window.TerrainWind.slopes[0];
-      if (!g) return false;
-      const inf = info && info.find((x) => x.origin[0] === g.origin[0] && x.origin[1] === g.origin[1] && x.cell === g.cell);
-      const W = g.width, H = g.height, n = W * H, base = new Float32Array(n), quiet = new Float32Array(n), net = new Uint8Array(n);
-      for (let i = 0; i < n; i++) {
-        const sl = g.slope[i];
-        let c = 1 + (sl / 12) ** 2 + (sl > 35 ? 25 : 0), q = 0;
-        if (inf) {
-          const code = inf.codes[inf.px[i * 4] - 1], th = inf.px[i * 4 + 2] / 2.5;
-          if (code === 61 || code === 62) c = 1e4;
-          else if (code === 51 || code === 52) c += 30;
-          else if (code === 3) c *= 1.15;
-          else if (code >= 200 && code < 300) c *= 2.2;
-          else if (code === 118 || code === 128) { c *= 2; q += 0.7; }
-          if (code >= 121 && code <= 128) c += 0.3;
-          if ([115, 116, 117, 125, 126, 127].includes(code)) q += 0.6;
-          else if (code === 111 || code === 121) q += 0.2;
-          c *= 1 + th / 60; q += th / 120;
-        }
-        base[i] = c; quiet[i] = q;
-      }
-      // trails and tracks: cheap, and quiet underfoot
-      const burn = (coords, cost) => {
-        for (let k = 1; k < coords.length; k++) {
-          const a = Geo.toSweref(...coords[k - 1]), b = Geo.toSweref(...coords[k]), L = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.ceil(L / 2.5) + 1;
-          for (let t = 0; t <= steps; t++) {
-            const E = a[0] + (b[0] - a[0]) * t / steps, N = a[1] + (b[1] - a[1]) * t / steps;
-            const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
-            if (c < 0 || r < 0 || c >= W || r >= H) continue;
-            const i = r * W + c; if (base[i] < 1e3) { base[i] = Math.min(base[i], cost); quiet[i] = 0; net[i] = 1; }
-          }
-        }
-      };
-      for (const f of vectors.osm || []) {
-        const kind = f.properties && f.properties.kind;
-        if (f.geometry.type !== "LineString" || !["track", "path", "road", "road_minor", "road_major"].includes(kind)) continue;
-        burn(f.geometry.coordinates, kind === "track" || kind === "path" ? 0.4 : 0.5);
-      }
-      for (const t of Store.data.trails) burn(pairs(t.pts), 0.35);
-      this.grid = g; this.base = base; this.quiet = quiet; this.net = net;
-      return true;
-    },
-    cell(ll) {
-      const g = this.grid, [E, N] = Geo.toSweref(ll[0], ll[1]);
-      const c = Math.floor((E - g.origin[0]) / g.cell), r = Math.floor((g.origin[1] - N) / g.cell);
-      return c < 0 || r < 0 || c >= g.width || r >= g.height ? -1 : r * g.width + c;
-    },
-    // extra cost for the scent-safe kind: cells whose scent drifts into the stand's sector, and the sector itself
-    windCost(st) {
-      const g = this.grid, W = g.width, H = g.height, out = new Float32Array(W * H);
-      if (typeof st.facing !== "number") return out;   // a spot placed on the map has no shooting direction
-      const [sE, sN] = Geo.toSweref(st.lon, st.lat), down = ((localFrom(st.lon, st.lat) + 180) % 360) * Math.PI / 180;
-      const dx = Math.sin(down), dy = Math.cos(down), face = (st.facing || 0) * Math.PI / 180, half = ((st.width || 90) / 2 + 10) * Math.PI / 180;
-      const inSec = (E, N) => {
-        const ex = E - sE, ny = N - sN, d = Math.hypot(ex, ny); if (d < 25 || d > 250) return false;
-        let a = Math.atan2(ex, ny) - face; a = Math.atan2(Math.sin(a), Math.cos(a)); return Math.abs(a) <= half;
-      };
-      for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) {
-        const E = g.origin[0] + (c + 0.5) * g.cell, N = g.origin[1] - (r + 0.5) * g.cell;
-        let x = 0;
-        if (inSec(E, N)) x += 4;
-        for (const t of [40, 90, 150]) if (inSec(E + dx * t, N + dy * t)) { x += 3; break; }
-        out[r * W + c] = x;
-      }
-      return out;
-    },
-    // Dijkstra on 8 neighbours from cell a to cell b with cost per cell cost(i)
-    path(a, b, cost) {
-      const g = this.grid, W = g.width, H = g.height, n = W * H;
-      const dist = new Float32Array(n).fill(Infinity), prev = new Int32Array(n).fill(-1), done = new Uint8Array(n);
-      const heap = [[0, a]]; dist[a] = 0;
-      const push = (d, i) => { heap.push([d, i]); let k = heap.length - 1; while (k > 0) { const p = (k - 1) >> 1; if (heap[p][0] <= heap[k][0]) break; [heap[p], heap[k]] = [heap[k], heap[p]]; k = p; } };
-      const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let k = 0;
-        for (;;) { const l = 2 * k + 1, r = l + 1; let m = k; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === k) break; [heap[m], heap[k]] = [heap[k], heap[m]]; k = m; } } return top; };
-      const NB = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, 1.414], [1, -1, 1.414], [-1, 1, 1.414], [-1, -1, 1.414]];
-      while (heap.length) {
-        const [d, i] = pop(); if (done[i]) continue; done[i] = 1; if (i === b) break;
-        const x = i % W, y = (i - x) / W, ci = cost(i);
-        for (const [ox, oy, f] of NB) {
-          const nx = x + ox, ny = y + oy; if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
-          const j = ny * W + nx; if (done[j]) continue;
-          const nd = d + (ci + cost(j)) / 2 * f * g.cell;
-          if (nd < dist[j]) { dist[j] = nd; prev[j] = i; push(nd, j); }
-        }
-      }
-      if (prev[b] < 0 && a !== b) return null;
-      const cells = []; for (let i = b; i >= 0; i = prev[i]) { cells.push(i); if (i === a) break; }
-      return cells.reverse();
-    },
-    toCoords(cells, from, to) {
-      const g = this.grid, W = g.width;
-      const pts = cells.map((i) => { const c = i % W, r = (i - c) / W; return Geo.fromSweref(g.origin[0] + (c + 0.5) * g.cell, g.origin[1] - (r + 0.5) * g.cell); });
-      pts[0] = from; pts[pts.length - 1] = to;
-      // smooth the staircase a little and drop points that add nothing
-      const sm = pts.map((p, i) => i === 0 || i === pts.length - 1 ? p : [(pts[i - 1][0] + 2 * p[0] + pts[i + 1][0]) / 4, (pts[i - 1][1] + 2 * p[1] + pts[i + 1][1]) / 4]);
-      return simplifyLine(sm, 2.5);
-    },
-    // up to three suggestions from `from` to stand `st`: [{ kind, coords, len, overlap }]
-    suggest(from, st) {
-      if (!this.base && !this.build()) return null;
-      const a = this.cell(from), b = this.cell([st.lon, st.lat]);
-      if (a < 0 || b < 0) return null;
-      const base = this.base, quiet = this.quiet, wind = this.windCost(st), used = new Float32Array(base.length);
-      // stay on roads, tracks and our trails: going cross-country costs 25 times as much, so the only off-road bits
-      // are the short ways from the start to the nearest road or trail and from the last one to the stand
-      const net = this.net, walk = (i) => (net[i] ? base[i] : base[i] * 25);
-      const kinds = [["fast", walk], ["quiet", (i) => walk(i) + 1.6 * quiet[i]], ["wind", (i) => walk(i) + wind[i]]];
-      const out = [];
-      for (const [kind, cost] of kinds) {
-        let cells = this.path(a, b, (i) => cost(i) + used[i]);
-        if (!cells) continue;
-        const same = (cs) => out.some((o) => { const set = new Set(o.cells); return cs.filter((i) => set.has(i)).length / cs.length > 0.8; });
-        let label = kind;
-        if (same(cells)) {   // nearly the same way: look for a clearly different one instead
-          for (const o of out) for (const i of o.cells) for (const d of [0, 1, -1, this.grid.width, -this.grid.width]) if (used[i + d] !== undefined) used[i + d] += 4;
-          const alt = this.path(a, b, (i) => cost(i) + used[i]);
-          if (!alt || same(alt)) continue;
-          cells = alt; label = "other";
-        }
-        const coords = this.toCoords(cells, from, [st.lon, st.lat]);
-        let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
-        out.push({ kind: label, cells, coords, len });
-      }
-      return out;
-    },
-  };
-  function simplifyLine(pts, tol) {   // Douglas-Peucker in metres
-    if (pts.length < 3) return pts;
-    const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
-    const xy = pts.map((p) => Geo.toSweref(p[0], p[1]));
-    const rec = (i, j) => {
-      let best = -1, bd = tol; const [ax, ay] = xy[i], [bx, by] = xy[j], L = Math.hypot(bx - ax, by - ay) || 1;
-      for (let k = i + 1; k < j; k++) { const d = Math.abs((bx - ax) * (ay - xy[k][1]) - (ax - xy[k][0]) * (by - ay)) / L; if (d > bd) { bd = d; best = k; } }
-      if (best > 0) { keep[best] = 1; rec(i, best); rec(best, j); }
-    };
-    rec(0, pts.length - 1);
-    return pts.filter((_, i) => keep[i]).map((p) => [+p[0].toFixed(6), +p[1].toFixed(6)]);
-  }
-  // Each suggestion gets its own letter and colour by its place in the list (two "another way" must not look the
-  // same): blue, green, pink, white. Far apart in hue and not orange or yellow like roads, the boundary and feeding.
-  const ROUTE_COLORS = ["#228be6", "#40c057", "#f06595", "#ffffff", "#be4bdb"];
-  const ROUTE_NAMES = { fast: "Easiest", quiet: "Quietest", wind: "Scent-safe", other: "Another way", via: "Via the chosen road" };
-  const routeLook = (i, kind) => ["ABCDE"[i] || "?", ROUTE_COLORS[i % ROUTE_COLORS.length], ROUTE_NAMES[kind] || "Another way"];
-  // where a walk to a stand starts, in this order: the parking (the default), where they are now, entrances,
-  // then any other named place (each group nearest the stand first)
-  function routeStarts(email, st) {
-    const places = Store.data.places.slice().sort((p, q) => Geo.distance([p.lon, p.lat], [st.lon, st.lat]) - Geo.distance([q.lon, q.lat], [st.lon, st.lat]));
-    const item = (p) => ({ id: "p:" + p.id, name: p.name || "Place", ll: [p.lon, p.lat] });
-    const parking = places.filter((p) => /parker/i.test(p.name || "") || p.kind === "parking");
-    const entry = places.filter((p) => !parking.includes(p) && /ingång|grind|bil|start|väg/i.test(p.name || ""));
-    const rest = places.filter((p) => !parking.includes(p) && !entry.includes(p));
-    const out = parking.map(item);
-    const w = Family.whereIs(email);
-    if (w && w.ll) out.push({ id: "here", name: tr(`Where ${Family.nameFor(email)} is now`), ll: w.ll });
-    return [...out, ...entry.map(item), ...rest.map(item)];
-  }
-  // the chooser in the hunt-day card: one person at a time
-  const RoutePick = {
-    email: null, start: null, opts: [], sel: -1,
-    custom: null,
-    open(email, startId) {
-      const st = Day.placeOf(email);
-      if (!st) return;
-      if (this.custom && this.custom.email !== email) this.custom = null;
-      const starts = routeStarts(email, st);
-      if (this.custom) starts.unshift(this.custom);
-      if (!starts.length) { toast("Add a place first (e.g. Parkering) to start the walk from."); return; }
-      this.email = email; this.start = starts.find((x) => x.id === startId) || starts[0];   // first = the parking
-      this.opts = Router.suggest(this.start.ll, st) || [];
-      this.sel = -1;
-      if (!this.opts.length) toast("Couldn't find a way there from that start.");
-      this.draw();
-      const all = this.opts.flatMap((o) => o.coords);
-      if (all.length) {
-        const xs = all.map((p) => p[0]), ys = all.map((p) => p[1]);
-        const bottom = isPhone() ? Math.round(innerHeight - $("#panel").getBoundingClientRect().top) + 20 : 60;
-        map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: { top: 90, left: 40, right: 70, bottom }, maxZoom: 17 });
-      }
-      Day.render();
-    },
-    draw() {
-      const src = map.getSource("routeopts"); if (!src) return;
-      src.setData(FC(this.opts.map((o, i) => { const [l, color] = routeLook(i, o.kind);
-        return { type: "Feature", properties: { i, color, sel: i === this.sel, label: `${l} · ${Math.round(o.len)} m` }, geometry: { type: "LineString", coordinates: o.coords } }; })));
-    },
-    close(quiet) { this.email = null; this.opts = []; const src = map.getSource("routeopts"); if (src) src.setData(FC()); if (!quiet) Day.render(); },
-    // the person will walk via a certain road or track: one tap on it, the way through there is saved
-    pickVia() { this.pending = this.email; setTool("routeVia"); if (isPhone()) setSheet("peek"); },
-    pickStart() { this.pending = this.email; setTool("routeFrom"); if (isPhone()) setSheet("peek"); },
-    fromPoint(ll) {
-      const email = this.pending || this.email; if (!email) return;
-      this.custom = { id: "custom", name: tr("Chosen start"), ll, email };
-      showTab("stands", true); this.open(email, "custom");
-    },
-    via(ll) {
-      const email = this.pending || this.email, st = email && Day.placeOf(email);
-      if (!st || !this.start || (!Router.base && !Router.build())) return;
-      // snap to the nearest trail, track or road within ~30 m (that's what they meant to walk on)
-      const g = Router.grid, W = g.width;
-      let v = Router.cell(ll), best = Infinity;
-      if (v >= 0) for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
-        const c = (v % W) + dx, r = Math.floor(v / W) + dy, i = r * W + c;
-        if (c < 0 || r < 0 || c >= W || r >= g.height || Router.base[i] > 0.5) continue;
-        const d = dx * dx + dy * dy; if (d < best) { best = d; v = i; }
-      }
-      const a = Router.cell(this.start.ll), b = Router.cell([st.lon, st.lat]);
-      if (a < 0 || b < 0 || v < 0) return;
-      const cost = (i) => (Router.net[i] ? Router.base[i] : Router.base[i] * 25), p1 = Router.path(a, v, cost), p2 = Router.path(v, b, cost);
-      if (!p1 || !p2) { toast("Couldn't find a way there from that start."); return; }
-      const cells = [...p1, ...p2.slice(1)], coords = Router.toCoords(cells, this.start.ll, [st.lon, st.lat]);
-      let len = 0; for (let k = 1; k < coords.length; k++) len += Geo.distance(coords[k - 1], coords[k]);
-      this.email = email; this.opts.push({ kind: "via", cells, coords, len });
-      showTab("stands", true);
-      this.choose(this.opts.length - 1);
-    },
-    async choose(i) {
-      const o = this.opts[i], email = this.email; if (!o) return;
-      this.sel = i; this.draw();
-      // not awaited: offline the save waits for signal, but shows on this phone right away
-      const pl = Day.placeOf(email) || {};
-      if ((Day.doc.routes || {})[email]) Day.tell(email, "Your way to the stand has been changed. Tap to see it on the map.");
-      window.FB.db.doc("map/huntday").update({ routes: { [email]: { pts: o.coords.flat(), len: Math.round(o.len), kind: o.kind, from: this.start.name, stand: (Day.doc.assign || {})[email] || "", at: [pl.lon, pl.lat] } } })
-        .catch(() => toast("Couldn't save. Check your connection."));
-      toast(tr(`Route saved for ${Family.nameFor(email)}`));
-      this.close();
-    },
-    html(email) {
-      if (this.email !== email) return "";
-      const starts = routeStarts(email, Day.placeOf(email) || {}); if (this.custom && this.custom.email === email) starts.unshift(this.custom);
-      const startOpts = starts.map((s) => `<option value="${esc(s.id)}"${s.id === this.start.id ? " selected" : ""}>${esc(s.name)}</option>`).join("")
-        + `<option value="__pick">${esc(tr("Tap the start on the map…"))}</option>`;
-      return `<div class="route-pick">
-          <label class="route-from"><span>From</span> <select data-route-from="${esc(email)}">${startOpts}</select></label>
-          <div class="route-opts">${this.opts.map((o, i) => { const [l, color, name] = routeLook(i, o.kind);
-            return `<button type="button" class="btn small route-opt" data-route-pick="${i}" style="--rc:${color}"><b>${l}</b> <span>${esc(tr(name))}</span> · ${Math.round(o.len)} m</button>`; }).join("")}</div>
-          <button type="button" class="btn small route-via" data-route-via>${esc(tr("Via a road or track…"))}</button>
-          <p class="note small">Tap the way ${esc(Family.nameFor(email))} says they will walk. The lines are on the map.</p>
-          <div class="row gap"><button type="button" class="btn small ghost" data-route-none="${esc(email)}">No route</button><button type="button" class="btn small ghost" data-route-close>Close</button></div>
-        </div>`;
-    },
-  };
-  // everyone's chosen way on a hunt day, in their colour
-  function renderDayRoutes() {
-    const src = map.getSource("dayroutes"); if (!src) return;
-    const r = FAMILY && Day.active() && Day.doc.routes ? Day.doc.routes : {};
-    const me = Family.user && Family.user.email.toLowerCase(), act = FAMILY && Day.active();
-    const lines = Object.entries(r).filter(([email, v]) => v && v.pts && v.pts.length >= 4 && Day.placeOf(email) && email !== me)
-      .map(([email, v]) => ({ type: "Feature", properties: { color: Family.colorFor(email), label: Family.nameFor(email) }, geometry: { type: "LineString", coordinates: pairs(v.pts) } }));
-    const spots = act ? Object.entries(Day.doc.spots || {}).filter(([email, sp]) => sp && sp.length === 2 && !(Day.doc.assign || {})[email])
-      .map(([email, sp]) => ({ type: "Feature", properties: { color: Family.colorFor(email), label: Family.nameFor(email) }, geometry: { type: "Point", coordinates: sp } })) : [];
-    src.setData(FC([...lines, ...spots]));
-  }
-
-  // ---------- hunt day: leader, who sits where, start and end, summary ----------
-  // Stored in map/huntday (the map collection is open to every member, so no new rules are needed);
-  // finished days are kept as summaries in days/<start time>.
-  const Day = {
-    doc: null, past: [],
-    start(db) {
-      db.doc("map/huntday").onSnapshot((snap) => {
-        const was = this.active();
-        this.doc = snap.exists ? snap.data() : null;
-        this.render(); syncMarkers(); Hunt.checkSafety(); renderGoto(); renderDayRoutes();
-        if (!was && this.active() && this.myStand() && this.doc.leader !== Family.user.email.toLowerCase()) {
-          const st = Store.data.stands.find((x) => x.id === this.myStand());
-          if (st) toast(tr(`Your stand today: ${st.name || "Stand"}`), 7000);
-        }
-      }, () => {});
-      db.collection("days").onSnapshot((snap) => {
-        this.past = snap.docs.map((d) => ({ ...d.data(), id: d.id })).sort((a, b) => b.started - a.started);
-        this.render();
-      }, () => {});
-    },
-    active() { return !!(this.doc && this.doc.active && Date.now() - (this.doc.started || 0) < 14 * 3600e3); },
-    me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
-    myStand() { return this.active() ? (this.doc.assign || {})[this.me()] || null : null; },
-    // a saved stand, or a spot the leader tapped on the map: { lon, lat, name, (facing, width) }
-    placeOf(email) {
-      if (!this.doc) return null;
-      const sid = (this.doc.assign || {})[email], st = sid && Store.data.stands.find((x) => x.id === sid);
-      if (st) return st;
-      const sp = (this.doc.spots || {})[email];
-      return sp && sp.length === 2 ? { id: "", lon: sp[0], lat: sp[1], name: tr(`${Family.nameFor(email)}'s stand`) } : null;
-    },
-    myPlace() { return this.active() ? this.placeOf(this.me()) : null; },
-    // on a hunt day: is this person at their spot (within 40 m, position less than 30 min old)? null = unknown
-    where(email) {
-      const pl = this.placeOf(email), w = pl && Family.whereIs(email);
-      if (!pl || !w || !w.ll || (w.age || 0) > 30) return null;
-      const d = Geo.distance(w.ll, [pl.lon, pl.lat]);
-      return { at: d <= 40, d };
-    },
-    whereText(email) {
-      const w = this.where(email);
-      return !w ? "" : w.at ? tr("At the stand") : tr(`On the way, ${Math.round(w.d / 10) * 10} m left`);
-    },
-    // tell someone their spot or route was changed during the hunt (they may have the map closed)
-    tell(email, what) {
-      if (!this.active() || email === this.me()) return;
-      Ntfy.toPerson(email, { title: Family.nameFor(this.me()), message: tr(what), priority: 4, tags: ["round_pushpin"] });
-    },
-    spotFor: null,
-    startSpot(email) {
-      this.spotFor = email; RoutePick.close(true);
-      setTool("daySpot");
-      if (isPhone()) setSheet("peek");
-    },
-    setSpot(email, ll) {
-      const at = [+ll[0].toFixed(6), +ll[1].toFixed(6)];
-      if (this.placeOf(email)) this.tell(email, "Your stand has been moved. Tap to see it on the map.");
-      window.FB.db.doc("map/huntday").update({ spots: { [email]: at }, assign: { [email]: "" }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
-      // straight on to the way there, as soon as the new spot shows (it can take a moment)
-      let tries = 0;
-      const go = () => { if (this.placeOf(email)) { showTab("stands", true); RoutePick.open(email); } else if (++tries < 20) setTimeout(go, 150); };
-      setTimeout(go, 150);
-    },
-    whoOn(standId) {
-      if (!this.active()) return null;
-      for (const [email, sid] of Object.entries(this.doc.assign || {})) if (sid === standId) return email;
-      return null;
-    },
-    canLead() { return this.active() && (this.doc.leader === this.me() || (Family.member && Family.member.role === "owner")); },
-    // A new hunt day starts empty: the leader places everyone's stand for today.
-    async begin() {
-      window.FB.db.doc("map/huntday").set({ active: true, started: Date.now(), leader: this.me(),
-        leaderName: (Family.member && Family.member.name) || this.me().split("@")[0], assign: {}, spots: {}, routes: {}, wind: `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s` })
-        .catch(() => toast("Couldn't save. Check your connection."));
-      window.FB.db.doc("map/onstand").set({}).catch(() => {});   // old check-ins don't carry into a new day
-      Hunt.post("daystart");
-      showTab("stands", true);
-    },
-    async assign(email, standId) {
-      if (standId && this.placeOf(email)) this.tell(email, "Your stand has been changed. Tap to see it on the map.");
-      // a new stand means the old route no longer fits
-      window.FB.db.doc("map/huntday").update({ assign: { [email]: standId || "" }, spots: { [email]: null }, routes: { [email]: null } }).catch(() => toast("Couldn't save. Check your connection."));
-      if (standId && this.canLead()) setTimeout(() => RoutePick.open(email), 200);   // straight on to choosing the way there
-    },
-    async end() {
-      const d = this.doc; if (!d) return;
-      const since = d.started || 0, name = (e) => { const m = Family.members.find((x) => x.email === e); return (m && m.name) || e.split("@")[0]; };
-      const ev = Hunt.events.filter((e) => e.tc >= since);
-      const summary = {
-        started: since, ended: Date.now(), leaderName: d.leaderName || "", wind: d.wind || "",
-        sat: Family.members.map((m) => [m.email, this.placeOf(m.email)]).filter(([, pl]) => pl).map(([e, pl]) => ({ name: name(e), stand: pl.name || "?" })),
-        shots: ev.filter((e) => e.type === "shot").map((e) => ({ name: e.name, t: e.tc, dir: typeof e.heading === "number" ? Geo.compassName(e.heading) : "" })),
-        downs: ev.filter((e) => e.type === "down").map((e) => ({ name: e.name, t: e.tc })),
-        tracks: Store.data.tracks.filter((t) => (t.start || 0) >= since).map((t) => ({ name: name(t.by || ""), kind: t.kind, len: trackLen(t.pts || []) })),
-      };
-      await window.FB.db.doc(`days/${since}`).set(summary).catch(() => {});
-      // nothing carries over: spots, routes and check-ins end with the day
-      window.FB.db.doc("map/huntday").set({ active: false, ended: Date.now() }).catch(() => toast("Couldn't save. Check your connection."));
-      window.FB.db.doc("map/onstand").set({}).catch(() => {});
-      Hunt.post("dayend");
-    },
-    // what someone in the hunt (not the leader) needs: their stand, the way there, shooting light, who sits where
-    mine(hm) {
-      const d = this.doc, me = this.me(), pl = this.placeOf(me), rt = (d.routes || {})[me], sun = sunTimes(Date.now());
-      let h = `<h2 class="eyebrow">Your hunt day</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
-      if (!pl) h += `<p class="day-mine">${esc(tr("You have no stand yet. The leader places it."))}</p>`;
-      else {
-        h += `<div class="day-mine"><b>${esc(pl.name || tr("Your stand"))}</b>${this.where(me) ? ` · <span class="${this.where(me).at ? "at-stand" : ""}">${esc(this.whereText(me))}</span>` : ""}
-          ${rt && rt.pts ? `<div class="note small">${esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`))}</div>` : ""}
-          <button class="btn primary small" type="button" data-show-way>${esc(tr(rt && rt.pts ? "Show the way" : "Show my stand"))}</button></div>`;
-      }
-      if (sun.up && sun.down) h += `<p class="note small">${esc(tr("Shooting light today"))} ${hm(sun.up - 3600e3)}–${hm(sun.down + 3600e3)}</p>`;
-      const others = Family.members.filter((m) => m.email !== me && this.placeOf(m.email));
-      if (others.length) h += `<h2 class="eyebrow">Who sits where</h2><ul class="items">` + others.map((m) =>
-        `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
-          <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div><div class="it-sub">${esc(this.placeOf(m.email).name || "")}${this.whereText(m.email) ? ` · ${esc(this.whereText(m.email))}` : ""}</div></span></li>`).join("") + `</ul>`;
-      return h;
-    },
-    showWay() {
-      const pl = this.myPlace(); if (!pl) return;
-      const rt = (this.doc.routes || {})[this.me()], pts = rt && rt.pts ? pairs(rt.pts) : [[pl.lon, pl.lat]];
-      const pos = myPos(); if (pos) pts.push(pos.ll);
-      const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
-      if (isPhone()) setSheet("peek");
-      map.fitBounds([[Math.min(...xs), Math.min(...ys)], [Math.max(...xs), Math.max(...ys)]], { padding: 80, maxZoom: 17 });
-    },
-    render() {
-      const card = $("#dayCard"); if (!card) return;
-      const hm = (t) => new Date(t).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
-      const stands = Store.data.stands.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv"));
-      let h = "";
-      if (this.active()) {
-        const d = this.doc, lead = this.canLead();
-        if (!lead) { card.innerHTML = this.mine(hm); return; }
-        h += `<h2 class="eyebrow">Hunt day in progress</h2><p class="note small"><span>Since</span> ${hm(d.started)} · <span>leader</span> ${esc(d.leaderName || "")}</p>`;
-        h += `<ul class="items day-assign">` + Family.members.slice().sort((a, b) => (a.name || "").localeCompare(b.name || "", "sv")).map((m) => {
-          const cur = (d.assign || {})[m.email] || "", spot = !cur && (d.spots || {})[m.email], place = this.placeOf(m.email);
-          const opts = `<option value="">${esc(tr("Choose stand"))}</option>` + stands.map((st) => `<option value="${esc(st.id)}"${st.id === cur ? " selected" : ""}>${esc(st.name || "Stand")}</option>`).join("")
-            + (spot ? `<option value="__spot" selected>${esc(tr("Placed on the map"))}</option>` : "") + `<option value="__place">${esc(tr("Place on the map…"))}</option>`;
-          const rt = (d.routes || {})[m.email], hasRoute = place && rt && rt.pts;
-          return `<li><span class="fam-dot" style="background:${Family.colorFor(m.email)}" translate="no">${esc(Family.letterFor(m.email, m.name))}</span>
-            <span class="it-main"><div class="it-name">${esc(Family.nameFor(m.email, m.name))}</div>
-              <div class="it-sub">${place ? (hasRoute ? esc(tr(`Walks from ${rt.from || "?"}, ${rt.len} m`)) : esc(tr("No route yet"))) : esc(tr("No stand yet"))}${this.where(m.email) ? ` · <b class="${this.where(m.email).at ? "at-stand" : ""}">${esc(this.whereText(m.email))}</b>` : ""}</div></span>
-            ${lead ? (stands.length ? `<select data-assign="${esc(m.email)}" aria-label="Stand">${opts}</select>` : "")
-                + `<button type="button" class="btn small${place ? " ghost" : " primary"}" data-spot="${esc(m.email)}"><span>${place ? "Move" : "Place stand"}</span></button>`
-                + (place ? `<button type="button" class="btn small ghost" data-route="${esc(m.email)}">${hasRoute ? "Change route" : "Route"}</button>` : "")
-              : (place ? `<span class="day-place">${esc(place.name || "Stand")}</span>` : "")}
-            ${RoutePick.html(m.email)}</li>`;
-        }).join("") + `</ul>`;
-        if (lead) h += `<button class="btn danger" type="button" data-day="end">End the hunt day</button>`;
-      } else {
-        h += `<h2 class="eyebrow">Hunt day</h2><p class="note small">Start a hunt day, then place everyone's stand on the map and choose their way there.</p>
-          <button class="btn primary" type="button" data-day="start">Start hunt day</button>`;
-      }
-      card.innerHTML = h;
-    },
-  };
-  // the stand you were given today: a chip on the map and a line from you to it
-  function renderGoto() {
-    const src = map.getSource("goto"), chip = $("#myStandChip");
-    const st = FAMILY ? Day.myPlace() : null;
-    if (!st) { chip.hidden = true; if (src) src.setData(FC()); return; }
-    chip.hidden = false;
-    const pos = myPos(), near = pos && Geo.distance(pos.ll, [st.lon, st.lat]);
-    chip.textContent = tr(`Your stand: ${st.name || "Stand"}`) + (pos ? ` · ${Math.round(near)} m ${Geo.compassName(Geo.bearing(pos.ll, [st.lon, st.lat]))}` : "");
-    chip.dataset.id = st.id;
-    const rt = Day.doc && Day.doc.routes && Day.doc.routes[Family.user.email.toLowerCase()];
-    if (rt && rt.pts && rt.pts.length >= 4) { if (src) src.setData(FC([{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: pairs(rt.pts) } }])); return; }   // the agreed way
-    if (src) src.setData(FC(pos && near > 30 ? [{ type: "Feature", properties: {}, geometry: { type: "LineString", coordinates: [pos.ll, [st.lon, st.lat]] } }] : []));
-  }
-
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
   const LOOK_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d", "#e03131", "#495057", "#f5c518", "#ffffff"];
   // the mode OwnTracks reported (saved by the receiver): Move = a position every minute
@@ -3329,16 +2521,16 @@
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
-        syncMarkers(); Hunt.checkSafety(); Rec.backfill(); OT.render(); renderMyCone(); renderGoto();
+        syncMarkers(); Hunt.checkSafety(); OT.render(); renderMyCone();
       }, () => {});
-      Hunt.start(db); Day.start(db); OT.start(db);
+      Hunt.start(db); OT.start(db);
       Hunt.showId = QS.get("ev") || null;   // opened from a notification
       Ntfy.start(db);
       db.doc("map/looks").onSnapshot((snap) => {
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();
       }, () => {});
-      setInterval(() => { this.render(); Hunt.render(); Day.render(); }, 30000);   // ages, fading dots, blinking pins, who is at their stand
+      setInterval(() => { this.render(); Hunt.render(); }, 30000);   // ages, fading dots, blinking pins, who is at their stand
       // Positions reach the family only through OwnTracks. The map's own GPS (the position button) only shows
       // you your dot and which way you face. A phone that shared from the map before stops (its old dot fades).
       if (prefs.share) {
@@ -3497,7 +2689,7 @@
       let d;
       try { d = JSON.parse(await file.text()); } catch { toast("That file isn't a map export."); return; }
       const items = [];
-      for (const k of ["stands", "sightings", "routes", "trails", "places"]) {
+      for (const k of ["stands", "sightings", "trails", "places"]) {
         for (const it of d[k] || []) { const { id, ...body } = it; if (id) items.push({ path: `${k}/${id}`, body }); }
       }
       if (Array.isArray(d.boundary) && d.boundary.length >= 6) items.push({ path: "map/boundary", body: { pts: d.boundary } });
@@ -3602,8 +2794,6 @@
 
   renderPosBtn();
 
-  // back from a locked screen while recording: fill the gap from OwnTracks once its latest points have arrived
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && Rec.on) setTimeout(() => Rec.backfill(true), 2500); });
   window.addEventListener("offline", () => toast("No coverage. The map still works; positions and messages are sent when you're back online.", 6000));
   window.addEventListener("online", () => toast("Back online."));
 
@@ -3622,7 +2812,6 @@
         { id: "d1", name: "Hyggestornet", type: "tower", height: 4, facing: 200, width: 100, range: 150, winds: [], notes: "", lon: 15.4352, lat: 56.3527 },
         { id: "d2", name: "Bäckpasset", type: "ground", height: 0, facing: 90, width: 120, range: 80, winds: [], notes: "", lon: 15.4318, lat: 56.3548 },
       ];
-      Store.data.routes = [{ id: "r1", name: "Stalk route 1", pts: [15.4300, 56.3505, 15.4322, 56.3517, 15.4345, 56.3512, 15.4362, 56.3534] }];
       Store.data.sightings = [{ id: "g1", species: "moose", count: 2, kind: "seen", when: "2026-10-28T06:40:00Z", wind: "SW 3 m/s", notes: "", lon: 15.4335, lat: 56.3540 }];
       Store.data.boundary = [15.4290, 56.3500, 15.4385, 56.3498, 15.4392, 56.3560, 15.4335, 56.3575, 15.4288, 56.3545];
     }
@@ -3661,7 +2850,7 @@
   checkForUpdate();
   setInterval(() => { if (document.visibilityState === "visible") checkForUpdate(); }, 5 * 60000);
   $("#appVersion").textContent = window.APP_VERSION || "dev";
-  // no position button any more: your dot comes from OwnTracks; the phone's GPS only runs while recording a track
+  // no position button any more: your dot comes from OwnTracks
   if (prefs.gpsOn) { prefs.gpsOn = false; savePrefs(); }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();

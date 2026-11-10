@@ -19,7 +19,7 @@
     "Hunting map": "Jaktkarta", "Where your stands and sightings are saved": "Var dina pass och observationer sparas",
     "Saved on this device": "Sparas på den här enheten", "Synced to your account": "Synkat till ditt konto", "Loading saved data…": "Hämtar sparad data…",
     "Can't reach saved data yet": "Når inte sparad data än", "Saved data unavailable": "Sparad data är inte tillgänglig",
-    "Panel sections": "Panelens delar", "Map": "Karta", "Weather": "Väder", "Wind": "Vind", "Stands": "Pass", "Sightings": "Observationer", "Family": "Familj",
+    "Panel sections": "Panelens delar", "Map": "Karta", "Weather": "Väder", "No forecast": "Ingen prognos", "The SMHI forecast can't be loaded right now.": "SMHI:s prognos kan inte hämtas just nu.", "Wind": "Vind", "Stands": "Pass", "Sightings": "Observationer", "Family": "Familj",
     // map tab
     "Ground": "Grundkarta", "Base map": "Grundkarta", "Forest types": "Skogstyper", "Terrain relief": "Terräng", "Tree height": "Trädhöjd",
     "Layers": "Lager", "Our trails & places": "Våra stigar och platser", "Our trails": "Våra stigar", "Place names": "Platsnamn", "entrances, parking": "ingångar, parkering", "Entrances": "Ingångar", "names and dots": "namn och prickar", "Contours": "Höjdkurvor", "Roads, tracks & paths": "Vägar, traktorvägar och stigar",
@@ -219,7 +219,7 @@
     "Light snow showers": "Lätta snöbyar", "Snow showers": "Snöbyar", "Heavy snow showers": "Kraftiga snöbyar", "Light rain": "Lätt regn", "Rain": "Regn",
     "Heavy rain": "Kraftigt regn", "Thunder": "Åska", "Light sleet": "Lätt snöblandat regn", "Sleet": "Snöblandat regn", "Heavy sleet": "Kraftigt snöblandat regn",
     "Light snow": "Lätt snöfall", "Snow": "Snöfall", "Heavy snow": "Kraftigt snöfall", "Whose plans to show": "Vems planer som visas",
-    "Stands, stalk routes and sightings. Only changes what you see on this phone.": "Pass, smygrutter och observationer. Ändrar bara vad du ser på din telefon.",
+    "Stands and sightings. Only changes what you see on this phone.": "Pass och observationer. Ändrar bara vad du ser på din telefon.",
     "Made before names were saved": "Gjort innan namn sparades", "(you)": "(du)", "Unknown": "Okänd", "Follow me (the map turns with you)": "Följ mig (kartan vrids med dig)",
     "Turn off my position": "Stäng av min position", "Follow me": "Följ mig", "My scent": "Vittring", "Show my scent cone": "Visa min vittringskon",
     
