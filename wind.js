@@ -23,6 +23,35 @@
     });
   }
 
+  // does a closed ring (first point == last) cross itself? (rings here are at most ~800 points)
+  function crosses(r) {
+    const n = r.length - 1;
+    for (let i = 0; i < n; i++) {
+      const ax = r[i][0], ay = r[i][1], bx = r[i + 1][0], by = r[i + 1][1];
+      const x0 = Math.min(ax, bx), x1 = Math.max(ax, bx), y0 = Math.min(ay, by), y1 = Math.max(ay, by);
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;   // neighbours through the closing point
+        const px = r[j][0], py = r[j][1], qx = r[j + 1][0], qy = r[j + 1][1];
+        if (Math.max(px, qx) < x0 || Math.min(px, qx) > x1 || Math.max(py, qy) < y0 || Math.min(py, qy) > y1) continue;
+        const den = (bx - ax) * (qy - py) - (by - ay) * (qx - px);
+        if (!den) continue;
+        const t = ((px - ax) * (qy - py) - (py - ay) * (qx - px)) / den, u = ((px - ax) * (by - ay) - (py - ay) * (bx - ax)) / den;
+        if (t > 1e-9 && t < 1 - 1e-9 && u > 1e-9 && u < 1 - 1e-9) return true;
+      }
+    }
+    return false;
+  }
+  // convex hull (monotone chain), returned as a closed ring
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const q of p) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (const q of p.reverse()) { while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    const h = lo.slice(0, -1).concat(up.slice(0, -1));
+    return [...h, h[0]];
+  }
+
   function boxBlur(src, W, H, r) {
     const tmp = new Float32Array(W * H), out = new Float32Array(W * H);
     for (let y = 0; y < H; y++) { let acc = 0, n = 0;
@@ -130,7 +159,7 @@
     plume(lon, lat, from, len, half) {
       const [E0, N0] = Geo.toSweref(lon, lat), a = this.areaAt(E0, N0);
       if (!a) return null;
-      const F = this.field(a, from), STEP = 6, med = a.meta.median || 0.72;
+      const F = this.field(a, from), STEP = 6, med = a.meta.median || 0.72, MAXTURN = 20 * rad;
       const path = [[E0, N0]], spread = [0];
       let E = E0, N = N0, d = 0, dir = null, wide = 0;
       while (d < len && path.length < 400) {
@@ -139,27 +168,46 @@
         let m = Math.hypot(w[0], w[1]) || 1e-6;
         // midpoint step (RK2) for a smooth line through curving flow
         const w2 = F.at(E + (w[0] / m) * STEP / 2, N + (w[1] / m) * STEP / 2) || w;
-        m = Math.hypot(w2[0], w2[1]) || 1e-6;
-        dir = [w2[0] / m, w2[1] / m];
+        m = Math.hypot(w2[0], w2[1]);
+        if (m < 0.03) break;   // still air: the scent pools here
+        let want = Math.atan2(w2[1], w2[0]);
+        if (dir) {
+          // Where thermals meet the wind (hollows, valley floors) the flow can fold back on itself. Scent pools there
+          // rather than zig-zagging, so stop on a near reversal and otherwise turn gently: a plume that bends sharper
+          // than its own width would draw an outline that crosses itself.
+          const cur = Math.atan2(dir[1], dir[0]);
+          let turn = want - cur; turn = Math.atan2(Math.sin(turn), Math.cos(turn));
+          if (Math.abs(turn) > 110 * rad) break;
+          want = cur + Math.max(-MAXTURN, Math.min(MAXTURN, turn));
+        }
+        dir = [Math.cos(want), Math.sin(want)];
         const slow = Math.min(1.8, Math.max(0.6, med / m));   // >1 where the air is slower than usual here
         E += dir[0] * STEP; N += dir[1] * STEP; d += STEP * slow; wide += STEP * slow;
         path.push([E, N]); spread.push(wide);
       }
       if (path.length < 3) return null;
-      const tan = Math.tan(half * rad), left = [], right = [];
-      for (let i = 0; i < path.length; i++) {
-        const p = path[i], q = path[Math.min(i + 1, path.length - 1)], o = path[Math.max(i - 1, 0)];
-        let tx = q[0] - o[0], ty = q[1] - o[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
-        const wdt = Math.max(4, spread[i] * tan);
-        left.push([p[0] - ty * wdt, p[1] + tx * wdt]); right.push([p[0] + ty * wdt, p[1] - tx * wdt]);
+      const tan = Math.tan(half * rad);
+      function outline(n) {
+        const left = [], right = [];
+        for (let i = 0; i < n; i++) {
+          // direction over a few steps either side, so one kink doesn't swing the edges about
+          const p = path[i], q = path[Math.min(i + 3, n - 1)], o = path[Math.max(i - 3, 0)];
+          let tx = q[0] - o[0], ty = q[1] - o[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+          const wdt = Math.max(4, spread[i] * tan);
+          left.push([p[0] - ty * wdt, p[1] + tx * wdt]); right.push([p[0] + ty * wdt, p[1] - tx * wdt]);
+        }
+        // rounded far end
+        const end = path[n - 1], last = left[n - 1], wEnd = Math.hypot(last[0] - end[0], last[1] - end[1]);
+        const ang = Math.atan2(last[1] - end[1], last[0] - end[0]), cap = [];
+        for (let k = 1; k < 8; k++) { const t = ang - (k / 8) * Math.PI; cap.push([end[0] + Math.cos(t) * wEnd, end[1] + Math.sin(t) * wEnd]); }
+        return [[E0, N0], ...left, ...cap, ...right.reverse(), [E0, N0]];
       }
-      // rounded far end
-      const end = path[path.length - 1], last = left[left.length - 1], wEnd = Math.hypot(last[0] - end[0], last[1] - end[1]);
-      const ang = Math.atan2(last[1] - end[1], last[0] - end[0]), cap = [];
-      for (let k = 1; k < 8; k++) { const t = ang - (k / 8) * Math.PI; cap.push([end[0] + Math.cos(t) * wEnd, end[1] + Math.sin(t) * wEnd]); }
-      const ring = [...left, ...cap, ...right.reverse()].map(([e, n]) => Geo.fromSweref(e, n));
-      ring.unshift([lon, lat]); ring.push([lon, lat]);
-      return ring;
+      // A ring that crosses itself is filled with stray triangles on the map, so never hand one over:
+      // shorten the plume until it is clean, and as a last resort use its convex outline.
+      let n = path.length, ring = outline(n);
+      while (crosses(ring) && n > 3) { n = Math.max(3, Math.floor(n * 0.85)); ring = outline(n); }
+      if (crosses(ring)) ring = hull(outline(path.length));
+      return ring.map(([e, nn]) => Geo.fromSweref(e, nn));
     },
   };
 
