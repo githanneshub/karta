@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "74b1bb6a3e";</script>
-<script src="firebase-config.js?v=74b1bb6a3e"></script>
-<script type="module" src="fb.js?v=74b1bb6a3e"></script>
+<script>window.APP_VERSION = "b29aebdfd0";</script>
+<script src="firebase-config.js?v=b29aebdfd0"></script>
+<script type="module" src="fb.js?v=b29aebdfd0"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=74b1bb6a3e">
-<link rel="stylesheet" href="app.css?v=74b1bb6a3e">
+<link rel="stylesheet" href="maplibre-gl.css?v=b29aebdfd0">
+<link rel="stylesheet" href="app.css?v=b29aebdfd0">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -46,6 +46,7 @@
       <button role="tab" id="tab-stands" aria-controls="pane-stands" aria-selected="false" data-tab="stands">Stands</button>
       <button role="tab" id="tab-seasons" aria-controls="pane-seasons" aria-selected="false" data-tab="seasons">Seasons</button>
       <button role="tab" id="tab-family" aria-controls="pane-family" aria-selected="false" data-tab="family" hidden>Family</button>
+      <button role="tab" id="tab-chat" aria-controls="pane-chat" aria-selected="false" data-tab="chat" hidden>Chat<span class="tab-badge" id="chatBadge" hidden translate="no"></span></button>
     </nav>
 
     <div class="panes">
@@ -317,7 +318,7 @@
         <h2 class="eyebrow">Settings</h2>
         <details class="sect" id="pushSect">
           <summary>Notifications</summary>
-          <p class="note small">Shots, "need help", "animal near me" and sounds buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:</p>
+          <p class="note small">Shots, "need help", "animal near me", sounds and chat messages buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:</p>
           <div id="pushBox"></div>
         </details>
         <details class="sect" id="otSect" translate="no">
@@ -337,6 +338,16 @@
         <h2 class="eyebrow">Your account</h2>
         <p class="note" id="meInfo"></p>
         <div class="row gap"><button class="btn" id="signOut" type="button">Sign out</button></div>
+      </section>
+
+      <!-- CHAT (hosted site only) -->
+      <section class="pane chat-pane" id="pane-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
+        <ol class="chat-list" id="chatList"></ol>
+        <form id="chatForm" class="chat-form" autocomplete="off">
+          <textarea id="chatText" rows="1" maxlength="1000" placeholder="Write to the family…" aria-label="Message" enterkeyhint="send"></textarea>
+          <button class="btn primary" type="submit" aria-label="Send">Send</button>
+        </form>
+        <label class="switch chat-push"><input type="checkbox" id="chatPush" checked><span>Chat messages buzz my phone (ntfy)</span></label>
       </section>
     </div>
   </aside>
@@ -447,12 +458,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=74b1bb6a3e"></script>
-<script src="geo.js?v=74b1bb6a3e"></script>
-<script src="view.js?v=74b1bb6a3e"></script>
-<script src="wind.js?v=74b1bb6a3e"></script>
-<script src="jakt.js?v=74b1bb6a3e"></script>
-<script src="app.js?v=74b1bb6a3e"></script>
+<script src="i18n.js?v=b29aebdfd0"></script>
+<script src="geo.js?v=b29aebdfd0"></script>
+<script src="view.js?v=b29aebdfd0"></script>
+<script src="wind.js?v=b29aebdfd0"></script>
+<script src="jakt.js?v=b29aebdfd0"></script>
+<script src="app.js?v=b29aebdfd0"></script>
 
 </body>
 </html>

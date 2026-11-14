@@ -199,6 +199,7 @@
   function setSheet(state) {
     $("#app").dataset.sheet = state;
     if (state === "open" && isPhone()) closePopups();   // the panel and a menu would cover each other
+    if (FAMILY && prefs.tab === "chat") setTimeout(() => { Chat.scrollNext = state === "open"; Chat.render(); }, 280);   // after the panel has grown
   }
   // the + and 📢 menus: only one open at a time
   function closePopups() {
@@ -262,6 +263,7 @@
     $$(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
     $$(".pane").forEach((p) => { p.hidden = p.id !== "pane-" + name; });
     if (expand && isPhone()) setSheet("open");
+    if (name === "chat" && FAMILY) { Chat.scrollNext = true; Chat.render(); }
   }
 
   // ---------- map ----------
@@ -2396,6 +2398,147 @@
     },
   };
 
+  // ---------- family chat ----------
+  // Messages live in chat/{id} (only the newest CHAT_KEEP are loaded). A new message buzzes everyone else's phone
+  // through their ntfy channel, unless they switched chat notifications off (map/chatmute {email: true}). Inside the
+  // map an unread count sits on the tab, and a message arriving while you look elsewhere shows as a short toast.
+  // What you have read is remembered on this device only.
+  const CHAT_KEEP = 80;
+  const Chat = {
+    msgs: [], mute: {}, seen: null, blocked: false,
+    start(db) {
+      db.doc("map/chatmute").onSnapshot((snap) => { this.mute = (snap.exists && snap.data()) || {}; this.renderPush(); }, () => {});
+      db.collection("chat").onLatest("tc", CHAT_KEEP, (snap) => {
+        this.blocked = false;
+        const all = snap.docs.map((d) => ({ ...d.data(), id: d.id, pending: !!(d.metadata && d.metadata.hasPendingWrites) }))
+          .filter((m) => typeof m.text === "string" && typeof m.tc === "number").sort((a, b) => a.tc - b.tc);
+        const me = this.me();
+        const fresh = this.seen ? all.filter((m) => !this.seen.has(m.id) && m.email !== me && Date.now() - m.tc < 10 * 60e3) : [];
+        this.seen = new Set(all.map((m) => m.id));
+        this.msgs = all;
+        if (fresh.length && !this.reading()) {
+          const m = fresh[fresh.length - 1];
+          this.toastText = `${Family.nameFor(m.email, m.name)}: ${m.text.length > 90 ? m.text.slice(0, 88) + "…" : m.text}`;
+          toast(this.toastText, 6000);
+          try { navigator.vibrate && navigator.vibrate(120); } catch { /* no vibration */ }
+        }
+        this.render();
+      }, () => { this.blocked = true; this.render(); });
+      document.addEventListener("visibilitychange", () => this.markRead());
+    },
+    me() { return Family.user ? Family.user.email.toLowerCase() : ""; },
+    // the chat is on screen: its tab is chosen, the panel is open (phone) and the page is in front
+    reading() {
+      return prefs.tab === "chat" && !document.hidden && !(isPhone() && $("#app").dataset.sheet !== "open");
+    },
+    unread() {
+      const me = this.me(), since = prefs.chatRead || 0;
+      return this.msgs.filter((m) => m.email !== me && m.tc > since).length;
+    },
+    markRead() {
+      if (!this.reading() || !this.msgs.length) { this.badge(); return; }
+      if (this.toastText && $("#toast").textContent === this.toastText) $("#toast").hidden = true;   // the chat itself is on screen now
+      const last = this.msgs[this.msgs.length - 1].tc;
+      if ((prefs.chatRead || 0) < last) { prefs.chatRead = last; savePrefs(); }
+      this.badge();
+    },
+    badge() {
+      const n = this.unread(), b = $("#chatBadge"); if (!b) return;
+      b.hidden = n === 0; b.textContent = n > 9 ? "9+" : String(n);
+      $("#tab-chat").setAttribute("aria-label", n ? `${tr("Chat")} (${n})` : tr("Chat"));
+    },
+    when(tc) { return new Date(tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }); },
+    dayName(tc) {
+      const d = new Date(tc), today = new Date(); today.setHours(0, 0, 0, 0);
+      const diff = Math.round((today - new Date(d).setHours(0, 0, 0, 0)) / 86400e3);
+      if (diff === 0) return tr("Today");
+      if (diff === 1) return tr("Yesterday");
+      return d.toLocaleDateString("sv-SE", { weekday: diff < 7 ? "long" : undefined, day: "numeric", month: "short" });
+    },
+    canDelete(m) { return !!Family.user && (m.email === this.me() || (Family.member && Family.member.role === "owner")); },
+    render() {
+      const list = $("#chatList"); if (!list) return;
+      const panes = $(".panes");
+      const atBottom = panes.scrollHeight - panes.scrollTop - panes.clientHeight < 60;
+      if (this.blocked && !this.msgs.length) {
+        list.innerHTML = `<li class="empty">${esc(tr("The chat can't be loaded. The owner needs to publish the new Firebase rules."))}</li>`;
+        this.badge(); return;
+      }
+      const me = this.me();
+      let day = "", html = "";
+      for (const m of this.msgs) {
+        const dn = this.dayName(m.tc);
+        if (dn !== day) { day = dn; html += `<li class="chat-day">${esc(dn)}</li>`; }
+        const mine = m.email === me;
+        const tapped = this.tapped === m.id ? " tapped" : "", can = this.canDelete(m) ? " can-del" : "";
+        html += `<li class="chat-msg${mine ? " mine" : ""}${m.pending ? " pending" : ""}${can}${tapped}" data-id="${esc(m.id)}" style="--c:${Family.colorFor(m.email)}">
+          ${mine ? "" : `<div class="who" translate="no">${esc(Family.nameFor(m.email, m.name))}</div>`}
+          <div class="txt" translate="no">${esc(m.text)}</div>
+          <div class="meta">${this.canDelete(m) ? `<button type="button" data-del-chat="${esc(m.id)}">${esc(tr("Delete"))}</button>` : ""}<span>${m.pending ? "…" : this.when(m.tc)}</span></div></li>`;
+      }
+      list.innerHTML = html || `<li class="empty">${esc(tr("No messages yet. Write the first one."))}</li>`;
+      if (prefs.tab === "chat" && (atBottom || this.scrollNext)) { panes.scrollTop = panes.scrollHeight; this.scrollNext = false; }
+      this.markRead();
+    },
+    async send(text) {
+      text = text.replace(/\s+$/, "").replace(/^\s*\n/, "").slice(0, 1000);
+      if (!text.trim() || !Family.user) return false;
+      const id = newId("c");
+      const m = { email: this.me(), name: (Family.member && Family.member.name) || Family.user.email.split("@")[0], text, tc: Date.now() };
+      this.scrollNext = true;
+      // not awaited before clearing the box: with weak signal it is saved on the phone and sent when the signal is back
+      window.FB.db.doc(`chat/${id}`).set(m).then(() => this.announce(m))
+        .catch(() => toast("Couldn't send. The owner needs to publish the new Firebase rules.", 7000));
+      return true;
+    },
+    announce(m) {
+      const title = `${Family.nameFor(m.email, m.name)} · ${tr("Chat")}`;
+      const message = m.text.length > 400 ? m.text.slice(0, 398) + "…" : m.text;
+      for (const [email, topic] of Object.entries(Ntfy.topics)) {
+        if (email === m.email || !topic || this.mute[email]) continue;
+        Ntfy.publish(topic, { title, message, priority: 3, tags: ["speech_balloon"], click: `${location.origin}${location.pathname}?chat=1` });
+      }
+    },
+    async remove(id) {
+      await window.FB.db.doc(`chat/${id}`).delete().catch(() => toast("Couldn't delete. Try again."));
+    },
+    renderPush() {
+      const c = $("#chatPush"); if (c) c.checked = !this.mute[this.me()];
+    },
+    async setPush(on) {
+      await window.FB.db.doc("map/chatmute").update({ [this.me()]: !on }).catch(() => toast("Couldn't save. Check your connection."));
+    },
+    wire() {
+      const ta = $("#chatText"), form = $("#chatForm");
+      const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(120, ta.scrollHeight + 2) + "px"; };
+      ta.addEventListener("input", grow);
+      // Enter sends on a computer; on a phone Enter makes a new line and the button sends
+      ta.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.isComposing && !isPhone()) { e.preventDefault(); form.requestSubmit(); }
+      });
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (await this.send(ta.value)) { ta.value = ""; grow(); }
+      });
+      $("#chatPush").addEventListener("change", (e) => this.setPush(e.target.checked));
+      $("#chatList").addEventListener("click", (e) => {
+        const b = e.target.closest("[data-del-chat]");
+        if (!b) {   // tap one of your messages to show its Delete
+          const li = e.target.closest(".chat-msg.can-del");
+          this.tapped = li && this.tapped !== li.dataset.id ? li.dataset.id : null;
+          $$("#chatList .chat-msg").forEach((x) => x.classList.toggle("tapped", x.dataset.id === this.tapped));
+          return;
+        }
+        if (b.dataset.confirm !== "1") {
+          b.dataset.confirm = "1"; b.textContent = tr("Confirm");
+          setTimeout(() => { if (b.isConnected) { b.dataset.confirm = ""; b.textContent = tr("Delete"); } }, 3000);
+          return;
+        }
+        this.remove(b.dataset.delChat);
+      });
+    },
+  };
+
   // ---------- family mode: sign-in, members and live positions (hosted site with Firebase) ----------
   const LOOK_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d", "#e03131", "#495057", "#f5c518", "#ffffff"];
   // the mode OwnTracks reported (saved by the receiver): Move = a position every minute
@@ -2455,6 +2598,7 @@
     async init() {
       $("#gate").hidden = false; this.gate("loading");
       $("#tab-family").hidden = false; $(".tabs").classList.add("with-family");
+      $("#tab-chat").hidden = false; $(".tabs").classList.add("with-chat"); Chat.wire();
       const FB = window.FB || await new Promise((r) => window.addEventListener("fb-ready", () => r(window.FB), { once: true }));
       FB.onAuth((user) => this.onUser(user));
     },
@@ -2526,6 +2670,8 @@
       Hunt.start(db); OT.start(db);
       Hunt.showId = QS.get("ev") || null;   // opened from a notification
       Ntfy.start(db);
+      Chat.start(db);
+      if (QS.has("chat")) { showTab("chat", true); history.replaceState(null, "", location.pathname + location.hash); }   // opened from a chat notification
       db.doc("map/looks").onSnapshot((snap) => {
         this.looks = snap.exists ? snap.data() : {};
         this.render(); renderAll();

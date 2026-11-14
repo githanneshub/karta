@@ -8,7 +8,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager, collection, doc, onSnapshot, setDoc, deleteDoc,
-  getDoc, serverTimestamp, connectFirestoreEmulator, writeBatch,
+  getDoc, serverTimestamp, connectFirestoreEmulator, writeBatch, query, orderBy, limit,
 } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
 const cfg = window.FIREBASE_CONFIG;
@@ -42,6 +42,9 @@ const db = {
     path,
     doc: (id) => docRef(`${path}/${id}`),
     onSnapshot: (next, err) => onSnapshot(collection(fs, path), { includeMetadataChanges: true },
+      (s) => next({ docs: s.docs.map(wrapDoc), size: s.size, empty: s.empty, metadata: s.metadata }), err),
+    // only the newest n documents by a field (the chat): keeps reads low as the history grows
+    onLatest: (field, n, next, err) => onSnapshot(query(collection(fs, path), orderBy(field, "desc"), limit(n)), { includeMetadataChanges: true },
       (s) => next({ docs: s.docs.map(wrapDoc), size: s.size, empty: s.empty, metadata: s.metadata }), err),
   }),
   async batchSet(items) {  // [{ path, body }]

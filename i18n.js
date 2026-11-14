@@ -135,7 +135,11 @@
     "Add or draw": "Lägg till eller rita", "Coordinates": "Koordinater", "Copy coordinates": "Kopiera koordinater", "Coordinates:": "Koordinater:", "No position for them yet.": "Ingen position för personen än.", "Animal near me": "Djur nära mig", "Map marker": "Kartmarkör", "Notifications": "Aviseringar", "Send a test": "Skicka ett test", "Tap to see it on the map": "Tryck för att se på kartan",
     "Test from the hunting map": "Test från jaktkartan", "Notifications work on this phone.": "Aviseringarna fungerar på den här telefonen.",
     "Test sent. It should arrive in a few seconds.": "Test skickat. Det ska komma inom några sekunder.", "Couldn't reach ntfy. Check your connection.": "Nådde inte ntfy. Kolla anslutningen.",
-    "Shots, \"need help\", \"animal near me\" and sounds buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:": "Skott, \"behöver hjälp\", \"djur nära mig\" och ljud plingar i telefonen även när kartan är stängd, via gratisappen ntfy. Ställ in en gång på varje telefon:",
+    "Shots, \"need help\", \"animal near me\", sounds and chat messages buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:": "Skott, \"behöver hjälp\", \"djur nära mig\", ljud och chattmeddelanden plingar i telefonen även när kartan är stängd, via gratisappen ntfy. Ställ in en gång på varje telefon:",
+    // chat
+    "Chat": "Chatt", "Today": "Idag", "Yesterday": "Igår", "Send": "Skicka", "Message": "Meddelande", "Write to the family…": "Skriv till familjen…",
+    "Chat messages buzz my phone (ntfy)": "Chattmeddelanden plingar i min telefon (ntfy)", "No messages yet. Write the first one.": "Inga meddelanden än. Skriv det första.",
+    "The chat can't be loaded. The owner needs to publish the new Firebase rules.": "Chatten kan inte hämtas. Ägaren behöver publicera de nya Firebase-reglerna.",
     "Install the free app": "Installera gratisappen", "(Android: Google Play).": "(Android: Google Play).", "Copy my channel": "Kopiera min kanal",
     "In ntfy tap": "Tryck på", ", paste it as the topic and tap Subscribe. Allow notifications when asked.": " i ntfy, klistra in den som topic och tryck Subscribe. Tillåt notiser när den frågar.",
     "It should buzz within a few seconds.": "Det ska plinga inom några sekunder.", "Your channel:": "Din kanal:", "Only for you; you won't get your own messages.": "Bara för dig; du får inte dina egna meddelanden.",
