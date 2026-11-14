@@ -331,6 +331,20 @@
     return g.getImageData(0, 0, s, s);
   }
 
+  // A sighting's direction: an arrow from the dot's centre pointing up (north), in the species colour with a white
+  // edge; the map turns it to the saved direction. Drawn under the dot so it seems to come out of it.
+  function sightArrowImage(color) {
+    const s = 176, c = document.createElement("canvas"); c.width = c.height = s;
+    const g = c.getContext("2d"), m = s / 2;
+    const draw = (col, w) => {
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = w; g.lineCap = "round"; g.lineJoin = "round";
+      g.beginPath(); g.moveTo(m, m); g.lineTo(m, 36); g.stroke();
+      g.beginPath(); g.moveTo(m, 7); g.lineTo(m + 17, 40); g.lineTo(m - 17, 40); g.closePath(); g.fill(); if (w > 7) g.stroke();
+    };
+    draw("#fff", 13); draw(color, 7);
+    return g.getImageData(0, 0, s, s);
+  }
+
   async function getJSON(p) { const r = await fetch(abs(p), { cache: "no-cache" }); if (!r.ok) throw new Error(p + " " + r.status); return r.json(); }
   // the lists of areas and layers: tagged with the app version so an older offline cache can't hand back an old list
   // (which would leave new layers blank); the plain address is the fallback offline
@@ -358,6 +372,7 @@
     // relief shading under our detailed areas and 3D terrain everywhere in the county.
     map.addSource("dem", { type: "raster-dem", tiles: [LIVE_DEM], tileSize: 512, encoding: "terrarium", minzoom: 6, maxzoom: 15, bounds: BLEKINGE });
     map.addImage("arrow-blue", arrowImage("#1f6fb5"), { pixelRatio: 2 });
+    for (const sp of SPECIES) map.addImage("sarrow-" + sp.id, sightArrowImage(sp.color), { pixelRatio: 2 });
 
     // relief shading from the live elevation; our own images draw on top of it inside the areas
     map.addLayer({ id: "relief-live", type: "hillshade", source: "dem", paint: {
@@ -454,7 +469,11 @@
     map.addLayer({ id: "mycone-line", type: "line", source: "mycone", paint: { "line-color": "#ff7a2e", "line-width": 2, "line-dasharray": [1.5, 1.5] } });
     map.addLayer({ id: "sectors", type: "fill", source: "sectors", paint: { "fill-color": ["get", "color"], "fill-opacity": .2 } });
     map.addLayer({ id: "sectors-line", type: "line", source: "sectors", paint: { "line-color": ["get", "color"], "line-width": 1.6 } });
-    // sightings
+    // sightings: which way the animal went (under the dot), then the dot
+    map.addLayer({ id: "sightings-dir", type: "symbol", source: "sightings", filter: ["has", "dir"],
+      layout: { "icon-image": ["concat", "sarrow-", ["get", "sp"]], "icon-rotate": ["get", "dir"], "icon-rotation-alignment": "map",
+        "icon-pitch-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 13, 0.5, 16, 0.85, 18, 1.1] } });
     map.addLayer({ id: "sightings", type: "circle", source: "sightings",
       // heard (not seen): a hollow ring in the species colour
       paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 13, 5, 17, 10],
@@ -501,7 +520,7 @@
     contours: ["contour-1", "contour-5"],
     roads: ["road-case", "road", "track", "path", "power", "buildings", "road-label"],
     reserve: ["reserve-fill", "reserve-line-halo", "reserve-line"],
-    sightings: ["sightings", "sightings-label"],
+    sightings: ["sightings-dir", "sightings", "sightings-label"],
     boundary: ["mask", "boundary-line"],
     drainage: ["drainage", "drainage-arrows"],
     cuts: ["cuts-fill", "cuts-line", "cuts-label"],
@@ -775,6 +794,7 @@
     const filter = $("#logFilter").value;
     map.getSource("sightings").setData(FC(plans("sightings").filter((x) => !filter || x.species === filter).map((x) => ({
       type: "Feature", properties: { id: x.id, color: (speciesById[x.species] || speciesById.other).color, heard: x.kind === "heard",
+        sp: speciesById[x.species] ? x.species : "other", ...(typeof x.dir === "number" ? { dir: x.dir } : {}),
         label: tr(`${(speciesById[x.species] || speciesById.other).name}${x.count > 1 ? " ×" + x.count : ""}${x.kind === "heard" ? " · Heard" : ""}`) },
       geometry: { type: "Point", coordinates: [x.lon, x.lat] },
     }))));
@@ -810,7 +830,7 @@
       const when = x.when ? new Date(x.when).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" }) : "";
       return `<li data-id="${esc(x.id)}"><span class="dot" style="background:${sp.color}"></span>
         <span class="it-main"><div class="it-name">${esc(sp.name)}${x.count > 1 ? " ×" + x.count : ""} · ${esc(KINDS[x.kind] || "Seen")}</div>
-        <div class="it-sub">${esc(when)}${x.wind ? " · wind " + esc(x.wind) : ""}${whoTag(x)}${x.notes ? " · " + esc(x.notes) : ""}</div></span></li>`;
+        <div class="it-sub">${esc(when)}${typeof x.dir === "number" ? " · heading " + Geo.compassName(x.dir) : ""}${x.wind ? " · wind " + esc(x.wind) : ""}${whoTag(x)}${x.notes ? " · " + esc(x.notes) : ""}</div></span></li>`;
     }).join("") : `<li class="empty">${filter ? "No sightings of this species yet." : "No sightings yet. Log what you see, where and in which wind, and patterns show up over a season."}</li>`;
 
     const b = Store.data.boundary ? pairs(Store.data.boundary) : null;
@@ -1273,13 +1293,54 @@
     updateDraftPin();
     showForm("#sightForm", [s.lon, s.lat]);
   }
-  let draftPin = null;
+  let draftPin = null, draftArrow = null;
   function updateDraftPin() {
     if (draftPin) { draftPin.remove(); draftPin = null; }
+    if (draftArrow) { draftArrow.remove(); draftArrow = null; }
+    // the saved arrow of the sighting being edited is hidden; the one you drag takes its place
+    if (map.getLayer("sightings-dir")) map.setFilter("sightings-dir", draftSighting ? ["all", ["has", "dir"], ["!=", ["get", "id"], draftSighting.id]] : ["has", "dir"]);
+    renderDirRow();
     if (!draftSighting) return;
-    const el = document.createElement("div"); el.className = "me-dot"; el.style.background = (speciesById[$("#lf-species").value] || speciesById.other).color;
+    const color = (speciesById[$("#lf-species").value] || speciesById.other).color;
+    if (typeof draftSighting.dir === "number") {
+      const a = document.createElement("div"); a.className = "sarrow-edit"; a.style.setProperty("--c", color);
+      a.innerHTML = `<i class="shaft"></i><i class="head"></i><b class="knob" title="Drag to turn the arrow"></b>`;
+      draftArrow = new maplibregl.Marker({ element: a, rotationAlignment: "map", pitchAlignment: "map" })
+        .setLngLat([draftSighting.lon, draftSighting.lat]).setRotation(draftSighting.dir).addTo(map);
+      dragArrowKnob(a.querySelector(".knob"));
+    }
+    const el = document.createElement("div"); el.className = "me-dot"; el.style.background = color;
     draftPin = new maplibregl.Marker({ element: el, draggable: true }).setLngLat([draftSighting.lon, draftSighting.lat]).addTo(map);
+    draftPin.on("drag", () => { if (draftArrow) draftArrow.setLngLat(draftPin.getLngLat()); });
     draftPin.on("dragend", () => { const ll = draftPin.getLngLat(); draftSighting.lon = ll.lng; draftSighting.lat = ll.lat; });
+  }
+  // Turn the arrow by dragging its round tip: the direction is from the dot to wherever your finger is (works in
+  // a turned or tilted map too). The map itself doesn't pan while you do it.
+  function dragArrowKnob(knob) {
+    const stop = (e) => e.stopPropagation();
+    for (const t of ["mousedown", "touchstart", "dblclick", "click"]) knob.addEventListener(t, stop);
+    knob.addEventListener("pointerdown", (e) => {
+      e.stopPropagation(); e.preventDefault();
+      try { knob.setPointerCapture(e.pointerId); } catch { /* not supported */ }
+      knob.classList.add("on");
+      const move = (ev) => {
+        if (!draftSighting || !draftArrow) return;
+        const r = map.getContainer().getBoundingClientRect();
+        const ll = map.unproject([ev.clientX - r.left, ev.clientY - r.top]);
+        draftSighting.dir = Math.round((Geo.bearing([draftSighting.lon, draftSighting.lat], [ll.lng, ll.lat]) + 360) % 360);
+        draftArrow.setRotation(draftSighting.dir);
+        renderDirRow();
+      };
+      const up = () => { knob.classList.remove("on"); knob.removeEventListener("pointermove", move); knob.removeEventListener("pointerup", up); knob.removeEventListener("pointercancel", up); };
+      knob.addEventListener("pointermove", move); knob.addEventListener("pointerup", up); knob.addEventListener("pointercancel", up);
+    });
+  }
+  function renderDirRow() {
+    const has = !!draftSighting && typeof draftSighting.dir === "number";
+    $("#lf-dirAdd").hidden = has;
+    $("#lf-dirClear").hidden = !has;
+    $("#lf-dirText").hidden = !has;
+    if (has) $("#lf-dirText").textContent = tr(`Heading ${Geo.compassName(draftSighting.dir)}. Drag the arrow tip on the map.`);
   }
   function closeSightForm() { draftSighting = null; $("#sightForm").hidden = true; updateDraftPin(); }
   function sightingPopup(id, ll) {
@@ -1287,7 +1348,7 @@
     const sp = speciesById[x.species] || speciesById.other;
     const when = x.when ? new Date(x.when).toLocaleString("sv-SE", { dateStyle: "medium", timeStyle: "short" }) : "";
     const html = `<div class="pop"><h3>${esc(sp.name)}${x.count > 1 ? " ×" + x.count : ""}</h3><dl>
-      <dt>What</dt><dd>${esc(KINDS[x.kind] || "Seen")}</dd><dt>When</dt><dd>${esc(when)}</dd>${x.wind ? `<dt>Wind</dt><dd>${esc(x.wind)}</dd>` : ""}
+      <dt>What</dt><dd>${esc(KINDS[x.kind] || "Seen")}</dd><dt>When</dt><dd>${esc(when)}</dd>${typeof x.dir === "number" ? `<dt>Direction</dt><dd>heading ${Geo.compassName(x.dir)}</dd>` : ""}${x.wind ? `<dt>Wind</dt><dd>${esc(x.wind)}</dd>` : ""}
       ${x.notes ? `<dt>Notes</dt><dd>${esc(x.notes)}</dd>` : ""}</dl>
       <div class="row gap" style="margin-top:8px"><button class="btn small" type="button" id="popEdit">Edit</button></div></div>`;
     const p = new maplibregl.Popup({ maxWidth: "280px" }).setLngLat([x.lon, x.lat]).setHTML(html).addTo(map);
@@ -1864,12 +1925,20 @@
     $("#logFilter").innerHTML = `<option value="">All species</option>` + SPECIES.map((s) => `<option value="${s.id}">${s.name}</option>`).join("");
     $("#logFilter").addEventListener("change", renderAll);
     $("#lf-species").addEventListener("change", updateDraftPin);
+    // a new arrow starts pointing up the screen, then you turn it on the map
+    $("#lf-dirAdd").addEventListener("click", () => {
+      if (!draftSighting) return;
+      draftSighting.dir = Math.round((map.getBearing() + 360) % 360); updateDraftPin();
+      if (isPhone()) showForm("#sightForm", [draftSighting.lon, draftSighting.lat]);
+    });
+    $("#lf-dirClear").addEventListener("click", () => { if (draftSighting) { delete draftSighting.dir; updateDraftPin(); } });
     $("#sightForm").addEventListener("submit", async (e) => {
       e.preventDefault(); if (!draftSighting) return;
       const { isNew, ...s } = draftSighting;
       Object.assign(s, { species: $("#lf-species").value, count: clamp(+$("#lf-count").value || 1, 1, 99), kind: $("#lf-kind").value,
         when: $("#lf-when").value ? new Date($("#lf-when").value).toISOString() : new Date().toISOString(), notes: $("#lf-notes").value.trim() });
       if (isNew) s.wind = `${dir8(prefs.wind.from)} ${prefs.wind.speed} m/s`;
+      if (typeof s.dir !== "number") delete s.dir;
       closeSightForm(); await Store.put("sightings", s); toast("Sighting saved");
     });
     $("#lf-cancel").addEventListener("click", closeSightForm);
@@ -2444,7 +2513,7 @@
     },
     badge() {
       const n = this.unread(), b = $("#chatBadge"); if (!b) return;
-      b.hidden = n === 0; b.textContent = n > 9 ? "9+" : String(n);
+      b.hidden = n === 0; b.textContent = n === 0 ? "" : n > 9 ? "9+" : String(n);
       $("#tab-chat").setAttribute("aria-label", n ? `${tr("Chat")} (${n})` : tr("Chat"));
     },
     when(tc) { return new Date(tc).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" }); },

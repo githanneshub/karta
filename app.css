@@ -733,3 +733,16 @@ html.recording .map-legend { bottom: calc(132px + env(safe-area-inset-bottom, 0p
 .mask-row input { flex: 1; min-width: 0; }
 .mask-row output { width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
 .sw-place { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #1b1f18; }
+
+/* the direction arrow you turn while filling in a sighting: its round tip is the handle */
+.sarrow-edit { width: 160px; height: 160px; pointer-events: none; }
+.sarrow-edit .shaft { position: absolute; left: 50%; bottom: 50%; width: 6px; height: 50px; transform: translateX(-50%); background: var(--c); border-radius: 3px;
+  box-shadow: 0 0 0 2.5px #fff; }
+.sarrow-edit .head { position: absolute; left: 50%; bottom: calc(50% + 46px); width: 0; height: 0; transform: translateX(-50%);
+  border-left: 13px solid transparent; border-right: 13px solid transparent; border-bottom: 24px solid var(--c);
+  filter: drop-shadow(0 0 1.5px #fff) drop-shadow(0 0 1.5px #fff); }
+.sarrow-edit .knob { position: absolute; left: 50%; bottom: calc(50% + 36px); width: 46px; height: 46px; transform: translateX(-50%); box-sizing: border-box;
+  border-radius: 50%; border: 2.5px dashed #fff; background: rgb(255 255 255 / .18); pointer-events: auto; touch-action: none; cursor: grab;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / .35); }
+.sarrow-edit .knob.on { cursor: grabbing; background: rgb(255 255 255 / .35); border-style: solid; }
+.dir-row { align-items: center; flex-wrap: wrap; }

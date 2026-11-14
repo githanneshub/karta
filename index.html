@@ -12,17 +12,17 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon-192.png">
-<script>window.APP_VERSION = "b29aebdfd0";</script>
-<script src="firebase-config.js?v=b29aebdfd0"></script>
-<script type="module" src="fb.js?v=b29aebdfd0"></script>
+<script>window.APP_VERSION = "812ec71836";</script>
+<script src="firebase-config.js?v=812ec71836"></script>
+<script type="module" src="fb.js?v=812ec71836"></script>
 </head>
 <body>
 <title>Alnaryd Hunting Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow+Semi+Condensed:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
-<link rel="stylesheet" href="maplibre-gl.css?v=b29aebdfd0">
-<link rel="stylesheet" href="app.css?v=b29aebdfd0">
+<link rel="stylesheet" href="maplibre-gl.css?v=812ec71836">
+<link rel="stylesheet" href="app.css?v=812ec71836">
 
 <script>document.documentElement.dataset.theme = "dark";</script>
 <div class="ios-top-band" aria-hidden="true"></div>
@@ -263,6 +263,12 @@
           </div>
           <label for="lf-notes">Notes</label>
           <textarea id="lf-notes" rows="2" maxlength="400" placeholder="Cow with calf heading north along the ditch"></textarea>
+          <label>Which way it went</label>
+          <div class="row gap dir-row">
+            <button class="btn small" type="button" id="lf-dirAdd">Add direction arrow</button>
+            <span class="note small" id="lf-dirText" hidden></span>
+            <button class="btn small ghost" type="button" id="lf-dirClear" hidden>Remove arrow</button>
+          </div>
           <p class="note small" id="lf-wind"></p>
           <div class="row gap">
             <button class="btn primary" type="submit">Save sighting</button>
@@ -458,12 +464,12 @@
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/5.24.0/maplibre-gl.js"></script>
-<script src="i18n.js?v=b29aebdfd0"></script>
-<script src="geo.js?v=b29aebdfd0"></script>
-<script src="view.js?v=b29aebdfd0"></script>
-<script src="wind.js?v=b29aebdfd0"></script>
-<script src="jakt.js?v=b29aebdfd0"></script>
-<script src="app.js?v=b29aebdfd0"></script>
+<script src="i18n.js?v=812ec71836"></script>
+<script src="geo.js?v=812ec71836"></script>
+<script src="view.js?v=812ec71836"></script>
+<script src="wind.js?v=812ec71836"></script>
+<script src="jakt.js?v=812ec71836"></script>
+<script src="app.js?v=812ec71836"></script>
 
 </body>
 </html>

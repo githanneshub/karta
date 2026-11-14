@@ -136,6 +136,9 @@
     "Test from the hunting map": "Test från jaktkartan", "Notifications work on this phone.": "Aviseringarna fungerar på den här telefonen.",
     "Test sent. It should arrive in a few seconds.": "Test skickat. Det ska komma inom några sekunder.", "Couldn't reach ntfy. Check your connection.": "Nådde inte ntfy. Kolla anslutningen.",
     "Shots, \"need help\", \"animal near me\", sounds and chat messages buzz on your phone even when the map is closed, through the free ntfy app. Set it up once on each phone:": "Skott, \"behöver hjälp\", \"djur nära mig\", ljud och chattmeddelanden plingar i telefonen även när kartan är stängd, via gratisappen ntfy. Ställ in en gång på varje telefon:",
+    // sighting direction
+    "Which way it went": "Vilket håll djuret gick", "Add direction arrow": "Lägg till riktningspil", "Remove arrow": "Ta bort pil",
+    "Direction": "Riktning", "Drag to turn the arrow": "Dra för att vrida pilen",
     // chat
     "Chat": "Chatt", "Today": "Idag", "Yesterday": "Igår", "Send": "Skicka", "Message": "Meddelande", "Write to the family…": "Skriv till familjen…",
     "Chat messages buzz my phone (ntfy)": "Chattmeddelanden plingar i min telefon (ntfy)", "No messages yet. Write the first one.": "Inga meddelanden än. Skriv det första.",
@@ -234,6 +237,8 @@
   const RULES = [
     [/^(.+) on wet ground$/, (m, a) => `${tr(a)} på våtmark`],
     [/^faces ([A-Z]{1,3})$/, (m, a) => `mot ${C(a)}`],
+    [/^heading ([A-Z]{1,3})$/, (m, a) => `gick mot ${C(a)}`],
+    [/^Heading ([A-Z]{1,3})\. Drag the arrow tip on the map\.$/, (m, a) => `Mot ${C(a)}. Dra pilens spets på kartan.`],
     [/^([A-Z]{1,3}) · (\d+)°$/, (m, a, b) => `${C(a)} · ${b}°`],
     [/^From (\d+)° at ([\d.]+) m\/s(?:, gusts (\d+))?$/, (m, a, b, g) => `Från ${a}° i ${b} m/s` + (g ? `, byar ${g}` : "")],
     [/^visibility ([\d.]+ k?m)$/, (m, a) => `sikt ${a}`],
