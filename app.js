@@ -287,7 +287,7 @@
       layers: [{ id: "bg", type: "background", paint: { "background-color": "#dcd7c8" } }],
     },
     center: START.center, zoom: START.zoom, minZoom: 12, maxZoom: 19.5,
-    maxPitch: 75,
+    maxPitch: 0,   // flat map: no tilting; 3D mode raises it (set3D)
     attributionControl: false,   // sources are listed under Settings → Sources
   });
   if (/[?&](shot|test)=/.test(location.search)) window.__map = map;  // test hook for screenshot mode and tests
@@ -583,8 +583,13 @@
   function set3D(on, animate = true) {
     is3D = on;
     $("#tilt").setAttribute("aria-pressed", String(on));
-    if (on) { map.setTerrain({ source: "dem", exaggeration: prefs.exag }); if (animate) map.easeTo({ pitch: 62, duration: 900 }); }
-    else { map.setTerrain(null); if (animate) map.easeTo({ pitch: 0, duration: 600 }); }
+    // tilting is only allowed in 3D: the flat map stays flat whatever the fingers do
+    if (on) { map.setMaxPitch(75); map.setTerrain({ source: "dem", exaggeration: prefs.exag }); if (animate) map.easeTo({ pitch: 62, duration: 900 }); }
+    else {
+      map.setTerrain(null);
+      const flat = () => { if (!is3D) map.setMaxPitch(0); };
+      if (animate && map.getPitch() > 0) { map.easeTo({ pitch: 0, duration: 600 }); map.once("moveend", flat); } else flat();
+    }
     renderFlow();
   }
 
@@ -1654,20 +1659,15 @@
     Heading.on = true; Heading.seen = false; renderHud();
     setTimeout(() => { if (Heading.on && !Heading.seen) { if (!quiet) toast("This device has no compass."); disableHeading(false); } }, 3000);
   }
-  // Position turned on without a tap (app reopened): the iPhone only asks for the compass from a tap, so use the next one.
+  // At start: the compass is only asked for from a tap on the compass itself (no pop-up from tapping the map).
+  // Where no asking is needed, or the phone already said yes, it starts by itself: asking without a tap
+  // never shows a pop-up, it just fails when there is no answer yet.
   function armHeading() {
     if (Heading.on || Heading.pending) return;
     const D = window.DeviceOrientationEvent;
     if (!D) return;
     if (typeof D.requestPermission !== "function") { enableHeading(true); return; }
-    // keep trying on every tap until it works: iOS refuses the request after a drag or pinch (not a tap)
-    if (armHeading.go) return;
-    armHeading.go = (e) => {
-      if (e && e.target && e.target.closest && e.target.closest("#hudRose")) return;   // the compass asks by itself, with messages
-      if (Heading.on) { for (const n of ["touchend", "click"]) document.removeEventListener(n, armHeading.go, true); armHeading.go = null; return; }
-      enableHeading(true);
-    };
-    for (const n of ["touchend", "click"]) document.addEventListener(n, armHeading.go, true);
+    Promise.resolve().then(() => D.requestPermission()).then((r) => { if (r === "granted") enableHeading(true); }).catch(() => {});
   }
   const Follow = { on: false, warnedFar: false, touches: 0 };
   for (const ev of ["touchstart", "touchend", "touchcancel"]) {
@@ -1768,7 +1768,7 @@
     });
     buildHud();
     $("#hudRose").addEventListener("click", () => {
-      if (!Heading.on) enableHeading();   // a tap on the compass starts it, and says so if the phone refuses
+      if (!Heading.on) enableHeading();   // the only place the compass is asked for; says so if the phone refuses
       map.easeTo({ bearing: 0, pitch: is3D ? map.getPitch() : 0 });
     });
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
