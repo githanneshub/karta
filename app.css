@@ -305,6 +305,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .chat-form .btn { flex: none; }
 .chat-push { font-size: 13px; color: var(--muted); padding-bottom: 4px; }
 .share-card { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
+/* the same beam under your "Du" square: longer, since the square covers its root */
+.me.head-beam, .me.head-beam .me-beam { width: 170px; height: 170px; }
+.me.head-beam .me-beam { -webkit-mask: radial-gradient(circle, #000 0 30px, rgb(0 0 0 / .6) 55px, transparent 84px); mask: radial-gradient(circle, #000 0 30px, rgb(0 0 0 / .6) 55px, transparent 84px); }
 .switch.big { font-size: 17px; font-weight: 600; }
 .switch.big input { width: 22px; height: 22px; }
 /* the square sits exactly on the spot, the name hangs below it */

@@ -1608,6 +1608,22 @@
       meMarker.getElement().classList.toggle("has-heading", hasHead);
       if (hasHead) meMarker.setRotation(Heading.deg);
     }
+    renderHeadBeam();
+  }
+  // The way you face, as a blue beam under your own "Du" square (your OwnTracks position).
+  // Its own marker, so it stays visible when your square is merged into a stack with others.
+  let headMarker = null;
+  function renderHeadBeam() {
+    const ot = FAMILY && Family.meOt ? Family.meOt.getLngLat() : null;
+    const pos = ot ? [ot.lng, ot.lat] : null;
+    if (!(Heading.on && Heading.deg !== null && pos && !meMarker)) { if (headMarker) { headMarker.remove(); headMarker = null; } return; }
+    if (!headMarker) {
+      const el = document.createElement("div"); el.className = "me has-heading head-beam"; el.innerHTML = '<i class="me-beam"></i>';
+      headMarker = new maplibregl.Marker({ element: el, rotationAlignment: "map" }).setLngLat(pos).addTo(map);
+      const box = map.getCanvasContainer(), cv = map.getCanvas();   // put it under the people's squares
+      if (cv.parentNode === box) box.insertBefore(el, cv.nextSibling);
+    }
+    headMarker.setLngLat(pos).setRotation(Heading.deg);
   }
   function onOrientation(e) {
     let h = null;
@@ -1644,7 +1660,7 @@
     const D = window.DeviceOrientationEvent;
     if (!D) return;
     if (typeof D.requestPermission !== "function") { enableHeading(true); return; }
-    const go = () => { if (watchId !== null) enableHeading(true); };
+    const go = () => enableHeading(true);
     document.addEventListener("touchend", go, { once: true, capture: true });
   }
   const Follow = { on: false, warnedFar: false, touches: 0 };
@@ -2981,7 +2997,7 @@
         el.setAttribute("translate", "no");
         el.querySelector("span").textContent = "Du";
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
-      this.spread(); this.renderTrails();
+      this.spread(); this.renderTrails(); renderHeadBeam();
     },
     // ready for the hunt: OwnTracks sending (and in which mode), notifications tested, battery
     // only what needs fixing: a refused phone (and why), notifications not set up, a low battery;
@@ -3189,6 +3205,8 @@
   $("#appVersion").textContent = window.APP_VERSION || "dev";
   // no position button any more: your dot comes from OwnTracks
   if (prefs.gpsOn) { prefs.gpsOn = false; savePrefs(); }
+  // which way you face: the compass starts by itself (on an iPhone at the first tap, which it needs to ask for access)
+  armHeading();
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkForUpdate(); });
   if (FAMILY) { initFamilyUI(); Family.init(); } else Store.connect();
 })();
