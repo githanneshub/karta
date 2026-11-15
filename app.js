@@ -2709,6 +2709,14 @@
       $("#tab-chat").hidden = false; $(".tabs").classList.add("with-chat"); Chat.wire();
       const FB = window.FB || await new Promise((r) => window.addEventListener("fb-ready", () => r(window.FB), { once: true }));
       FB.onAuth((user) => this.onUser(user));
+      // back on screen after a while (phone locked, another app): fill in the track lines from while it slept
+      let hiddenAt = 0;
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") { hiddenAt = Date.now(); return; }
+        if (hiddenAt && Date.now() - hiddenAt > 10000 && this.ready) this.reseedTrails();
+        hiddenAt = 0;
+      });
+      window.addEventListener("pageshow", (e) => { if (e.persisted && this.ready) this.reseedTrails(); });
     },
     async onUser(user) {
       this.user = user;
@@ -2814,7 +2822,12 @@
       this.tracks.set(email, a);
     },
     // the minutes before the map was opened: each person's receiver keeps their recent points in map/poshist_<email>
-    // (read once per person, not listened to, since that record is big)
+    // (read once per person, not listened to, since that record is big). An iPhone web app isn't restarted but
+    // woken up when it is opened again, and it heard nothing while asleep: then it is read again for everyone.
+    reseedTrails() {
+      this.seeded.clear();
+      for (const v of (this.otBy || new Map()).values()) if (typeof v.lon === "number") this.seedTrail(v.email);
+    },
     seedTrail(email) {
       if (this.seeded.has(email)) return;
       this.seeded.add(email);
