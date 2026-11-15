@@ -1660,8 +1660,14 @@
     const D = window.DeviceOrientationEvent;
     if (!D) return;
     if (typeof D.requestPermission !== "function") { enableHeading(true); return; }
-    const go = () => enableHeading(true);
-    document.addEventListener("touchend", go, { once: true, capture: true });
+    // keep trying on every tap until it works: iOS refuses the request after a drag or pinch (not a tap)
+    if (armHeading.go) return;
+    armHeading.go = (e) => {
+      if (e && e.target && e.target.closest && e.target.closest("#hudRose")) return;   // the compass asks by itself, with messages
+      if (Heading.on) { for (const n of ["touchend", "click"]) document.removeEventListener(n, armHeading.go, true); armHeading.go = null; return; }
+      enableHeading(true);
+    };
+    for (const n of ["touchend", "click"]) document.addEventListener(n, armHeading.go, true);
   }
   const Follow = { on: false, warnedFar: false, touches: 0 };
   for (const ev of ["touchstart", "touchend", "touchcancel"]) {
@@ -1761,7 +1767,10 @@
       if (is3D) map.setTerrain({ source: "dem", exaggeration: prefs.exag });
     });
     buildHud();
-    $("#hudRose").addEventListener("click", () => map.easeTo({ bearing: 0, pitch: is3D ? map.getPitch() : 0 }));
+    $("#hudRose").addEventListener("click", () => {
+      if (!Heading.on) enableHeading();   // a tap on the compass starts it, and says so if the phone refuses
+      map.easeTo({ bearing: 0, pitch: is3D ? map.getPitch() : 0 });
+    });
     $("#hudWindText").addEventListener("click", () => showTab("wind", true));
     // moving the map by hand ends follow mode
     map.on("rotate", renderHud);
