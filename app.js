@@ -2778,7 +2778,7 @@
           if (v.src === "owntracks" && v.email) this.otBy.set(v.email, v);
           if (!cur || t > cur.t) best.set(k, { id: d.id, v, t });
         }
-        for (const v of this.otBy.values()) if (typeof v.lon === "number") { this.addPoint(v.email, [v.lon, v.lat], this.posTime(v), v.acc); this.seedTrail(v.email); }
+        for (const v of this.otBy.values()) if (typeof v.lon === "number") { this.noteGap(v.email, this.posTime(v)); this.addPoint(v.email, [v.lon, v.lat], this.posTime(v), v.acc); this.seedTrail(v.email); }
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
@@ -2831,6 +2831,19 @@
     seedTrail(email) {
       if (this.seeded.has(email)) return;
       this.seeded.add(email);
+      this.fetchTrail(email);
+    },
+    // A phone that was locked sends what it saved up in a quick burst, and the live listener may only hand us the
+    // newest of those. So a position that comes after a gap means points are missing: read the history again,
+    // a few seconds later so the whole burst is in.
+    noteGap(email, t) {
+      const a = this.tracks.get(email) || [], last = a.length ? a[a.length - 1].t : 0;
+      if (!this.seeded.has(email) || t <= last || t - last < 100000) return;
+      this.gapTimers = this.gapTimers || new Map();
+      clearTimeout(this.gapTimers.get(email));
+      this.gapTimers.set(email, setTimeout(() => { this.gapTimers.delete(email); this.fetchTrail(email); }, 5000));
+    },
+    fetchTrail(email) {
       window.FB.db.doc("map/poshist_" + email.replace(/[^a-z0-9]/g, "_")).get().then((d) => {
         const h = d && d.exists && d.data().hist;
         if (!Array.isArray(h)) return;
