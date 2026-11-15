@@ -495,6 +495,17 @@
         "circle-color": ["case", ["get", "sel"], "#df5a12", "#fff"], "circle-stroke-color": "#df5a12", "circle-stroke-width": 2.5 } });
     // my position
     map.addLayer({ id: "me-acc", type: "fill", source: "me", paint: { "fill-color": "#1d7cf2", "fill-opacity": .12 } });
+    // family members' track lines for the last few minutes (Family.renderTrails): white edge, colour, dots
+    map.addSource("ptrails", { type: "geojson", data: FC() });
+    const ptLine = ["==", ["geometry-type"], "LineString"], ptDot = ["==", ["geometry-type"], "Point"];
+    map.addLayer({ id: "ptrails-case", type: "line", source: "ptrails", filter: ptLine, layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": "#fff", "line-width": 6, "line-opacity": ["*", 0.85, ["get", "op"]] } });
+    map.addLayer({ id: "ptrails", type: "line", source: "ptrails", filter: ptLine, layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": ["get", "color"], "line-width": 3, "line-opacity": ["get", "op"] } });
+    map.addLayer({ id: "ptrails-dot", type: "circle", source: "ptrails", filter: ptDot,
+      paint: { "circle-radius": 3.5, "circle-color": ["get", "color"], "circle-stroke-color": "#fff", "circle-stroke-width": 1.5,
+        "circle-opacity": ["get", "op"], "circle-stroke-opacity": ["get", "op"] } });
+    if (FAMILY) Family.renderTrails();
 
     // data
     addImageSet(prefs.base, "anchor-base");
@@ -2615,10 +2626,13 @@
   const C_SV = { N: "N", NNE: "NNÖ", NE: "NÖ", ENE: "ÖNÖ", E: "Ö", ESE: "ÖSÖ", SE: "SÖ", SSE: "SSÖ", S: "S", SSW: "SSV", SW: "SV",
     WSW: "VSV", W: "V", WNW: "VNV", NW: "NV", NNW: "NNV" };
   const otMode = (v) => (v && typeof v.mode === "number" && OT_MODES[v.mode] ? ` (${OT_MODES[v.mode]})` : "");
+  // a person on the map: letter square and name
+  const TRAIL_MIN = 5;   // minutes of track line behind someone who walks
+  const FAM_MARKER_HTML = `<b translate="no"></b><span></span>`;
   const FAMILY_COLORS = ["#1d7cf2", "#d6336c", "#2b8a3e", "#f08c00", "#7048e8", "#0c8599", "#c2255c", "#5c940d"];
   const Family = {
     ready: false, user: null, member: null, members: [], positions: new Map(),
-    markers: new Map(), looks: {}, editing: null,
+    markers: new Map(), stacks: new Map(), looks: {}, editing: null,
 
     colorFor(email) {  // chosen colour, else distinct colours in a stable order (by email) for everyone on the list
       const look = this.looks[email];
@@ -2731,6 +2745,7 @@
           if (v.src === "owntracks" && v.email) this.otBy.set(v.email, v);
           if (!cur || t > cur.t) best.set(k, { id: d.id, v, t });
         }
+        for (const v of this.otBy.values()) if (typeof v.lon === "number") { this.addPoint(v.email, [v.lon, v.lat], this.posTime(v), v.acc); this.seedTrail(v.email); }
         // my own entry is keyed by my uid so the map never draws me as someone else
         this.positions = new Map([...best.values()].map(({ id, v }) => [v.email === me ? this.user.uid : id, v]));
         this.render();
@@ -2746,6 +2761,7 @@
         this.render(); renderAll();
       }, () => {});
       setInterval(() => { this.render(); Hunt.render(); }, 30000);   // ages, fading dots, blinking pins, who is at their stand
+      map.on("move", () => this.schedSpread());   // people on the same spot: regroup as the map zooms
       // Positions reach the family only through OwnTracks. The map's own GPS (the position button) only shows
       // you your dot and which way you face. A phone that shared from the map before stops (its old dot fades).
       if (prefs.share) {
@@ -2759,6 +2775,107 @@
       this.lastFix = now; this.render(); Hunt.checkSafety();
     },
     posTime(v) { return (v.t && v.t.toMillis ? v.t.toMillis() : 0) || v.tc || 0; },
+    // ---- trails: where each person has walked in the last few minutes, as a fading track line ----
+    // OwnTracks sends a position about once a minute while someone walks (only after 15 m of movement) and nothing
+    // while they sit still. So a line means "moving now or a moment ago" and no line means "standing still": points
+    // drop off after TRAIL_MIN minutes, so the line shrinks away once they stop. GPS drift while sitting (fixes that
+    // jump to and fro) isn't drawn: the line needs its ends at least 25 m apart and well beyond the GPS error.
+    tracks: new Map(), seeded: new Set(),
+    addPoint(email, ll, t, acc) {
+      if (!email || !t || !Array.isArray(ll) || typeof ll[0] !== "number") return;
+      // (the history keeps whole seconds, the position milliseconds: the same fix counts once)
+      const a = (this.tracks.get(email) || []).filter((p) => p.t > Date.now() - TRAIL_MIN * 60000 && Math.abs(p.t - t) >= 1500);
+      a.push({ ll, t, acc: acc || 0 }); a.sort((x, y) => x.t - y.t);
+      this.tracks.set(email, a);
+    },
+    // the minutes before the map was opened: each person's receiver keeps their recent points in map/poshist_<email>
+    // (read once per person, not listened to, since that record is big)
+    seedTrail(email) {
+      if (this.seeded.has(email)) return;
+      this.seeded.add(email);
+      window.FB.db.doc("map/poshist_" + email.replace(/[^a-z0-9]/g, "_")).get().then((d) => {
+        const h = d && d.exists && d.data().hist;
+        if (!Array.isArray(h)) return;
+        for (let i = 0; i + 2 < h.length; i += 3) if (h[i + 2] * 1000 > Date.now() - TRAIL_MIN * 60000) this.addPoint(email, [h[i], h[i + 1]], h[i + 2] * 1000, 0);
+        this.renderTrails();
+      }).catch(() => {});
+    },
+    // The points to draw for one person, or null when they're standing still. Moving means the first and last
+    // point are at least 25 m apart (and twice the GPS error), and the way between them is fairly straight: drift
+    // zig-zags round one spot, so its path is much longer than the distance it ends up from where it started.
+    trailOf(email) {
+      const a = (this.tracks.get(email) || []).filter((p) => p.t > Date.now() - TRAIL_MIN * 60000);
+      if (a.length < 2) return null;
+      const acc = Math.max(...a.map((p) => p.acc)), net = Geo.distance(a[0].ll, a[a.length - 1].ll);
+      let path = 0; for (let i = 1; i < a.length; i++) path += Geo.distance(a[i - 1].ll, a[i].ll);
+      return net >= Math.max(25, 2 * acc) && net >= 0.5 * path ? a : null;
+    },
+    renderTrails() {
+      const src = map.getSource("ptrails");
+      if (!src || !this.user) return;
+      const f = [], now = Date.now(), span = TRAIL_MIN * 60000;
+      // newest end strong, oldest end faint
+      const op = (t) => Math.max(0.15, Math.min(1, 1 - (now - t) / span));
+      for (const [email] of this.tracks) {
+        const a = this.trailOf(email);
+        if (!a) continue;
+        const color = this.colorFor(email);
+        for (let i = 1; i < a.length; i++)
+          f.push({ type: "Feature", properties: { color, op: op(a[i - 1].t) }, geometry: { type: "LineString", coordinates: [a[i - 1].ll, a[i].ll] } });
+        for (let i = 0; i < a.length - 1; i++)   // the newest point is under their square
+          f.push({ type: "Feature", properties: { color, op: op(a[i].t) }, geometry: { type: "Point", coordinates: a[i].ll } });
+      }
+      src.setData(FC(f));
+    },
+    schedSpread() { if (!this.spreadRaf) this.spreadRaf = requestAnimationFrame(() => this.spread()); },
+    // People on the same spot would hide under each other. Markers closer than GAP pixels on the screen become one
+    // stack: their squares piled up, a red count, and their names on one line. Tapping it lists who's there.
+    spread() {
+      cancelAnimationFrame(this.spreadRaf); this.spreadRaf = 0;
+      const GAP = 34, list = [...this.markers.values()];
+      if (this.meOt) list.push(this.meOt);
+      const pts = list.map((m) => map.project(m.getLngLat()));
+      const par = list.map((_, i) => i), find = (i) => (par[i] === i ? i : (par[i] = find(par[i])));
+      for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++)
+        if (Math.hypot(pts[i].x - pts[j].x, pts[i].y - pts[j].y) < GAP) par[find(i)] = find(j);
+      const groups = new Map();
+      list.forEach((_, i) => { const r = find(i); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(list[i]); });
+      const used = new Set();
+      for (const g of groups.values()) {
+        for (const m of g) m.getElement().style.visibility = g.length > 1 ? "hidden" : "";
+        if (g.length < 2) continue;
+        g.sort((a, b) => String(a._name).localeCompare(String(b._name), "sv"));
+        const key = g.map((m) => m._email).join("|");
+        used.add(key);
+        let s = this.stacks.get(key);
+        if (!s) {
+          const el = document.createElement("div"); el.className = "fam-stack"; el.setAttribute("translate", "no");
+          el.addEventListener("click", (e) => { e.stopPropagation(); this.openStack(key); });
+          s = new maplibregl.Marker({ element: el }).setLngLat([0, 0]).addTo(map);
+          this.stacks.set(key, s);
+        }
+        s._members = g;
+        const lon = g.reduce((t, m) => t + m.getLngLat().lng, 0) / g.length, lat = g.reduce((t, m) => t + m.getLngLat().lat, 0) / g.length;
+        s.setLngLat([lon, lat]);
+        const names = g.map((m) => m._name), shown = names.length > 3 ? names.slice(0, 2).join(", ") + ` +${names.length - 2}` : names.join(", ");
+        const pile = g.slice(0, 3);
+        const html = `<i class="stack-pile">${pile.map((m, i) => `<b style="--c:${m._color};--i:${pile.length - 1 - i}">${esc(m._letter)}</b>`).join("")}</i>` +
+          `<em>${g.length}</em><span>${esc(shown)}</span>`;
+        if (s._html !== html) { s.getElement().innerHTML = html; s._html = html; }
+        s.getElement().classList.toggle("stale", g.every((m) => m.getElement().classList.contains("stale")));
+      }
+      for (const [k, s] of this.stacks) if (!used.has(k)) { s.remove(); this.stacks.delete(k); }
+    },
+    // tap on a stack: a list of who's there (and how fresh each position is), and zoom in a step
+    openStack(key) {
+      const s = this.stacks.get(key);
+      if (!s) return;
+      const rows = s._members.map((m) => `<li><b style="background:${m._color}" translate="no">${esc(m._letter)}</b><span>${esc(m._name)}</span>` +
+        `<small>${esc(m._when || "")}</small></li>`).join("");
+      new maplibregl.Popup({ closeButton: false, offset: 24 }).setLngLat(s.getLngLat())
+        .setHTML(`<div class="pop"><b>${s._members.length} här</b><ul class="stack-list">${rows}</ul></div>`).addTo(map);
+      map.easeTo({ center: s.getLngLat(), zoom: Math.min(Math.max(map.getZoom() + 1.5, 17), 20) });
+    },
     // Is this person's position current? The map sends every few seconds while open, so a few minutes of silence
     // means it's closed. OwnTracks only sends after 15 m of movement, so silence means "sitting still": its
     // positions count as current for 2 hours (unless the battery is about to die).
@@ -2817,7 +2934,7 @@
         let m = this.markers.get(uid);
         if (!m) {
           const el = document.createElement("div"); el.className = "fam-marker";
-          el.innerHTML = `<b translate="no"></b><span></span>`;
+          el.innerHTML = FAM_MARKER_HTML;
           el.addEventListener("click", (e) => {
             e.stopPropagation();
             const cur = this.positions.get(uid) || v;
@@ -2830,6 +2947,7 @@
           this.markers.set(uid, m);
         }
         m.setLngLat([v.lon, v.lat]);
+        m._email = v.email; m._name = this.nameFor(v.email, v.name); m._color = this.colorFor(v.email); m._letter = this.letterFor(v.email, v.name);
         const el = m.getElement(), live = this.isCurrent(v, 10);
         const low = typeof v.batt === "number" && v.batt <= 15;
         el.style.setProperty("--c", this.colorFor(v.email));
@@ -2837,7 +2955,8 @@
         el.querySelector("b").textContent = this.letterFor(v.email, v.name);
         el.setAttribute("translate", "no");
         // name only (battery is shown in Familj, not on the map)
-        el.querySelector("span").textContent = `${this.nameFor(v.email, v.name)}${live ? "" : ` · ${age < 60 ? age + " min" : age < 48 * 60 ? Math.round(age / 60) + " h" : Math.round(age / 1440) + " dagar"} sedan`}`;
+        m._when = live ? "" : `${age < 60 ? age + " min" : age < 48 * 60 ? Math.round(age / 60) + " h" : Math.round(age / 1440) + " dagar"} sedan`;
+        el.querySelector("span").textContent = `${this.nameFor(v.email, v.name)}${m._when ? " · " + m._when : ""}`;
         // warn once per person and day when their phone is about to die in the forest
         if (low && live) {
           const key = `${v.email}|${new Date().toDateString()}`;
@@ -2850,16 +2969,19 @@
       if (ot) {
         if (!this.meOt) {
           const el = document.createElement("div"); el.className = "fam-marker me-ot";
-          el.innerHTML = `<b translate="no"></b><span></span>`;
+          el.innerHTML = FAM_MARKER_HTML;
           this.meOt = new maplibregl.Marker({ element: el }).setLngLat([ot.lon, ot.lat]).addTo(map);
         }
         this.meOt.setLngLat([ot.lon, ot.lat]);
+        this.meOt._email = ot.email; this.meOt._name = "Du"; this.meOt._when = "";
         const el = this.meOt.getElement(), me = this.user.email.toLowerCase();
+        this.meOt._color = this.colorFor(me); this.meOt._letter = this.letterFor(me, this.member && this.member.name);
         el.style.setProperty("--c", this.colorFor(me));
         el.querySelector("b").textContent = this.letterFor(me, this.member && this.member.name);
         el.setAttribute("translate", "no");
         el.querySelector("span").textContent = "Du";
       } else if (this.meOt) { this.meOt.remove(); this.meOt = null; }
+      this.spread(); this.renderTrails();
     },
     // ready for the hunt: OwnTracks sending (and in which mode), notifications tested, battery
     // only what needs fixing: a refused phone (and why), notifications not set up, a low battery;

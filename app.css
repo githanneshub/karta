@@ -307,13 +307,26 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin: 2px 0 4p
 .share-card { margin-top: 12px; padding: 12px; border-radius: 10px; background: var(--raise); border: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
 .switch.big { font-size: 17px; font-weight: 600; }
 .switch.big input { width: 22px; height: 22px; }
-.fam-marker { display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+/* the square sits exactly on the spot, the name hangs below it */
+.fam-marker { cursor: pointer; }   /* (MapLibre makes it position: absolute, the box for the name below) */
 /* people are rounded squares, so they never look like the round sightings, stands or shots */
-.fam-marker b { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--c, #1d7cf2); color: #fff;
+.fam-marker b, .stack-pile b { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; background: var(--c, #1d7cf2); color: #fff;
   font: 700 14px var(--f-ui); border: 3px solid #fff; box-shadow: 0 0 0 5px color-mix(in srgb, var(--c, #1d7cf2) 30%, transparent), 0 2px 6px rgb(0 0 0 / .4); }
-.fam-marker span { margin-top: 3px; font: 600 12px var(--f-ui); color: #1c231b; background: rgb(255 255 255 / .92); padding: 0 6px; border-radius: 4px; white-space: nowrap; }
-.fam-marker.stale { opacity: .55; }
+.fam-marker span, .fam-stack span { position: absolute; top: calc(100% + 3px); left: 50%; transform: translateX(-50%);
+  font: 600 12px var(--f-ui); color: #1c231b; background: rgb(255 255 255 / .92); padding: 0 6px; border-radius: 4px; white-space: nowrap; }
+.fam-marker.stale, .fam-stack.stale { opacity: .55; }
 .fam-marker.stale b { box-shadow: 0 2px 6px rgb(0 0 0 / .4); }
+/* several people on one spot: their squares piled up (front one on the spot), a red count, all names on one line */
+.fam-stack { width: 26px; height: 26px; cursor: pointer; }
+.stack-pile { position: absolute; inset: 0; }
+.stack-pile b { position: absolute; left: calc(var(--i) * -5px); top: calc(var(--i) * -5px); box-shadow: 0 1px 4px rgb(0 0 0 / .45); }
+.fam-stack em { position: absolute; top: -13px; right: -13px; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; box-sizing: border-box;
+  display: grid; place-items: center; background: #d0332b; color: #fff; font: 700 12px var(--f-ui); font-style: normal; border: 2px solid #fff; box-shadow: 0 1px 3px rgb(0 0 0 / .4); }
+.stack-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
+.stack-list li { display: flex; align-items: center; gap: 8px; }
+.stack-list li b { width: 20px; height: 20px; border-radius: 5px; display: grid; place-items: center; color: #fff; font: 700 11px var(--f-ui); flex: none; }
+.stack-list li span { flex: 1; }
+.stack-list li small { color: #666; }
 .gate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; background: var(--bg); overflow-y: auto;
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
 .gate-card { width: min(380px, 100%); display: flex; flex-direction: column; gap: 14px; }
