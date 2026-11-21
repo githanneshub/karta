@@ -2152,7 +2152,6 @@
       const e = this.events.find((x) => x.id === id);
       if (!e) { this.showId = id; return; }   // not loaded yet: shown when it arrives
       this.showId = null;
-      dropParam("ev");   // shown once: a later reload shouldn't fly back to it
       if (typeof e.lon === "number") map.flyTo({ center: [e.lon, e.lat], zoom: Math.max(map.getZoom(), 16) });
       if (isPhone()) setSheet("peek");
     },
@@ -2724,19 +2723,14 @@
       if (!user) { this.ready = false; this.gate("signin"); return; }
       if (!user.emailVerified) { this.gate("verify"); return; }
       const email = user.email.toLowerCase(), ref = window.FB.db.doc(`members/${email}`);
-      let m = null, failed = null;
-      try { const d = await ref.get(); m = d.exists ? d.data() : null; } catch (e) { failed = e; }
-      if (!m && !failed) {
-        // The owner (named in the security rules) creates their own entry on first sign-in; anyone else is refused
-        // the read itself. A read that failed for another reason (no signal) must not overwrite an entry.
+      let m = null;
+      try { const d = await ref.get(); m = d.exists ? d.data() : null; } catch { m = null; }
+      if (!m) {
+        // The owner (named in the security rules) creates their own entry on first sign-in; anyone else is refused.
         try { await ref.set({ name: user.displayName || email.split("@")[0], role: "owner", added: window.FB.serverTimestamp() }); m = (await ref.get()).data(); }
         catch { m = null; }
       }
-      if (!m) {
-        this.gate("noaccess");
-        if (failed && failed.code !== "permission-denied") $("#gate-msg").textContent = "No connection. Try again when you have signal.";
-        return;
-      }
+      if (!m) { this.gate("noaccess"); return; }
       this.member = m;
       $("#gate").hidden = true;
       if (!this.ready) { this.start(); this.offerBoundary(); window.addEventListener("hashchange", () => this.offerBoundary()); }
@@ -3194,11 +3188,6 @@
   // ---------- boot ----------
   // ?shot=1 is a development switch for headless screenshots: in-memory sample data, no saving.
   const QS = new URLSearchParams(location.search);
-  function dropParam(name) {
-    const q = new URLSearchParams(location.search); if (!q.has(name)) return;
-    q.delete(name); const s = String(q);
-    history.replaceState(null, "", location.pathname + (s ? "?" + s : "") + location.hash);
-  }
   if (QS.has("shot")) {
     document.documentElement.classList.add("shot");
     Store.saveLocal = () => {};
@@ -3243,9 +3232,7 @@
       let last = 0;
       try { last = +(localStorage.getItem("alnaryd-update-try") || 0); localStorage.setItem("alnaryd-update-try", String(Date.now())); } catch { /* ignore */ }
       if (Date.now() - last < 120000) return;
-      // keep #grans=… and ?ev= / ?chat=1 (opened from a notification) through the reload
-      const q = new URLSearchParams(location.search); q.set("v", v); q.set("r", String(Date.now()));
-      location.replace(location.pathname + "?" + q + location.hash);
+      location.replace(location.pathname + "?v=" + v + "&r=" + Date.now() + location.hash);   // keep #grans=… through the reload
     } catch { /* offline: keep running this version */ }
   }
   checkForUpdate();
